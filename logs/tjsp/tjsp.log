@@ -1,0 +1,768 @@
+INFO:root:[+] Starting TJSP crawler...
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+INFO:root:[+] Starting TJSP crawler...
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 15 seconds and handled 0 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "tjsp_crawler.py", line 84, in <module>
+    driver.find_element_by_id('pbEntrar').click()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webelement.py", line 80, in click
+    self._execute(Command.CLICK_ELEMENT)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webelement.py", line 633, in _execute
+    return self._parent.execute(command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 319, in execute
+    response = self.command_executor.execute(driver_command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 374, in execute
+    return self._request(command_info[0], url, body=data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 397, in _request
+    resp = self._conn.request(method, url, body=body, headers=headers)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 79, in request
+    return self.request_encode_body(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 171, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/poolmanager.py", line 336, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 670, in urlopen
+    httplib_response = self._make_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 426, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 421, in _make_request
+    httplib_response = conn.getresponse()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 1332, in getresponse
+    response.begin()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 303, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 264, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8c5c12d3a0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/d21a9300bb78b495caf893116a86d161
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8c5c12d520>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/d21a9300bb78b495caf893116a86d161
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8c5c12d670>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/d21a9300bb78b495caf893116a86d161
+INFO:root:[+] Starting TJSP crawler...
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 7 seconds and handled 0 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "tjsp_crawler.py", line 77, in <module>
+    driver.get(('https://esaj.tjsp.jus.br/sajcas/login?service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fj_spring_cas_security_check'))
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 333, in get
+    self.execute(Command.GET, {'url': url})
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 319, in execute
+    response = self.command_executor.execute(driver_command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 374, in execute
+    return self._request(command_info[0], url, body=data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 397, in _request
+    resp = self._conn.request(method, url, body=body, headers=headers)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 79, in request
+    return self.request_encode_body(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 171, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/poolmanager.py", line 336, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 670, in urlopen
+    httplib_response = self._make_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 426, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 421, in _make_request
+    httplib_response = conn.getresponse()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 1332, in getresponse
+    response.begin()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 303, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 264, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f875312d370>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/f78eac4a12193665a3699dd45f550789
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f875312d4f0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/f78eac4a12193665a3699dd45f550789
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f875312d640>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/f78eac4a12193665a3699dd45f550789
+INFO:root:[+] Starting TJSP crawler...
+INFO:root:[+] OK - TJSP Crawler initialized
+INFO:root:The loading image is gone.... we can continue
+INFO:root:found the results, we can parse and go to next page
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529624&cdForo=0 into 14529624.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529621&cdForo=0 into 14529621.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529623&cdForo=0 into 14529623.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529620&cdForo=0 into 14529620.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529614&cdForo=0 into 14529614.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529604&cdForo=0 into 14529604.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529622&cdForo=0 into 14529622.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529619&cdForo=0 into 14529619.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529618&cdForo=0 into 14529618.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529617&cdForo=0 into 14529617.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529613&cdForo=0 into 14529613.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529612&cdForo=0 into 14529612.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529611&cdForo=0 into 14529611.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529609&cdForo=0 into 14529609.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529608&cdForo=0 into 14529608.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529607&cdForo=0 into 14529607.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529606&cdForo=0 into 14529606.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529610&cdForo=0 into 14529610.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529616&cdForo=0 into 14529616.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529615&cdForo=0 into 14529615.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529605&cdForo=0 into 14529605.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529587&cdForo=0 into 14529587.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529584&cdForo=0 into 14529584.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529581&cdForo=0 into 14529581.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529571&cdForo=0 into 14529571.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529543&cdForo=0 into 14529543.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529588&cdForo=0 into 14529588.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529586&cdForo=0 into 14529586.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529585&cdForo=0 into 14529585.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529583&cdForo=0 into 14529583.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529551&cdForo=0 into 14529551.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529573&cdForo=0 into 14529573.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529576&cdForo=0 into 14529576.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529566&cdForo=0 into 14529566.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529564&cdForo=0 into 14529564.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529558&cdForo=0 into 14529558.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529550&cdForo=0 into 14529550.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529552&cdForo=0 into 14529552.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529557&cdForo=0 into 14529557.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529560&cdForo=0 into 14529560.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529554&cdForo=0 into 14529554.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529582&cdForo=0 into 14529582.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529589&cdForo=0 into 14529589.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529548&cdForo=0 into 14529548.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529556&cdForo=0 into 14529556.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529553&cdForo=0 into 14529553.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529580&cdForo=0 into 14529580.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529572&cdForo=0 into 14529572.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529561&cdForo=0 into 14529561.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529546&cdForo=0 into 14529546.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529579&cdForo=0 into 14529579.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529590&cdForo=0 into 14529590.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529568&cdForo=0 into 14529568.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529570&cdForo=0 into 14529570.pdf
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529545&cdForo=0 into 14529545.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529567&cdForo=0 into 14529567.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529541&cdForo=0 into 14529541.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529574&cdForo=0 into 14529574.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529562&cdForo=0 into 14529562.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529547&cdForo=0 into 14529547.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529577&cdForo=0 into 14529577.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529565&cdForo=0 into 14529565.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529569&cdForo=0 into 14529569.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529575&cdForo=0 into 14529575.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529563&cdForo=0 into 14529563.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529559&cdForo=0 into 14529559.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529549&cdForo=0 into 14529549.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529544&cdForo=0 into 14529544.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529542&cdForo=0 into 14529542.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529555&cdForo=0 into 14529555.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529578&cdForo=0 into 14529578.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529537&cdForo=0 into 14529537.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529450&cdForo=0 into 14529450.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529439&cdForo=0 into 14529439.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529453&cdForo=0 into 14529453.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529451&cdForo=0 into 14529451.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529455&cdForo=0 into 14529455.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529447&cdForo=0 into 14529447.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529436&cdForo=0 into 14529436.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529452&cdForo=0 into 14529452.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529454&cdForo=0 into 14529454.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529443&cdForo=0 into 14529443.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529435&cdForo=0 into 14529435.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529448&cdForo=0 into 14529448.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529437&cdForo=0 into 14529437.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529449&cdForo=0 into 14529449.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529438&cdForo=0 into 14529438.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529441&cdForo=0 into 14529441.pdf
+ERROR:root:[-] Got a timeout trying to download a PDF. Backing off for five seconds and trying again
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529433&cdForo=0 into 14529433.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529442&cdForo=0 into 14529442.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529434&cdForo=0 into 14529434.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529440&cdForo=0 into 14529440.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529432&cdForo=0 into 14529432.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529508&cdForo=0 into 14529508.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529506&cdForo=0 into 14529506.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529505&cdForo=0 into 14529505.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529504&cdForo=0 into 14529504.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529501&cdForo=0 into 14529501.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529500&cdForo=0 into 14529500.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529499&cdForo=0 into 14529499.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529498&cdForo=0 into 14529498.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529485&cdForo=0 into 14529485.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529480&cdForo=0 into 14529480.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529516&cdForo=0 into 14529516.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529507&cdForo=0 into 14529507.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529503&cdForo=0 into 14529503.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529502&cdForo=0 into 14529502.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529494&cdForo=0 into 14529494.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529493&cdForo=0 into 14529493.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529492&cdForo=0 into 14529492.pdf
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529491&cdForo=0 into 14529491.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529486&cdForo=0 into 14529486.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529418&cdForo=0 into 14529418.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529419&cdForo=0 into 14529419.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529510&cdForo=0 into 14529510.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529509&cdForo=0 into 14529509.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529496&cdForo=0 into 14529496.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529495&cdForo=0 into 14529495.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529475&cdForo=0 into 14529475.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529474&cdForo=0 into 14529474.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529473&cdForo=0 into 14529473.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529472&cdForo=0 into 14529472.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529467&cdForo=0 into 14529467.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529466&cdForo=0 into 14529466.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529521&cdForo=0 into 14529521.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529520&cdForo=0 into 14529520.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529427&cdForo=0 into 14529427.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529425&cdForo=0 into 14529425.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529424&cdForo=0 into 14529424.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529519&cdForo=0 into 14529519.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529518&cdForo=0 into 14529518.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529489&cdForo=0 into 14529489.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529497&cdForo=0 into 14529497.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529490&cdForo=0 into 14529490.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529488&cdForo=0 into 14529488.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529487&cdForo=0 into 14529487.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529484&cdForo=0 into 14529484.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529471&cdForo=0 into 14529471.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529470&cdForo=0 into 14529470.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529469&cdForo=0 into 14529469.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529468&cdForo=0 into 14529468.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529426&cdForo=0 into 14529426.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529421&cdForo=0 into 14529421.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529420&cdForo=0 into 14529420.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529423&cdForo=0 into 14529423.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529422&cdForo=0 into 14529422.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529517&cdForo=0 into 14529517.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529515&cdForo=0 into 14529515.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529514&cdForo=0 into 14529514.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529513&cdForo=0 into 14529513.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529512&cdForo=0 into 14529512.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529511&cdForo=0 into 14529511.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529483&cdForo=0 into 14529483.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529482&cdForo=0 into 14529482.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529481&cdForo=0 into 14529481.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529479&cdForo=0 into 14529479.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529478&cdForo=0 into 14529478.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529477&cdForo=0 into 14529477.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529476&cdForo=0 into 14529476.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529465&cdForo=0 into 14529465.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529462&cdForo=0 into 14529462.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529461&cdForo=0 into 14529461.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529431&cdForo=0 into 14529431.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529460&cdForo=0 into 14529460.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529446&cdForo=0 into 14529446.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529445&cdForo=0 into 14529445.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529430&cdForo=0 into 14529430.pdf
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529464&cdForo=0 into 14529464.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529459&cdForo=0 into 14529459.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529456&cdForo=0 into 14529456.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529428&cdForo=0 into 14529428.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529463&cdForo=0 into 14529463.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529458&cdForo=0 into 14529458.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529457&cdForo=0 into 14529457.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529444&cdForo=0 into 14529444.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529429&cdForo=0 into 14529429.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529171&cdForo=0 into 14529171.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529394&cdForo=0 into 14529394.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529383&cdForo=0 into 14529383.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529334&cdForo=0 into 14529334.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529308&cdForo=0 into 14529308.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529306&cdForo=0 into 14529306.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529294&cdForo=0 into 14529294.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529286&cdForo=0 into 14529286.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529282&cdForo=0 into 14529282.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529280&cdForo=0 into 14529280.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529279&cdForo=0 into 14529279.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529270&cdForo=0 into 14529270.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529267&cdForo=0 into 14529267.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529266&cdForo=0 into 14529266.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529233&cdForo=0 into 14529233.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529221&cdForo=0 into 14529221.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529208&cdForo=0 into 14529208.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529203&cdForo=0 into 14529203.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529165&cdForo=0 into 14529165.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529247&cdForo=0 into 14529247.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529380&cdForo=0 into 14529380.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529246&cdForo=0 into 14529246.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529379&cdForo=0 into 14529379.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529358&cdForo=0 into 14529358.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529218&cdForo=0 into 14529218.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529357&cdForo=0 into 14529357.pdf
+ERROR:root:[-] Got a timeout trying to download a PDF. Backing off for five seconds and trying again
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 237 seconds and handled 200 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "./tjsp_crawler.py", line 295, in <module>
+    r = s.get(pdf_url, timeout=1)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/requests/sessions.py", line 543, in get
+    return self.request('GET', url, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/requests/sessions.py", line 530, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/requests/sessions.py", line 685, in send
+    r.content
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/requests/models.py", line 829, in content
+    self._content = b''.join(self.iter_content(CONTENT_CHUNK_SIZE)) or b''
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/requests/models.py", line 751, in generate
+    for chunk in self.raw.stream(chunk_size, decode_content=True):
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/response.py", line 576, in stream
+    data = self.read(amt=amt, decode_content=decode_content)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/response.py", line 519, in read
+    data = self._fp.read(amt) if not fp_closed else b""
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 454, in read
+    n = self.readinto(b)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 498, in readinto
+    n = self.fp.readinto(b)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/ssl.py", line 1241, in recv_into
+    return self.read(nbytes, buffer)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/ssl.py", line 1099, in read
+    return self._sslobj.read(len, buffer)
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "./tjsp_crawler.py", line 302, in <module>
+    time.sleep(5)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ff4e291b2e0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/1b8aa01112a0562da29b7c96f9555190
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ff4e4971c10>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/1b8aa01112a0562da29b7c96f9555190
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ff4e4971df0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/1b8aa01112a0562da29b7c96f9555190
+INFO:root:[+] Starting TJSP crawler...
+INFO:root:[+] OK - TJSP Crawler initialized
+INFO:root:The loading image is gone.... we can continue
+INFO:root:found the results, we can parse and go to next page
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529624&cdForo=0 into 14529624.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529621&cdForo=0 into 14529621.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529623&cdForo=0 into 14529623.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529620&cdForo=0 into 14529620.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529614&cdForo=0 into 14529614.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529604&cdForo=0 into 14529604.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529622&cdForo=0 into 14529622.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529619&cdForo=0 into 14529619.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529618&cdForo=0 into 14529618.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529617&cdForo=0 into 14529617.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529613&cdForo=0 into 14529613.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529612&cdForo=0 into 14529612.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529611&cdForo=0 into 14529611.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529609&cdForo=0 into 14529609.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529608&cdForo=0 into 14529608.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529607&cdForo=0 into 14529607.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529606&cdForo=0 into 14529606.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529610&cdForo=0 into 14529610.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529616&cdForo=0 into 14529616.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529615&cdForo=0 into 14529615.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529605&cdForo=0 into 14529605.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529587&cdForo=0 into 14529587.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529584&cdForo=0 into 14529584.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529581&cdForo=0 into 14529581.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529571&cdForo=0 into 14529571.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529543&cdForo=0 into 14529543.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529588&cdForo=0 into 14529588.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529586&cdForo=0 into 14529586.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529585&cdForo=0 into 14529585.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529583&cdForo=0 into 14529583.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529551&cdForo=0 into 14529551.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529573&cdForo=0 into 14529573.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529576&cdForo=0 into 14529576.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529566&cdForo=0 into 14529566.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529564&cdForo=0 into 14529564.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529558&cdForo=0 into 14529558.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529550&cdForo=0 into 14529550.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529552&cdForo=0 into 14529552.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529557&cdForo=0 into 14529557.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529560&cdForo=0 into 14529560.pdf
+INFO:root:Retrieving next page of results manually.....
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 59 seconds and handled 40 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "tjsp_crawler.py", line 448, in <module>
+    driver.get('https://esaj.tjsp.jus.br/cjsg/trocaDePagina.do?tipoDeDecisao=A&pagina=%d&conversationId=' %(page_num))
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 333, in get
+    self.execute(Command.GET, {'url': url})
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 319, in execute
+    response = self.command_executor.execute(driver_command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 374, in execute
+    return self._request(command_info[0], url, body=data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 397, in _request
+    resp = self._conn.request(method, url, body=body, headers=headers)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 79, in request
+    return self.request_encode_body(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 171, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/poolmanager.py", line 336, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 670, in urlopen
+    httplib_response = self._make_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 426, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 421, in _make_request
+    httplib_response = conn.getresponse()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 1332, in getresponse
+    response.begin()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 303, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 264, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8d0d4fa280>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/9b42255b595b6aa1d68342095b42ba36
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8d0e4141c0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/9b42255b595b6aa1d68342095b42ba36
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8d0e414340>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/9b42255b595b6aa1d68342095b42ba36
+INFO:root:[+] Starting TJSP crawler...
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 11 seconds and handled 0 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "tjsp_crawler.py", line 106, in <module>
+    search_button.click()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webelement.py", line 80, in click
+    self._execute(Command.CLICK_ELEMENT)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webelement.py", line 633, in _execute
+    return self._parent.execute(command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 319, in execute
+    response = self.command_executor.execute(driver_command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 374, in execute
+    return self._request(command_info[0], url, body=data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 397, in _request
+    resp = self._conn.request(method, url, body=body, headers=headers)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 79, in request
+    return self.request_encode_body(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 171, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/poolmanager.py", line 336, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 670, in urlopen
+    httplib_response = self._make_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 426, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 421, in _make_request
+    httplib_response = conn.getresponse()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 1332, in getresponse
+    response.begin()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 303, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 264, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fefeba69250>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/b4cc1493eb2823a2166963f9abe35a46
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fefeba693d0>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/b4cc1493eb2823a2166963f9abe35a46
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fefeba69520>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/b4cc1493eb2823a2166963f9abe35a46
+INFO:root:[+] Starting TJSP crawler...
+INFO:root:[+] OK - TJSP Crawler initialized
+INFO:root:The loading image is gone.... we can continue
+INFO:root:found the results, we can parse and go to next page
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529624&cdForo=0 into 14529624.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529621&cdForo=0 into 14529621.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529623&cdForo=0 into 14529623.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529620&cdForo=0 into 14529620.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529614&cdForo=0 into 14529614.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529604&cdForo=0 into 14529604.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529622&cdForo=0 into 14529622.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529619&cdForo=0 into 14529619.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529618&cdForo=0 into 14529618.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529617&cdForo=0 into 14529617.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529613&cdForo=0 into 14529613.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529612&cdForo=0 into 14529612.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529611&cdForo=0 into 14529611.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529609&cdForo=0 into 14529609.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529608&cdForo=0 into 14529608.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529607&cdForo=0 into 14529607.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529606&cdForo=0 into 14529606.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529610&cdForo=0 into 14529610.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529616&cdForo=0 into 14529616.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529615&cdForo=0 into 14529615.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529605&cdForo=0 into 14529605.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529587&cdForo=0 into 14529587.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529584&cdForo=0 into 14529584.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529581&cdForo=0 into 14529581.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529571&cdForo=0 into 14529571.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529543&cdForo=0 into 14529543.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529588&cdForo=0 into 14529588.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529586&cdForo=0 into 14529586.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529585&cdForo=0 into 14529585.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529583&cdForo=0 into 14529583.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529551&cdForo=0 into 14529551.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529573&cdForo=0 into 14529573.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529576&cdForo=0 into 14529576.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529566&cdForo=0 into 14529566.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529564&cdForo=0 into 14529564.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529558&cdForo=0 into 14529558.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529550&cdForo=0 into 14529550.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529552&cdForo=0 into 14529552.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529557&cdForo=0 into 14529557.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529560&cdForo=0 into 14529560.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529554&cdForo=0 into 14529554.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529582&cdForo=0 into 14529582.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529589&cdForo=0 into 14529589.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529548&cdForo=0 into 14529548.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529556&cdForo=0 into 14529556.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529553&cdForo=0 into 14529553.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529580&cdForo=0 into 14529580.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529572&cdForo=0 into 14529572.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529561&cdForo=0 into 14529561.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529546&cdForo=0 into 14529546.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529579&cdForo=0 into 14529579.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529590&cdForo=0 into 14529590.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529568&cdForo=0 into 14529568.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529570&cdForo=0 into 14529570.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529545&cdForo=0 into 14529545.pdf
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+ERROR:root:[-] Got a weird status code 403 while downloading a PDF. Backing off for five seconds and trying again
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529567&cdForo=0 into 14529567.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529541&cdForo=0 into 14529541.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529574&cdForo=0 into 14529574.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529562&cdForo=0 into 14529562.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529547&cdForo=0 into 14529547.pdf
+INFO:root:Retrieving next page of results manually.....
+INFO:root:Got new page, continuing on!
+INFO:root:got html_data
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529577&cdForo=0 into 14529577.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529565&cdForo=0 into 14529565.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529569&cdForo=0 into 14529569.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529575&cdForo=0 into 14529575.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529563&cdForo=0 into 14529563.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529559&cdForo=0 into 14529559.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529549&cdForo=0 into 14529549.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529544&cdForo=0 into 14529544.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529542&cdForo=0 into 14529542.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529555&cdForo=0 into 14529555.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529578&cdForo=0 into 14529578.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529537&cdForo=0 into 14529537.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529450&cdForo=0 into 14529450.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529439&cdForo=0 into 14529439.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529453&cdForo=0 into 14529453.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529451&cdForo=0 into 14529451.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529455&cdForo=0 into 14529455.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529447&cdForo=0 into 14529447.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529436&cdForo=0 into 14529436.pdf
+INFO:root:Saving PDF from https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=14529452&cdForo=0 into 14529452.pdf
+INFO:root:Retrieving next page of results manually.....
+ERROR:root:
+
+
+
+------------------------
+
+[--- UNHANDLED EXCEPTION ALERT ---]
+
+Hi! This crawler has behaved in a very naughty way and as such has failed to handle an exception in the correct manner.
+I am now handling this by closing down the crawler's driver object (hopefully) closing the browser and exiting in a graceful manner.
+If I was started by the Watchdog then he should restart me within the next few seconds.
+Thank you for (ab)using python's sys.excepthook!
+
+
+ERROR:root:We ran for 83 seconds and handled 80 search results
+ERROR:root:------------------------
+
+
+ERROR:root:
+
+
+ERROR:root:Uncaught exception
+Traceback (most recent call last):
+  File "tjsp_crawler.py", line 450, in <module>
+    driver.get('https://esaj.tjsp.jus.br/cjsg/trocaDePagina.do?tipoDeDecisao=A&pagina=%d&conversationId=' %(page_num))
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 333, in get
+    self.execute(Command.GET, {'url': url})
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/webdriver.py", line 319, in execute
+    response = self.command_executor.execute(driver_command, params)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 374, in execute
+    return self._request(command_info[0], url, body=data)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/selenium/webdriver/remote/remote_connection.py", line 397, in _request
+    resp = self._conn.request(method, url, body=body, headers=headers)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 79, in request
+    return self.request_encode_body(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/request.py", line 171, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/poolmanager.py", line 336, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 670, in urlopen
+    httplib_response = self._make_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 426, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/urllib3/connectionpool.py", line 421, in _make_request
+    httplib_response = conn.getresponse()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 1332, in getresponse
+    response.begin()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 303, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/http/client.py", line 264, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+KeyboardInterrupt
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8f902e4550>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/ac7ef71eefb6f990f8d3075faef267de
+WARNING:urllib3.connectionpool:Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8f902e4430>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/ac7ef71eefb6f990f8d3075faef267de
+WARNING:urllib3.connectionpool:Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f8f902e4880>: Failed to establish a new connection: [Errno 61] Connection refused')': /session/ac7ef71eefb6f990f8d3075faef267de

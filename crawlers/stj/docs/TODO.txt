@@ -1,0 +1,15 @@
+TODO:
+
+- See if there's a better way of handling backend server downtimes and outages
+  other than just crashing and having to restart with a offset (e.g. start from
+  page 10 / document 101) which is what we do now.
+
+- Python requests *probably* has a better way of handling timeouts and dropped
+  connections but we already have it set for 5 retries before crashing out. I'm not
+  sure what more we can do other than some custom code to time.slepe(5 minutes) if
+  we get 10+ connection errors in a row.
+  
+- Note that the above will only fix the Python Requests parts of the code, if a 
+  server handling a request from the Selenium-driven browser times out... then
+  our entire flow is fucked and we have to start over with an offset anyway.
+  
