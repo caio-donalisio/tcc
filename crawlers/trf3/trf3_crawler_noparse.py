@@ -11,15 +11,14 @@ import json
 import timeit
 import pendulum
 import traceback
-from collections import OrderedDict
 from google.cloud import storage
 import os
 
 storage_client = storage.Client()
 
-bucket_name = os.environ.get("BUCKET_NAME") or "inspira-trf3"
+bucket_name = os.environ.get('BUCKET_NAME') or "trf3"
 
-bucket = storage_client.bucket(bucket_name)
+bucket = storage_client.create_bucket(bucket_name)
 
 def uploadGCS(file_path, blob_name):
   global bucket
@@ -32,9 +31,9 @@ sys.path.append('../libs/')
 from json_to_sqlite import json_to_sqlite_single
 
 s = requests.Session()
-s.headers = OrderedDict([('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0'), ('Accept', '*/*'), ('Accept-Encoding', 'gzip, deflate'), ('Referer', 'http://web.trf3.jus.br/base-textual')])
+s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0'})
 
-s.proxies = {'http': 'http://127.0.0.1:8080'}
+# s.proxies = {'http': 'http://127.0.0.1:8080'}
 errors = 0
 good = 0
 current_range = []
@@ -45,7 +44,6 @@ def initialize_session():
   return r.status_code == 200
 
 def set_search(term, date_range):
-  print('aaaaa')
   data = {
     'txtPesquisaLivre': term,
     'chkMostrarLista': 'on',
@@ -68,7 +66,6 @@ def set_search(term, date_range):
     'hdnMostrarListaResumida': ''
   }
   r = s.post('http://web.trf3.jus.br/base-textual/Home/ResultadoTotais', data=data)
-  print('REREEEE')
   return r.status_code == 200
 
 def get_page(page):
@@ -99,29 +96,31 @@ def get_acordao(id):
       set_search('a ou de ou o', current_range)
       r = s.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={id}')
       # print(r.text)
-    soup = BeautifulSoup(r.text, features="html.parser")
-    processo_full = soup.find('p', {'class': 'docTexto'}).get_text().strip()
-    tipo_processual = ' - '.join(processo_full.split(' - ')[:-1]).strip()
+    # soup = BeautifulSoup(r.text, features="html.parser")
+    # processo_full = soup.find('p', {'class': 'docTexto'}).get_text().strip()
+    # tipo_processual = ' - '.join(processo_full.split(' - ')[:-1]).strip()
     # numero_acordao = processo_full.split(' - ')[-1].split('   ')[0].strip()
     numero_processo = processo_full.split(' - ')[-1].split('   ')[1].strip()
-    info = soup.find_all('div', {'class': 'docTexto'})
-    relator = info[0].get_text().strip()
-    orgao = info[1].get_text().strip()
-    data_julgamento = info[2].get_text().strip()
-    data_publicacao = re.search(r'\d*\/\d*\/\d*', info[3].get_text().strip()).group(0)
-    ementa = info[4].get_text().strip()
-    acordao = info[5].get_text().strip()
-    integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['href']
+    numero_processo = re.sub(r'_|\.|-', '', numero_processo) # Sanitize (take dots, underlines and dashes out)
+    # info = soup.find_all('div', {'class': 'docTexto'})
+    # relator = info[0].get_text().strip()
+    # orgao = info[1].get_text().strip()
+    # data_julgamento = info[2].get_text().strip()
+    # data_publicacao = re.search(r'\d*\/\d*\/\d*', info[3].get_text().strip()).group(0)
+    # ementa = info[4].get_text().strip()
+    # acordao = info[5].get_text().strip()
+    # integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['x']
     doc_urls = get_docs(integra, id)
-
+  
     downloaded = download_docs(doc_urls, numero_processo) if doc_urls else []
+    return { 'num': numero_processo, 'data': r.text }
     # downloaded = False
 
     # print(','.join(downloaded))
 
-    df = {'Tipo Processual': tipo_processual, 'NumProcesso': numero_processo, 'Relator(a)': relator, 'Orgao Julgador': orgao, 'Data da Publicacao': data_publicacao, 'Data do Julgamento': data_julgamento, 'Ementa': ementa, 'Acordao': acordao, 'PathToPdf': ','.join(downloaded)}
+    # df = {'Tipo Processual': tipo_processual, 'NumProcesso': numero_processo, 'Relator(a)': relator, 'Orgao Julgador': orgao, 'Data da Publicacao': data_publicacao, 'Data do Julgamento': data_julgamento, 'Ementa': ementa, 'Acordao': acordao, 'PathToPdf': ','.join(downloaded)}
 
-    return df
+    # return df
   except:
     global errors
     print('error')
@@ -142,7 +141,6 @@ def get_docs(url, id):
   return links
 
 def download_docs(links, numero_processo):
-  numero_processo = re.sub(r'_|\.|-', '', numero_processo) # Sanitize (take dots, underlines and dashes out)
   files = []
   for idx, link in enumerate(links):
     r = s.get(link)
@@ -184,11 +182,9 @@ ranges = ranges[dateid:]
 for idx, date_range in enumerate(ranges):
   current_range = date_range
   print(f'using range: {"-".join(date_range)}')
-  print('set search?')
   print(set_search('a ou de ou o', date_range))
   i = offset if offset else 1 # offset from the actual search
   while True:
-    # print(i)
     acordao = get_acordao(i)
 
     if acordao == 'finish':
@@ -196,15 +192,12 @@ for idx, date_range in enumerate(ranges):
 
     if acordao:
       good += 1
-      json_to_write = "%s,\r\n" %(json.dumps(acordao))
-      print("%s" %(json_to_write))
+      filename = f'{acordao.num}.html'
+      filepath = f'raw_html/{acordao.num}.html' 
+      with open(filepath) as file:
+        file.write(acordao.data)
+      uploadGCS(filepath, filename)
 
-      jsonf = open('trf3_json_data.json', 'a')
-      jsonf.write(json_to_write)
-      jsonf.flush()
-      jsonf.close()
-
-      json_to_sqlite_single('trf3.db', acordao)
     stop = timeit.default_timer()
     idstr = f'{idx}:{i}'
     print(f'Current ID: {idstr} | Total errors: {errors} | Total processed: {good} | Time elapsed: {stop - start}')
