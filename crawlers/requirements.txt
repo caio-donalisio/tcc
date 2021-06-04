@@ -2,3 +2,4 @@ bs4
 requests
 pendulum
 selenium
+google-cloud-storage
