@@ -111,8 +111,10 @@ def get_acordao(id):
     # ementa = info[4].get_text().strip()
     # acordao = info[5].get_text().strip()
     integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['href']
+    # FIX for googlecloud (www.trf3.jus.br) is not accessible
+    integra = f'http://web.trf3.jus.br/acordaos/Acordao/PesquisarDocumento?processo={integra.split("&processo=")[1]}'
     doc_urls = get_docs(integra, id)
-  
+
     downloaded = download_docs(doc_urls, numero_processo) if doc_urls else []
     return { 'num': numero_processo, 'data': r.text }
     # downloaded = False
