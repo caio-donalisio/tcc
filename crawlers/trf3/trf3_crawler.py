@@ -11,13 +11,28 @@ import json
 import timeit
 import pendulum
 import traceback
+from collections import OrderedDict
+from google.cloud import storage
+import os
+
+storage_client = storage.Client()
+
+bucket_name = os.environ.get('BUCKET_NAME') or "inspira-trf3"
+
+bucket = storage_client.bucket(bucket_name)
+
+def uploadGCS(content, blob_name):
+  global bucket
+  blob = bucket.blob(blob_name)
+  blob.upload_from_string(content)
+  print("uploaded")
 
 sys.path.append('../libs/')
 
 from json_to_sqlite import json_to_sqlite_single
 
 s = requests.Session()
-s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0'})
+s.headers = OrderedDict([('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0'), ('Accept', '*/*'), ('Accept-Encoding', 'gzip, deflate'), ('Referer', 'http://web.trf3.jus.br/base-textual')])
 
 # s.proxies = {'http': 'http://127.0.0.1:8080'}
 errors = 0
@@ -84,27 +99,29 @@ def get_acordao(id):
       # print(r.text)
     soup = BeautifulSoup(r.text, features="html.parser")
     processo_full = soup.find('p', {'class': 'docTexto'}).get_text().strip()
-    tipo_processual = ' - '.join(processo_full.split(' - ')[:-1]).strip()
+    # tipo_processual = ' - '.join(processo_full.split(' - ')[:-1]).strip()
     # numero_acordao = processo_full.split(' - ')[-1].split('   ')[0].strip()
     numero_processo = processo_full.split(' - ')[-1].split('   ')[1].strip()
-    info = soup.find_all('div', {'class': 'docTexto'})
-    relator = info[0].get_text().strip()
-    orgao = info[1].get_text().strip()
-    data_julgamento = info[2].get_text().strip()
-    data_publicacao = re.search(r'\d*\/\d*\/\d*', info[3].get_text().strip()).group(0)
-    ementa = info[4].get_text().strip()
-    acordao = info[5].get_text().strip()
-    integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['x']
+    numero_processo = re.sub(r'_|\.|-', '', numero_processo) # Sanitize (take dots, underlines and dashes out)
+    # info = soup.find_all('div', {'class': 'docTexto'})
+    # relator = info[0].get_text().strip()
+    # orgao = info[1].get_text().strip()
+    # data_julgamento = info[2].get_text().strip()
+    # data_publicacao = re.search(r'\d*\/\d*\/\d*', info[3].get_text().strip()).group(0)
+    # ementa = info[4].get_text().strip()
+    # acordao = info[5].get_text().strip()
+    integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['href']
     doc_urls = get_docs(integra, id)
-
+  
     downloaded = download_docs(doc_urls, numero_processo) if doc_urls else []
+    return { 'num': numero_processo, 'data': r.text }
     # downloaded = False
 
     # print(','.join(downloaded))
 
-    df = {'Tipo Processual': tipo_processual, 'NumProcesso': numero_processo, 'Relator(a)': relator, 'Orgao Julgador': orgao, 'Data da Publicacao': data_publicacao, 'Data do Julgamento': data_julgamento, 'Ementa': ementa, 'Acordao': acordao, 'PathToPdf': ','.join(downloaded)}
+    # df = {'Tipo Processual': tipo_processual, 'NumProcesso': numero_processo, 'Relator(a)': relator, 'Orgao Julgador': orgao, 'Data da Publicacao': data_publicacao, 'Data do Julgamento': data_julgamento, 'Ementa': ementa, 'Acordao': acordao, 'PathToPdf': ','.join(downloaded)}
 
-    return df
+    # return df
   except:
     global errors
     print('error')
@@ -125,17 +142,16 @@ def get_docs(url, id):
   return links
 
 def download_docs(links, numero_processo):
-  numero_processo = re.sub(r'_|\.|-', '', numero_processo) # Sanitize (take dots, underlines and dashes out)
   files = []
   for idx, link in enumerate(links):
     r = s.get(link)
     extension = mimetypes.guess_extension(r.headers['content-type'].split(';')[0]) # get extension from mime
     suffix = f'_{idx+1}'
-    filename = f'downloads/{numero_processo}{suffix}{extension}'
-    with open(filename, 'wb') as file:
-      file.write(r.content)
-      files.append(filename)
-      print(f'{filename} downloaded.')
+    filename = f'{numero_processo}{suffix}{extension}'
+    # filepath = f'downloads/{filename}'
+    uploadGCS(r.content, filename)
+    print(f'{filename} saved to gcs.')
+    files.append(filename)
     return files
 
 start_date = pendulum.datetime(2020, 1, 1)
@@ -168,7 +184,6 @@ for idx, date_range in enumerate(ranges):
   print(set_search('a ou de ou o', date_range))
   i = offset if offset else 1 # offset from the actual search
   while True:
-    # print(i)
     acordao = get_acordao(i)
 
     if acordao == 'finish':
@@ -176,15 +191,11 @@ for idx, date_range in enumerate(ranges):
 
     if acordao:
       good += 1
-      json_to_write = "%s,\r\n" %(json.dumps(acordao))
-      print("%s" %(json_to_write))
+      filename = f'{acordao["num"]}.html'
+      # filepath = f'raw_html/{acordao.num}.html'
+      uploadGCS(acordao["data"], filename)
+      print('raw html data saved')
 
-      jsonf = open('trf3_json_data.json', 'a')
-      jsonf.write(json_to_write)
-      jsonf.flush()
-      jsonf.close()
-
-      json_to_sqlite_single('trf3.db', acordao)
     stop = timeit.default_timer()
     idstr = f'{idx}:{i}'
     print(f'Current ID: {idstr} | Total errors: {errors} | Total processed: {good} | Time elapsed: {stop - start}')
