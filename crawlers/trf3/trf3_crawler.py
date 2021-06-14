@@ -149,7 +149,8 @@ def download_docs(links, numero_processo):
     r = s.get(link)
     extension = mimetypes.guess_extension(r.headers['content-type'].split(';')[0]) # get extension from mime
     suffix = f'_{idx+1}'
-    filename = f'{numero_processo}{suffix}{extension}'
+    dateinfo = current_range[0].split('/')
+    filename = f'{dateinfo[2]}/{dateinfo[1]}/{numero_processo}{suffix}{extension}'
     # filepath = f'downloads/{filename}'
     uploadGCS(r.content, filename)
     print(f'{filename} saved to gcs.')
@@ -193,7 +194,8 @@ for idx, date_range in enumerate(ranges):
 
     if acordao:
       good += 1
-      filename = f'{acordao["num"]}.html'
+      dateinfo = current_range[0].split('/')
+      filename = f'{dateinfo[2]}/{dateinfo[1]}/{acordao["num"]}.html'
       # filepath = f'raw_html/{acordao.num}.html'
       uploadGCS(acordao["data"], filename)
       print('raw html data saved')
