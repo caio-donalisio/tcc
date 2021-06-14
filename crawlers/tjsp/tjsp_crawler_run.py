@@ -19,6 +19,20 @@ import tjsp_parse_pdf
 import logging
 import pendulum
 
+from google.cloud import storage
+
+storage_client = storage.Client()
+
+bucket_name = os.environ.get('BUCKET_NAME') or "inspira-tjsp"
+
+bucket = storage_client.bucket(bucket_name)
+
+def uploadGCS(content, blob_name):
+  global bucket
+  blob = bucket.blob(blob_name)
+  blob.upload_from_string(content)
+  print("uploaded")
+
 sys.path.append('../libs/')
 
 from json_to_sqlite import json_to_sqlite_single
@@ -50,7 +64,7 @@ sys.excepthook = handle_unhandled_exceptions
 
 
 cwd = os.getcwd()
-logfile = "%s/../../logs/tjsp/tjsp.log" %(cwd)
+logfile = "%s/tjsp.log" %(cwd)
 logging.basicConfig(filename=logfile,level=logging.INFO)
 
 logging.info("[+] Starting TJSP crawler...")
@@ -236,17 +250,18 @@ for idx, date_range in enumerate(ranges):
 		# outra informacao. Seja: a gente ja tem tudo o HTML aqui no servidor local
 		# e nao tem que fazer o trabalho de crawl/baixar tudo de novo.
 		#
-		page_file_path = "raw_html_pages/tjsp_raw_html_page_%d.html" %(page_num)
+		page_file_path = "tjsp_raw_html_page_%d_%d.html" %(page_num, initial_range+idx)
 		
-		if os.path.exists(page_file_path):
-			page_file_path = "raw_html_pages/tjsp_raw_html_page_%d_retry_at_%s.html" %(page_num, datetime.now().isoformat())
+		# if os.path.exists(page_file_path):
+		# 	page_file_path = "raw_html_pages/tjsp_raw_html_page_%d_retry_at_%s.html" %(page_num, datetime.now().isoformat())
 			
 		page_file_path = page_file_path.replace(':', '.')
 
-		f = open(page_file_path, 'w')
-		f.write(html_data)
-		f.flush()
-		f.close()
+		uploadGCS(html_data, page_file_path)
+		# f = open(page_file_path, 'w')
+		# f.write(html_data)
+		# f.flush()
+		# f.close()
 		
 		#
 		# Aqui ja carregamos o HTML da pagina dos resultados, ja salvamos num arquivo com nome unico
@@ -309,7 +324,7 @@ for idx, date_range in enumerate(ranges):
 		aoj = []
 		for fc in fcs:
 			#print("In FC")
-			dj = {'Tipo Processual': None, 'NumAcordao':None, 'NumProcesso':None, 'Relator(a)': None, 'Orgao Julgador':None, 'Data do Julgamento':None, 'Classe/Assunto':None, 'Requerente':None, 'Requerido':None, 'PathToPdf':None}
+			# dj = {'Tipo Processual': None, 'NumAcordao':None, 'NumProcesso':None, 'Relator(a)': None, 'Orgao Julgador':None, 'Data do Julgamento':None, 'Classe/Assunto':None, 'Requerente':None, 'Requerido':None, 'PathToPdf':None}
 			
 			ec = fc.find('tr', {'class':'ementaClass'})
 			acordao = ec.find('a', {'title':'Visualizar Inteiro Teor'})
@@ -318,8 +333,8 @@ for idx, date_range in enumerate(ranges):
 			#print("cdAcordao: %s" %(acordao.get('cdacordao')))
 			#print("cdForo: %s" %(acordao.get('cdforo')))
 		
-			dj['NumAcordao'] = acordao.get('cdacordao')
-			dj['NumProcesso'] = acordao.get_text().strip()
+			num_acordao = acordao.get('cdacordao')
+			# dj['NumProcesso'] = acordao.get_text().strip()
 
 				
 			pdf_url = "https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=%d&cdForo=%d" %(int(acordao.get('cdacordao').strip()), int(acordao.get('cdforo').strip()))
@@ -331,9 +346,9 @@ for idx, date_range in enumerate(ranges):
 			#       ter o codigo centralizado num lugar em vez de duplicar a
 			#       mesma logica em cada crawler.
 			#
-			logging.info("Saving PDF from %s into %s.pdf" %(pdf_url, dj['NumAcordao']))
-			pdf_file_name = "downloaded_pdfs/%s.pdf" %(dj['NumAcordao'])
-			dj['PathToPdf'] = pdf_file_name
+			logging.info("Saving PDF from %s into %s.pdf" %(pdf_url, num_acordao))
+			pdf_file_name = "%s.pdf" %(num_acordao)
+			# dj['PathToPdf'] = pdf_file_name
 		
 			request_cookies_browser = driver.get_cookies()
 			
@@ -377,100 +392,102 @@ for idx, date_range in enumerate(ranges):
 				driver.quit()
 				sys.exit()
 				
+			uploadGCS(r.content, pdf_file_name)
+
 			# Uma vez que sabemos que baixamos o PDF com exito, podemos salvar	
-			f = open(pdf_file_name, "wb") # isso e' Python3 - lembra de abrir PDF (ou doc) em modo 'b' pra binary file
-			f.write(r.content) # Assim lembra tambem de user r.content (bytes) e nao r.text (ascii)
-			f.flush()
-			f.close()
+			# f = open(pdf_file_name, "wb") # isso e' Python3 - lembra de abrir PDF (ou doc) em modo 'b' pra binary file
+			# f.write(r.content) # Assim lembra tambem de user r.content (bytes) e nao r.text (ascii)
+			# f.flush()
+			# f.close()
 		
 			#print("Entering parse_pdf")
-			requerentes,requeridos = tjsp_parse_pdf.tjsp_parse_pdf(pdf_file_name) # Isso aqui e' completamente quebrado, mas functiona 10% do tempo
+			# requerentes,requeridos = tjsp_parse_pdf.tjsp_parse_pdf(pdf_file_name) # Isso aqui e' completamente quebrado, mas functiona 10% do tempo
 			#print("Exiting parse_pdf")
-			dj['Requerido'] = requeridos
-			dj['Requerente'] = requerentes
+			# dj['Requerido'] = requeridos
+			# dj['Requerente'] = requerentes
 			
-			ec2s = fc.find_all('tr', {'class':'ementaClass2'})
+			# ec2s = fc.find_all('tr', {'class':'ementaClass2'})
 		
 			# Para cado resultado nesta pagina....
-			for ec2 in ec2s:
-				td = ec2.find('td')
-				text = td.find_all(text=True)
-				text = ''.join(text)
-				parts = text.split(':')
-				title = parts[0].strip()
-				texto = parts[1].strip()
+			# for ec2 in ec2s:
+				# td = ec2.find('td')
+				# text = td.find_all(text=True)
+				# text = ''.join(text)
+				# parts = text.split(':')
+				# title = parts[0].strip()
+				# texto = parts[1].strip()
 			
-				try:
-					if title == 'Relator(a)':
-						dj['Relator(a)'] = texto
-					elif title == 'Classe/Assunto':
-						class_parts = texto.split('/')
-						dj['Tipo Processual'] = class_parts[0]
-						dj['Classe/Assunto'] = '/'.join(class_parts[1:])
-					elif title.count('julgador'):
-						dj['Orgao Julgador'] = "TJSP - " + texto
-					elif title == 'Data do julgamento':
-						dj['Data do Julgamento'] = texto
-					elif title.startswith('Data de publica'):
-						dj['Data da Publicacao'] = texto
-					elif 'Ementa:' in text:
-						#print("FOUND EMENTA")
-						#time.sleep(3)
+				# try:
+				# 	if title == 'Relator(a)':
+				# 		dj['Relator(a)'] = texto
+				# 	elif title == 'Classe/Assunto':
+				# 		class_parts = texto.split('/')
+				# 		dj['Tipo Processual'] = class_parts[0]
+				# 		dj['Classe/Assunto'] = '/'.join(class_parts[1:])
+				# 	elif title.count('julgador'):
+				# 		dj['Orgao Julgador'] = "TJSP - " + texto
+				# 	elif title == 'Data do julgamento':
+				# 		dj['Data do Julgamento'] = texto
+				# 	elif title.startswith('Data de publica'):
+				# 		dj['Data da Publicacao'] = texto
+				# 	elif 'Ementa:' in text:
+				# 		#print("FOUND EMENTA")
+				# 		#time.sleep(3)
 						
-						ementa_divs = td.find_all('div')
-						if len(ementa_divs) == 1:
-							# Essa ementa nao precisava ser expandido, vamos marcar [COMPLETE] por equanto so por debug
-							dj['Ementa'] = "[COMPLETE] " + ''.join(parts[1:]).strip()
-							print(dj['Ementa'])
-							#time.sleep(5)
-						else:
-							#print("FOUND EMENTA ELSE %d", len(ementa_divs))
-							#print(ementa_divs[1])
-							working_ementa = ''.join( ementa_divs[1].find_all(text=True) ).strip()
-							#print("[ WE: " + working_ementa + ' ]')
-							working_ementa_parts = working_ementa.split('Ementa:')[1:]
-							#print("WEP" + working_ementa_parts)
+				# 		ementa_divs = td.find_all('div')
+				# 		if len(ementa_divs) == 1:
+				# 			# Essa ementa nao precisava ser expandido, vamos marcar [COMPLETE] por equanto so por debug
+				# 			dj['Ementa'] = "[COMPLETE] " + ''.join(parts[1:]).strip()
+				# 			print(dj['Ementa'])
+				# 			#time.sleep(5)
+				# 		else:
+				# 			#print("FOUND EMENTA ELSE %d", len(ementa_divs))
+				# 			#print(ementa_divs[1])
+				# 			working_ementa = ''.join( ementa_divs[1].find_all(text=True) ).strip()
+				# 			#print("[ WE: " + working_ementa + ' ]')
+				# 			working_ementa_parts = working_ementa.split('Ementa:')[1:]
+				# 			#print("WEP" + working_ementa_parts)
 							
-							fixed_ementa = ''.join(working_ementa_parts).strip()
-							# Essa ementa precisava ser expandido, vamos marcar [HIDDEN] por enquanto so por debug
-							dj['Ementa'] = "[HIDDEN] " + fixed_ementa
-							print(dj['Ementa'])
-							#time.sleep(5)
+				# 			fixed_ementa = ''.join(working_ementa_parts).strip()
+				# 			# Essa ementa precisava ser expandido, vamos marcar [HIDDEN] por enquanto so por debug
+				# 			dj['Ementa'] = "[HIDDEN] " + fixed_ementa
+				# 			print(dj['Ementa'])
+				# 			#time.sleep(5)
 							
 					
-				except Exception as e:
-					#logging.error('[DEBUG] - Major problem processing the following text pair: Title: %s --- Text: %s' %(title, texto))
-					print('[DEBUG] - Major problem processing the following text pair: Title: %s --- Text: %s' %(title, texto))
-					print(e)
+				# except Exception as e:
+				# 	#logging.error('[DEBUG] - Major problem processing the following text pair: Title: %s --- Text: %s' %(title, texto))
+				# 	print('[DEBUG] - Major problem processing the following text pair: Title: %s --- Text: %s' %(title, texto))
+				# 	print(e)
 			
 			### 2020-08-18 - New policy, we write out the JSON results line by line and we give it a timestamp too.
-			dj['Timestamp'] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-			json_to_write = "%s,\r\n" %(json.dumps(dj))
+			# dj['Timestamp'] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+			# json_to_write = "%s,\r\n" %(json.dumps(dj))
 				
-			jsonf = open('tjsp_json_data.json', 'a')
-			jsonf.write(json_to_write)
-			jsonf.flush()
-			jsonf.close()
+			# jsonf = open('tjsp_json_data.json', 'a')
+			# jsonf.write(json_to_write)
+			# jsonf.flush()
+			# jsonf.close()
 			
 			#
 			# Agora vamos fazer um rapido conversao de JSON pra SQL e inserir no banco de dados sqlite3
 			# Premeiro vamos ter que mudar as datas extraidas do site para ISO format
 			#
-			tdate = dj['Data do Julgamento']
-			tdate_parts = tdate.split('/')
-			tdate_parts.reverse()
-			tdate = '-'.join(tdate_parts)
-			dj['Data do Julgamento'] = tdate;
+			# tdate = dj['Data do Julgamento']
+			# tdate_parts = tdate.split('/')
+			# tdate_parts.reverse()
+			# tdate = '-'.join(tdate_parts)
+			# dj['Data do Julgamento'] = tdate;
 		
-			pdate = dj['Data da Publicacao']
-			pdate_parts = pdate.split('/')
-			pdate_parts.reverse()
-			pdate = '-'.join(pdate_parts)
-			dj['Data da Publicacao'] = pdate
+			# pdate = dj['Data da Publicacao']
+			# pdate_parts = pdate.split('/')
+			# pdate_parts.reverse()
+			# pdate = '-'.join(pdate_parts)
+			# dj['Data da Publicacao'] = pdate
 			
-			print("\n[+] Saving to SQL\n")
+			# print("\n[+] Saving to SQL\n")
 			# Agora joga pro library function json_to_sqlite_single() (single quer dizer que trata com um entry so)
-			json_to_sqlite_single('tjsp_robtest.db', dj)
+			# json_to_sqlite_single('tjsp_robtest.db', dj)
 			
 			
 		# Now we're going to overwrite our session file with our current *PAGE* number... that way we can recover like Ninjas if we ever need to
