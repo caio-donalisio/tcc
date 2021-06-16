@@ -20,7 +20,10 @@ storage_client = storage.Client()
 bucket_name = os.environ.get('BUCKET_NAME') or "inspira-trf3"
 
 start_date_arr = (os.environ.get('START_DATE') or "2020/01").split("/")
-end_date_arr = (os.environ.get('START_DATE') or "2020/12").split("/")
+end_date_arr = (os.environ.get('END_DATE') or "2020/12").split("/")
+
+start_date_arr = list(map(lambda x: int(x), start_date_arr))
+end_date_arr = list(map(lambda x: int(x), end_date_arr))
 
 start_date = pendulum.datetime(start_date_arr[0], start_date_arr[1], 1)
 end_date = pendulum.datetime(end_date_arr[0], end_date_arr[1], 1)
