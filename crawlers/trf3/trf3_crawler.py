@@ -19,6 +19,12 @@ storage_client = storage.Client()
 
 bucket_name = os.environ.get('BUCKET_NAME') or "inspira-trf3"
 
+start_date_arr = (os.environ.get('START_DATE') or "2020/01").split("/")
+end_date_arr = (os.environ.get('START_DATE') or "2020/12").split("/")
+
+start_date = pendulum.datetime(start_date_arr[0], start_date_arr[1], 1)
+end_date = pendulum.datetime(end_date_arr[0], end_date_arr[1], 1)
+
 bucket = storage_client.bucket(bucket_name)
 
 def uploadGCS(content, blob_name):
@@ -156,9 +162,6 @@ def download_docs(links, numero_processo):
     print(f'{filename} saved to gcs.')
     files.append(filename)
     return files
-
-start_date = pendulum.datetime(2020, 1, 1)
-end_date = pendulum.datetime(2021, 1, 1)
 
 period = pendulum.period(start_date, end_date)
 
