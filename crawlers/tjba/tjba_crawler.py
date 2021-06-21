@@ -1,7 +1,14 @@
 import math
 import pendulum
+
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
+
+from app import celery
+from celery import group
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 with open(f'crawlers/tjba/query.graphql', 'r') as f:
@@ -68,3 +75,36 @@ class Paginator:
 
   def __repr__(self):
     return f'Paginator(item_count={self._item_count}, page_count={self._page_count})'
+
+
+@celery.task(queue='crawlers', trail=True)
+def process_tjba(filters, items_per_page=50, chunk_size=5):
+  paginator  = TJBAClient().paginator(filters, items_per_page=items_per_page)
+  page_count = paginator.pages
+  item_count = paginator.total
+  pages = list(range(page_count))
+
+  logger.info("@process_tjba - item_count", item_count, "page_count", page_count)
+
+  chunks = [
+    pages[i:i + chunk_size] for i in range(0, len(pages), chunk_size)]
+
+  return group([
+    process_tjba_page.s(chunk, filters, items_per_page)
+    for chunk in chunks
+  ]).apply_async()
+
+
+@celery.task(queue='crawlers', trail=True, rate_limit='1/s',
+  autoretry_for=(Exception,), retry_backoff=True, retry_jitter=30)
+def process_tjba_page(chunk, filters, items_per_page):
+  logger.info(f"@process_tjba - chunk: {chunk}")
+
+  total   = 0
+  client  = TJBAClient()
+  # TODO: estou fazendo nada ainda
+  for page_number in chunk:
+    result = client.fetch(
+      filters=filters, page_number=page_number, items_per_page=items_per_page)
+    total += len(result['filter']['decisoes'])
+  return total

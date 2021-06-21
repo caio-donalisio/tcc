@@ -17,11 +17,11 @@ def cli(ctx):
 @click.option('--chunk-size', default=5, help='Number of pages per subtask')
 def tjba(start_date, end_date, items_per_page, chunk_size):
   from tqdm import tqdm
-  from crawlers.tjba.tjba_crawler import get_filters
+  from crawlers.tjba.tjba_crawler import get_filters, process_tjba
 
   filters = get_filters(
       start_date=pendulum.parse(start_date), end_date=pendulum.parse(end_date))
-  results = tasks.process_tjba.delay(
+  results = process_tjba.delay(
     filters=filters, items_per_page=items_per_page, chunk_size=chunk_size)
 
   total = 0
