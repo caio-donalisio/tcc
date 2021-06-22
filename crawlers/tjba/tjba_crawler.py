@@ -105,11 +105,12 @@ def process_tjba_period(filters, items_per_page=50, chunk_size=5, output_uri=Non
     docs = result['filter']['decisoes']
     total += len(docs)
 
-    persist_tjba_page(docs, output_uri)  # sync
+    persist_tjba_page.delay(docs, output_uri)
 
   return total
 
 
+@celery.task(queue='persistence', trail=True)
 def persist_tjba_page(records, output_uri):
   for record in records:
     published_at = pendulum.parse(record['dataPublicacao'])
