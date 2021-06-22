@@ -9,6 +9,7 @@ query filter(
     itemsPerPage: $itemsPerPage
   ) {
     decisoes {
+      id
       dataPublicacao
       relator {
         id

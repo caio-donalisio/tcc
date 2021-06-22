@@ -1,11 +1,13 @@
+import json
 import math
 import pendulum
+import storage
 
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 
 from app import celery
-from celery import group
+from celery import group, chain
 
 import logging
 logger = logging.getLogger(__name__)
@@ -39,12 +41,16 @@ class TJBAClient:
     return result['filter']['itemCount']
 
   def fetch(self, filters, page_number=0, items_per_page=10):
-    params = {
-      'decisaoFilter': filters,
-      'pageNumber': page_number,
-      'itemsPerPage': items_per_page,
-    }
-    return self.gql_client.execute(graphql_query, variable_values=params)
+    try:
+      params = {
+        'decisaoFilter': filters,
+        'pageNumber': page_number,
+        'itemsPerPage': items_per_page,
+      }
+      return self.gql_client.execute(graphql_query, variable_values=params)
+    except Exception as e:
+      logger.error(f"page fetch error params: {params}")
+      raise e
 
   def paginator(self, filters, items_per_page=10):
     item_count = self.count(filters)
@@ -78,33 +84,37 @@ class Paginator:
 
 
 @celery.task(queue='crawlers', trail=True)
-def process_tjba(filters, items_per_page=50, chunk_size=5):
-  paginator  = TJBAClient().paginator(filters, items_per_page=items_per_page)
-  page_count = paginator.pages
-  item_count = paginator.total
-  pages = list(range(page_count))
-
-  logger.info("@process_tjba - item_count", item_count, "page_count", page_count)
-
-  chunks = [
-    pages[i:i + chunk_size] for i in range(0, len(pages), chunk_size)]
-
-  return group([
-    process_tjba_page.s(chunk, filters, items_per_page)
-    for chunk in chunks
-  ]).apply_async()
+def process_tjba(start_date, end_date, items_per_page=50, chunk_size=5, output_uri=None):
+  period   = pendulum.parse(start_date).diff(pendulum.parse(end_date))
+  subtasks = [
+    process_tjba_period.s(get_filters(start_date=day, end_date=day), items_per_page, chunk_size, output_uri)
+    for day in period.range(unit='days')
+  ]
+  return group(subtasks).apply_async()
 
 
-@celery.task(queue='crawlers', trail=True, rate_limit='1/s',
-  autoretry_for=(Exception,), retry_backoff=True, retry_jitter=30)
-def process_tjba_page(chunk, filters, items_per_page):
-  logger.info(f"@process_tjba - chunk: {chunk}")
+@celery.task(queue='crawlers', trail=True, rate_limit='120/m')
+def process_tjba_period(filters, items_per_page=50, chunk_size=5, output_uri=None):
+  client     = TJBAClient()
+  paginator  = client.paginator(filters, items_per_page=items_per_page)
 
-  total   = 0
-  client  = TJBAClient()
-  # TODO: estou fazendo nada ainda
-  for page_number in chunk:
+  total = 0
+  for page_number in range(paginator.pages):
     result = client.fetch(
       filters=filters, page_number=page_number, items_per_page=items_per_page)
-    total += len(result['filter']['decisoes'])
+    docs = result['filter']['decisoes']
+    total += len(docs)
+
+    persist_tjba_page(docs, output_uri)  # sync
+
   return total
+
+
+def persist_tjba_page(records, output_uri):
+  for record in records:
+    published_at = pendulum.parse(record['dataPublicacao'])
+    doc_hash = record['hash']
+    doc_id   = record['id']
+
+    path = f"{output_uri}/{published_at.year}/{'{:02d}'.format(published_at.month)}/doc_{doc_id}_{doc_hash}.json"
+    storage.store(path=path, contents=json.dumps(record))
