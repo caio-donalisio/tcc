@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 
 class GSOutput:
     def __init__(self, bucket_name, client=None):
+        self._bucket_name = bucket_name
         self._client = (client or storage.Client())
         self._bucket = self._client.get_bucket(bucket_name)
 
@@ -29,6 +30,10 @@ class GSOutput:
         blob = self._bucket.blob(filepath)
         if blob.exists():
             return blob.download_as_bytes()
+
+    @property
+    def uri(self):
+        return f'gs://{self._bucket_name}'
 
     def __repr__(self):
         return f"GS({self._bucket})"
@@ -47,6 +52,10 @@ class LSOutput:
         if Path(source).exists():
             with open(source, 'r') as f:
                 return f.read()
+
+    @property
+    def uri(self):
+        return self._output_folder
 
     def __repr__(self):
         return f"Local({self._output_folder})"
