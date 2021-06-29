@@ -14,12 +14,13 @@ from functools import wraps
 import wrapt
 from urllib.parse import urlencode
 
+from storage import (get_bucket_ref, )
+
 
 class GSOutput:
-    def __init__(self, bucket_name, client=None):
+    def __init__(self, bucket_name):
         self._bucket_name = bucket_name
-        self._client = (client or storage.Client())
-        self._bucket = self._client.get_bucket(bucket_name)
+        self._bucket = get_bucket_ref(bucket_name)
 
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(filepath)

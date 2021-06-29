@@ -4,6 +4,10 @@ import crawlers.tjba.tjba_crawler
 import requests
 import utils
 
+# disable some warnings related to verify as False.
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
 import logging
 logger = logging.getLogger(__name__)
 
