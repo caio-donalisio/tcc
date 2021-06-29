@@ -4,6 +4,8 @@ import urllib.request
 import time
 import http.client
 import requests
+import io
+from tqdm import tqdm
 from datetime import datetime
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -153,3 +155,20 @@ def get_soup_xpath(element):
         child = parent
     components.reverse()
     return '/%s' % '/'.join(components)
+
+
+class TqdmToLogger(io.StringIO):
+    logger = None
+    level = None
+    buf = ''
+
+    def __init__(self,logger,level=None):
+        super(TqdmToLogger, self).__init__()
+        self.logger = logger
+        self.level = level or logging.INFO
+
+    def write(self,buf):
+        self.buf = buf.strip('\r\n\t ')
+
+    def flush(self):
+        self.logger.log(self.level, self.buf)

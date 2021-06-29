@@ -3,7 +3,9 @@ import time
 import requests
 import pendulum
 import utils
+import logging
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -30,15 +32,16 @@ class STF:
     self.logger.info(f'Expects {total_records} records.')
 
     records_fetch = 0
-    offset, page_size = 0, 50
+    offset, page_size = 0, 250
 
-    with tqdm(total=total_records) as pbar:
+    tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
+    with tqdm(total=total_records, file=tqdm_out) as pbar:
       while True:
         for row in self.rows(offset=offset, page_size=page_size):
           self.fetch_row(row)
           records_fetch += 1
           pbar.update(1)
-        time.sleep(0.5)
+        time.sleep(1)
         offset += page_size
         if offset >= total_records:
           break
@@ -66,7 +69,8 @@ class STF:
     # Raw json
     month = '{:02d}'.format(pub_date.month)
     json_filepath = f'{pub_date.year}/{month}/{doc_id}.json'
-    self.output.save_from_contents(filepath=json_filepath, contents=json.dumps(row['_source']))
+    self.output.save_from_contents(filepath=json_filepath, contents=json.dumps(row['_source']),
+      content_type='application/json')
 
     # PDF
     pdf_filepath = f'{pub_date.year}/{month}/{doc_id}.pdf'
