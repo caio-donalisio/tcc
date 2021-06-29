@@ -1,0 +1,16 @@
+---
+version: '2'
+services:
+  redis:
+    image: redis:latest
+    container_name: 'inspira-crawlers-redis'
+
+  celery:
+    build: .
+    network_mode: 'service:redis'
+    container_name: 'inspira-crawlers-celery'
+    command: 'celery -A tasks worker -Q crawlers --concurrency=2'
+    environment:
+      - C_FORCE_ROOT='true'
+    volumes:
+      - ".:/opt/service"

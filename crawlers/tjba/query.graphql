@@ -1,0 +1,46 @@
+query filter(
+  $decisaoFilter: DecisaoFilter!
+  $pageNumber: Int!
+  $itemsPerPage: Int!
+) {
+  filter(
+    decisaoFilter: $decisaoFilter
+    pageNumber: $pageNumber
+    itemsPerPage: $itemsPerPage
+  ) {
+    decisoes {
+      id
+      dataPublicacao
+      relator {
+        id
+        nome
+      }
+      orgaoJulgador {
+        id
+        nome
+      }
+      classe {
+        id
+        descricao
+      }
+      conteudo
+      ementa
+      hash
+      numeroProcesso
+    }
+    relatores {
+      key
+      value
+    }
+    orgaos {
+      key
+      value
+    }
+    classes {
+      key
+      value
+    }
+    pageCount
+    itemCount
+  }
+}
