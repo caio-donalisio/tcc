@@ -4,6 +4,7 @@ import urllib.request
 import time
 import http.client
 import requests
+import itertools
 import io
 from tqdm import tqdm
 from datetime import datetime
@@ -182,3 +183,21 @@ class TqdmToLogger(io.StringIO):
 
     def flush(self):
         self.logger.log(self.level, self.buf)
+
+
+def pairwise(iterable):
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
+
+def monthly(start_date, end_date):
+    date_range = start_date.diff(end_date)
+    if date_range.in_months() > 0:
+      dates = list(date_range.range(unit='months'))
+      if end_date > dates[-1]:
+        dates.append(end_date)
+      for x, y in pairwise(dates):
+          yield x, y
+    else:
+      yield start_date, end_date

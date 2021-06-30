@@ -23,11 +23,11 @@ DEFAULT_HEADERS = {
 
 
 class STF:
-  def __init__(self, params, output, logger, pdf_async=False):
+  def __init__(self, params, output, logger, **options):
     self.params = params
     self.output = output
     self.logger = logger
-    self.pdf_async = pdf_async
+    self.options = (options or {})
 
   def run(self):
     total_records = self.count()
@@ -45,10 +45,11 @@ class STF:
         download_args = dict(
           url=pdf['url'], dest=pdf['dest'], output_uri=self.output.uri,
           headers=DEFAULT_HEADERS, content_type='application/pdf', write_mode='wb')
-        if self.pdf_async:
-          download_from_url.delay(**download_args)
-        else:
-          download_from_url(**download_args)
+        if self.options.get('skip_pdf', False) is False:
+          if self.options.get('pdf_async', False):
+            download_from_url.delay(**download_args)
+          else:
+            download_from_url(**download_args)
 
         records_fetch += 1
         pbar.update(1)
@@ -56,21 +57,32 @@ class STF:
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
 
-  def rows(self, sleeptime=1., offset=0, page_size=250):
-    total_records = None
-    while True:
-      result =\
-        self._perform_search(offset, page_size)['result']['hits']
-      total_records = result['total']['value']
-      for hit in result['hits']:
-        yield self.get_doc(hit)
-      time.sleep(sleeptime)
-      offset += page_size
-      if offset >= total_records:
-        break
+  def rows(self, sleeptime=1., page_size=250):
+    for start_date, end_date in \
+        utils.monthly(self.params['start_date'], self.params['end_date']):
+      total_records = float('inf')
+      offset = 0
+      while offset < total_records:
+        query = get_query(
+          start_date=start_date.start_of('day').to_date_string(),
+          end_date=end_date.end_of('day').to_date_string(),
+          offset=offset,
+          size=page_size)
+        result =\
+          self._perform_search(query)['result']['hits']
+        total_records = result['total']['value']
+        for hit in result['hits']:
+          yield self.get_doc(hit)
+        time.sleep(sleeptime)
+        offset += page_size
 
   def count(self):
-    result = self._perform_search(offset=0, page_size=1)
+    result = self._perform_search(
+      query=get_query(
+        start_date=self.params['start_date'].to_date_string(),
+        end_date=self.params['end_date'].to_date_string(),
+        offset=0,
+        size=1))
     result = result['result']['hits']
     return result['total']['value']
 
@@ -88,13 +100,7 @@ class STF:
       'dest'  : f'{pub_date.year}/{month}/{doc_id}.pdf'
     }
 
-  def _perform_search(self, offset=0, page_size=100):
-    query = get_query(
-      start_date=self.params['start_date'].to_date_string(),
-      end_date=self.params['end_date'].to_date_string(),
-      offset=offset,
-      size=page_size)
-
+  def _perform_search(self, query):
     response =\
       requests.post('https://jurisprudencia.stf.jus.br/api/search/search',
                     data=json.dumps(query),
@@ -104,7 +110,6 @@ class STF:
       self.logger.warn(f'Expects 200. Got {response.status_code}.')
       self.logger.warn(response.text)
       raise utils.PleaseRetryException()
-
     return response.json()
 
 
@@ -113,7 +118,8 @@ class STF:
 @click.option('--end-date'  , prompt=True, help='End date (format YYYY-MM-DD).')
 @click.option('--output-uri', default=None, help='Output URI')
 @click.option('--pdf-async' , default=False, help='Download PDFs async', is_flag=True)
-def stf_command(start_date, end_date, output_uri, pdf_async):
+@click.option('--skip-pdf'  , default=False, help='Skip PDF', is_flag=True)
+def stf_command(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
 
@@ -124,5 +130,5 @@ def stf_command(start_date, end_date, output_uri, pdf_async):
 
   crawler = STF(params={
     'start_date': start_date, 'end_date': end_date
-  }, output=output, logger=logger, pdf_async=pdf_async)
+  }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf)
   crawler.run()
