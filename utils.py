@@ -1,10 +1,12 @@
 import os
+import json
 import logging
 import urllib.request
 import time
 import http.client
 import requests
 import itertools
+import hashlib
 import io
 from tqdm import tqdm
 from datetime import datetime
@@ -22,6 +24,9 @@ class GSOutput:
     def __init__(self, bucket_name):
         self._bucket_name = bucket_name
         self._bucket = get_bucket_ref(bucket_name)
+    def exists(self, filepath):
+        blob = self._bucket.blob(filepath)
+        return blob.exists()
 
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(filepath)
@@ -44,6 +49,10 @@ class GSOutput:
 class LSOutput:
     def __init__(self, output_folder):
         self._output_folder = output_folder
+
+    def exists(self, filepath):
+        source = f'{self._output_folder}/{filepath}'
+        return Path(source).exists()
 
     def save_from_contents(self, filepath, contents, **kwargs):
         target = f'{self._output_folder}/{filepath}'
@@ -194,10 +203,65 @@ def pairwise(iterable):
 def monthly(start_date, end_date):
     date_range = start_date.diff(end_date)
     if date_range.in_months() > 0:
-      dates = list(date_range.range(unit='months'))
-      if end_date > dates[-1]:
-        dates.append(end_date)
-      for x, y in pairwise(dates):
-          yield x, y
+        yield from timely(start_date, end_date, unit='months', step=1)
     else:
-      yield start_date, end_date
+        yield start_date, end_date
+
+
+def weekly(start_date, end_date):
+    date_range = start_date.diff(end_date)
+    if date_range.in_weeks() > 0:
+        yield from timely(start_date, end_date, unit='weeks', step=1)
+    else:
+        yield start_date, end_date
+
+
+def timely(start_date, end_date, unit, step):
+    date_range = start_date.diff(end_date)
+    dates = list(date_range.range(unit, step))
+    if end_date > dates[-1]:
+        dates.append(end_date)
+    pairs = list(pairwise(dates))
+    for x, y in pairs[:-1]:
+        yield x, y.subtract(days=1)
+    yield pairs[-1]
+
+
+class Chunk:
+  def __init__(self, params, output, rows_generator):
+    self._params = params
+    self._output = output
+    self._rows_generator = rows_generator
+    self._values = {**{}, **params}
+    if self.commited():
+      self._restore_values()
+
+  def _restore_values(self):
+    raw_value = self._output.load_as_string(self.filepath)
+    self._values = json.loads(raw_value)
+
+  @property
+  def filepath(self):
+    return f'.state/{self.hash}.json'
+
+  def commit(self):
+    self._output.save_from_contents(
+      filepath=self.filepath, contents=json.dumps(self._values),
+      content_type='application/json')
+
+  def commited(self):
+    return self._output.exists(self.filepath)
+
+  def set_value(self, key, value):
+    self._values[key] = value
+
+  def get_value(self, key):
+    return self._values[key]
+
+  @property
+  def hash(self):
+    return hashlib.sha1(repr(sorted(self._params.items())).encode()) \
+      .hexdigest()
+
+  def rows(self):
+    yield from self._rows_generator
