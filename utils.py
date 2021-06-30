@@ -220,12 +220,15 @@ def weekly(start_date, end_date):
 def timely(start_date, end_date, unit, step):
     date_range = start_date.diff(end_date)
     dates = list(date_range.range(unit, step))
-    if end_date > dates[-1]:
-        dates.append(end_date)
-    pairs = list(pairwise(dates))
-    for x, y in pairs[:-1]:
-        yield x, y.subtract(days=1)
-    yield pairs[-1]
+    if len(dates) == 1:
+        yield dates[0], dates[0]
+    else:
+        if end_date > dates[-1]:
+            dates.append(end_date)
+        pairs = list(pairwise(dates))
+        for x, y in pairs[:-1]:
+            yield x, y.subtract(days=1)
+        yield pairs[-1]
 
 
 class Chunk:

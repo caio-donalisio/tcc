@@ -1,11 +1,9 @@
 import click
 import pendulum
+from app import cli
 
-
-@click.group()
-@click.pass_context
-def cli(ctx):
-  pass
+from crawlers.trf2.trf2_crawler import (
+  trf2_command)
 
 
 @cli.command()
