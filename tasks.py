@@ -11,6 +11,8 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 import logging
 logger = logging.getLogger(__name__)
 
+from crawlers.stf.stf_api_crawler import stf_task
+
 
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')
 def download_from_url(url, dest, output_uri, **kwargs):

@@ -12,7 +12,6 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 import click
 from app import cli, celery
-from tasks import download_from_url
 
 from crawlers.stf.stf_api_query import get_query
 
@@ -30,6 +29,7 @@ class STF:
     self.options = (options or {})
 
   def run(self):
+    from tasks import download_from_url
     total_records = self.count()
     self.logger.info(f'Expects {total_records} records.')
     records_fetch = 0
@@ -100,6 +100,7 @@ class STF:
       'dest'  : f'{pub_date.year}/{month}/{doc_id}.pdf'
     }
 
+  @utils.retryable(max_retries=3)   # type: ignore
   def _perform_search(self, query):
     response =\
       requests.post('https://jurisprudencia.stf.jus.br/api/search/search',
@@ -113,13 +114,8 @@ class STF:
     return response.json()
 
 
-@cli.command(name='stf')
-@click.option('--start-date', prompt=True, help='Start date (format YYYY-MM-DD).')
-@click.option('--end-date'  , prompt=True, help='End date (format YYYY-MM-DD).')
-@click.option('--output-uri', default=None, help='Output URI')
-@click.option('--pdf-async' , default=False, help='Download PDFs async', is_flag=True)
-@click.option('--skip-pdf'  , default=False, help='Skip PDF', is_flag=True)
-def stf_command(start_date, end_date, output_uri, pdf_async, skip_pdf):
+@celery.task(queue='crawlers', rate_limit='1/h')
+def stf_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
 
@@ -132,3 +128,18 @@ def stf_command(start_date, end_date, output_uri, pdf_async, skip_pdf):
     'start_date': start_date, 'end_date': end_date
   }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf)
   crawler.run()
+
+
+@cli.command(name='stf')
+@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
+@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+def stf_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
+  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
+  if enqueue:
+    stf_task.delay(*args)
+  else:
+    stf_task(*args)
