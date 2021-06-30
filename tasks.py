@@ -17,11 +17,17 @@ from crawlers.stf.stf_api_crawler import stf_task
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')
 def download_from_url(url, dest, output_uri, **kwargs):
   output   = utils.get_output_strategy_by_path(path=output_uri)
+
+  if kwargs.get('override', True) is False and \
+    output.exists(dest):
+    return
+
   response = requests.get(url,
     allow_redirects=True,
     verify=kwargs.get('verify_ssl', False),
     headers=kwargs.get('headers', {}))
   assert response.status_code == 200
+
   output.save_from_contents(
     filepath=dest,
     contents=response.content,

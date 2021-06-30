@@ -29,52 +29,79 @@ class STF:
     self.options = (options or {})
 
   def run(self):
-    from tasks import download_from_url
     total_records = self.count()
     self.logger.info(f'Expects {total_records} records.')
     records_fetch = 0
 
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
     with tqdm(total=total_records, file=tqdm_out) as pbar:
-      for doc, pdf in self.rows():
-        self.output.save_from_contents(
-          filepath=doc['dest'],
-          contents=json.dumps(doc['source']),
-          content_type='application/json')
+      for chunk in self.chunks():
+        if chunk.commited():
+          chunk_records  = chunk.get_value('records')
+          records_fetch += chunk_records
+          pbar.update(chunk_records)
+          self.logger.info(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+          continue
 
-        download_args = dict(
-          url=pdf['url'], dest=pdf['dest'], output_uri=self.output.uri,
-          headers=DEFAULT_HEADERS, content_type='application/pdf', write_mode='wb')
-        if self.options.get('skip_pdf', False) is False:
-          if self.options.get('pdf_async', False):
-            download_from_url.delay(**download_args)
-          else:
-            download_from_url(**download_args)
+        chunk_records = 0
+        for doc, pdf in chunk.rows():
+          self.handle_doc(doc)
+          self.handle_pdf(pdf)
+          chunk_records += 1
 
-        records_fetch += 1
-        pbar.update(1)
+        chunk.set_value('records', chunk_records)
+        chunk.commit()
+        records_fetch += chunk_records
+        pbar.update(chunk_records)
+        self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
 
-  def rows(self, sleeptime=1., page_size=250):
+  def handle_doc(self, doc):
+    self.output.save_from_contents(
+      filepath=doc['dest'],
+      contents=json.dumps(doc['source']),
+      content_type='application/json')
+
+  def handle_pdf(self, pdf):
+    from tasks import download_from_url
+    download_args = dict(
+      url=pdf['url'], dest=pdf['dest'], output_uri=self.output.uri,
+      headers=DEFAULT_HEADERS, content_type='application/pdf', write_mode='wb',
+      override=False)
+    if self.options.get('skip_pdf', False) is False:
+      if self.options.get('pdf_async', False):
+        download_from_url.delay(**download_args)
+      else:
+        download_from_url(**download_args)
+
+  def chunks(self):
     for start_date, end_date in \
-        utils.monthly(self.params['start_date'], self.params['end_date']):
-      total_records = float('inf')
-      offset = 0
-      while offset < total_records:
-        query = get_query(
-          start_date=start_date.start_of('day').to_date_string(),
-          end_date=end_date.end_of('day').to_date_string(),
-          offset=offset,
-          size=page_size)
-        result =\
-          self._perform_search(query)['result']['hits']
-        total_records = result['total']['value']
-        for hit in result['hits']:
-          yield self.get_doc(hit)
-        time.sleep(sleeptime)
-        offset += page_size
+      utils.timely(self.params['start_date'], self.params['end_date'], unit='days', step=3):
+      chunk_params = {
+        'start_date': start_date.to_date_string(),
+        'end_date'  : end_date.to_date_string()
+      }
+      yield utils.Chunk(params=chunk_params, output=self.output,
+        rows_generator=self.rows(start_date=start_date, end_date=end_date))
+
+  def rows(self, start_date, end_date, sleeptime=1., page_size=250):
+    total_records = float('inf')
+    offset = 0
+    while offset < total_records:
+      query = get_query(
+        start_date=start_date.start_of('day').to_date_string(),
+        end_date=end_date.end_of('day').to_date_string(),
+        offset=offset,
+        size=page_size)
+      result =\
+        self._perform_search(query)['result']['hits']
+      total_records = result['total']['value']
+      for hit in result['hits']:
+        yield self.get_doc(hit)
+      time.sleep(sleeptime)
+      offset += page_size
 
   def count(self):
     result = self._perform_search(
