@@ -52,7 +52,7 @@ class TRF2:
   def handle_doc(self, doc):
     self.output.save_from_contents(
       filepath=doc['dest'],
-      contents=json.dumps(doc['source']),
+      contents=doc['source'],
       content_type='text/html')
 
   def handle_pdf(self, pdf):
