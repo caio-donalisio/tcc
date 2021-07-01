@@ -15,12 +15,14 @@ celery = Celery('inspira',
 
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
-  setup_logger(logger, output='celery.log')
+  logger.handlers.clear()
+  setup_logger(logger, output='workers.log')
 
 
 @after_setup_task_logger.connect
 def setup_task_logger(**kw):
   logger = logging.getLogger('tasks')
+  logger.handlers.clear()
   setup_logger(logger, output='workers.log')
 
 

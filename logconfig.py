@@ -15,8 +15,8 @@ def setup_logger(logger, output, level=logging.INFO, cloud=True):
   # TODO:
   # logger.addFilter(ContextFilter())
   # formatter = logging.Formatter('[%(asctime)s] %(name)s [args:%(crawler_args)s] %(levelname)s: %(message)s')
-  if logger.handlers:
-    return
+  # if logger.handlers:
+  #   return
 
   formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
 
@@ -38,7 +38,8 @@ def setup_logger(logger, output, level=logging.INFO, cloud=True):
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
-def logger_factory(name, level=logging.INFO, output='crawlers.log'):
+def logger_factory(name, level=logging.INFO, output='workers.log'):
   logger = logging.getLogger(name)
-  setup_logger(logger, output=output, level=level)
+  # if not logger.handlers:
+  #  setup_logger(logger, output=output, level=level)
   return logger
