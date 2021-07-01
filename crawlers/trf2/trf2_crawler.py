@@ -3,6 +3,7 @@ import time
 import requests
 import pendulum
 import utils
+import random
 import logging
 from tqdm import tqdm
 
@@ -73,6 +74,7 @@ class TRF2:
         download_from_url.delay(**download_args)
       else:
         download_from_url(**download_args)
+        time.sleep(random.uniform(1, 2))
 
   def chunks(self):
     for start_date, end_date in \
@@ -84,7 +86,7 @@ class TRF2:
       yield utils.Chunk(params=chunk_params, output=self.output,
         rows_generator=self.rows(start_date=start_date, end_date=end_date))
 
-  def rows(self, start_date, end_date, sleeptime=1.):
+  def rows(self, start_date, end_date):
     offset = 0
     while True:
       query = {
@@ -130,7 +132,7 @@ class TRF2:
 
       if last_page:
         break
-      time.sleep(sleeptime)
+      time.sleep(random.uniform(2, 5))
 
   @utils.retryable(max_retries=3)   # type: ignore
   def fetch_doc(self, url):
