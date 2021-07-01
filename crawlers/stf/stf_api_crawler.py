@@ -8,12 +8,15 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from urllib3.exceptions import InsecureRequestWarning
+
+from utils import setup_logger
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 import click
 from app import cli, celery
-
+from logconfig import logger_factory
 from crawlers.stf.stf_api_query import get_query
+
 
 DEFAULT_HEADERS = {
   'Accept': 'application/json, text/plain, */*',
@@ -40,7 +43,7 @@ class STF:
           chunk_records  = chunk.get_value('records')
           records_fetch += chunk_records
           pbar.update(chunk_records)
-          self.logger.info(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+          self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
         chunk_records = 0
@@ -53,7 +56,8 @@ class STF:
         chunk.commit()
         records_fetch += chunk_records
         pbar.update(chunk_records)
-        self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited')
+        self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
+        self.logger.info(f'Got {records_fetch} of {total_records}.')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
@@ -146,9 +150,8 @@ def stf_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
 
-  logger = utils.setup_logger('stf', 'logs/stf/stf.log')
-
   output = utils.get_output_strategy_by_path(path=output_uri)
+  logger = logger_factory('stf')
   logger.info(f'Output: {output}.')
 
   crawler = STF(params={

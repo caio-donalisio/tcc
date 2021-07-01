@@ -12,6 +12,8 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 import click
 from app import cli, celery
+from logconfig import logger_factory
+
 
 class TRF2:
   def __init__(self, params, output, logger, **options):
@@ -32,7 +34,7 @@ class TRF2:
           chunk_records  = chunk.get_value('records')
           records_fetch += chunk_records
           pbar.update(chunk_records)
-          self.logger.info(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+          self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
         chunk_records = 0
@@ -45,7 +47,8 @@ class TRF2:
         chunk.commit()
         records_fetch += chunk_records
         pbar.update(chunk_records)
-        self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited')
+        self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
+        self.logger.info(f'Got {records_fetch} so far.')
 
     self.logger.info(f'Fetched {records_fetch}.')
 
@@ -181,9 +184,8 @@ def trf2_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
 
-  logger = utils.setup_logger('trf2', 'logs/trf2/trf2.log')
-
   output = utils.get_output_strategy_by_path(path=output_uri)
+  logger = logger_factory('trf2')
   logger.info(f'Output: {output}.')
 
   crawler = TRF2(params={

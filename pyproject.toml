@@ -21,6 +21,7 @@ pydantic = "^1.8.2"
 wrapt = "^1.12.1"
 fake-headers = "^1.0.2"
 fake-useragent = "^0.1.11"
+google-cloud-logging = "^2.5.0"
 
 [tool.poetry.dev-dependencies]
 
