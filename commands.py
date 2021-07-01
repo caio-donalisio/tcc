@@ -1,11 +1,11 @@
+from os import name
 import click
 import pendulum
 
+from app import cli
 
-@click.group()
-@click.pass_context
-def cli(ctx):
-  pass
+from crawlers.stf.stf_api_crawler import (
+  stf_command)
 
 
 @cli.command()
