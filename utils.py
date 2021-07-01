@@ -18,6 +18,7 @@ import wrapt
 from urllib.parse import urlencode
 
 from storage import (get_bucket_ref, )
+from fake_useragent import UserAgent
 
 
 class GSOutput:
@@ -219,12 +220,15 @@ def weekly(start_date, end_date):
 def timely(start_date, end_date, unit, step):
     date_range = start_date.diff(end_date)
     dates = list(date_range.range(unit, step))
-    if end_date > dates[-1]:
-        dates.append(end_date)
-    pairs = list(pairwise(dates))
-    for x, y in pairs[:-1]:
-        yield x, y.subtract(days=1)
-    yield pairs[-1]
+    if len(dates) == 1:
+        yield dates[0], dates[0]
+    else:
+        if end_date > dates[-1]:
+            dates.append(end_date)
+        pairs = list(pairwise(dates))
+        for x, y in pairs[:-1]:
+            yield x, y.subtract(days=1)
+        yield pairs[-1]
 
 
 class Chunk:
@@ -242,7 +246,7 @@ class Chunk:
 
   @property
   def filepath(self):
-    return f'.state/{self.hash}.json'
+    return f'.state/{self.hash}.state'
 
   def commit(self):
     self._output.save_from_contents(
@@ -265,3 +269,29 @@ class Chunk:
 
   def rows(self):
     yield from self._rows_generator
+
+
+def generate_headers(origin=None, accept='*/*', user_agent=None, xhr=False):
+  headers = {
+    'Accept': accept,
+    'User-Agent': (user_agent or 'Mozilla/5.0 (X11; Linux x86_64; rv:53.0.2) Gecko/20100101 Firefox/53.0.2'),
+    'Referer': 'https://www.google.com/',
+  }
+  if origin:
+    headers['Origin'] = origin
+  if xhr:
+    headers['X-Requested-With'] = 'XMLHttpRequest'
+  return headers
+
+
+class HeaderGenerator:
+    def __init__(self, **defaults):
+        self.ua = UserAgent()
+        self.defaults = defaults
+
+    def generate(self):
+        return generate_headers(
+            accept=self.defaults.get('accept'),
+            origin=self.defaults.get('origin'),
+            xhr=self.defaults.get('xhr', False),
+        )

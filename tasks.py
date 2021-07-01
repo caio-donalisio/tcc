@@ -11,6 +11,7 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 import logging
 logger = logging.getLogger(__name__)
 
+from crawlers.trf2.trf2_crawler import trf2_task
 from crawlers.stf.stf_api_crawler import stf_task
 
 
