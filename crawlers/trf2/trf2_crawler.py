@@ -74,11 +74,11 @@ class TRF2:
         download_from_url.delay(**download_args)
       else:
         download_from_url(**download_args)
-        time.sleep(random.uniform(1, 2))
+        time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
     for start_date, end_date in \
-      utils.timely(self.params['start_date'], self.params['end_date'], unit='days', step=1):
+      utils.timely(self.params['start_date'], self.params['end_date'], unit='days', step=3):
       chunk_params = {
         'start_date': start_date.to_date_string(),
         'end_date'  : end_date.to_date_string()
@@ -123,7 +123,6 @@ class TRF2:
             preview_path = link['href']
             url = f'https://www10.trf2.jus.br/consultas/{preview_path}'
             doc, pdf = self.fetch_doc(url=url)
-            time.sleep(random.uniform(0, 1))
 
         # Pdf wasn't available on html -- use what we got from listing.
         if pdf['url'] is None:
@@ -133,7 +132,7 @@ class TRF2:
 
       if last_page:
         break
-      time.sleep(random.uniform(1, 3))
+      time.sleep(random.uniform(0.2, 0.3))
 
   @utils.retryable(max_retries=3)   # type: ignore
   def fetch_doc(self, url):
@@ -162,7 +161,7 @@ class TRF2:
   @utils.retryable(max_retries=3)   # type: ignore
   def _perform_search(self, query):
     query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
-      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'])
+      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'], timeout=5)
 
     response = requests.post(
       query_url,
