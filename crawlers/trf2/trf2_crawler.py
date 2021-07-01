@@ -12,13 +12,14 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 import click
 from app import cli, celery
 
-
 class TRF2:
   def __init__(self, params, output, logger, **options):
     self.params = params
     self.output = output
     self.logger = logger
     self.options = (options or {})
+    self.header_generator = utils.HeaderGenerator(
+      origin='https://www10.trf2.jus.br', xhr=True)
 
   def run(self):
     records_fetch = 0
@@ -36,7 +37,7 @@ class TRF2:
         chunk_records = 0
         for doc, pdf in chunk.rows():
           self.handle_doc(doc)
-          # self.handle_pdf(pdf)
+          self.handle_pdf(pdf)
           chunk_records += 1
 
         chunk.set_value('records', chunk_records)
@@ -54,17 +55,24 @@ class TRF2:
       content_type='text/html')
 
   def handle_pdf(self, pdf):
-    pass
-    # from tasks import download_from_url
-    # download_args = dict(
-    #   url=pdf['url'], dest=pdf['dest'], output_uri=self.output.uri,
-    #   headers=DEFAULT_HEADERS, content_type='application/pdf', write_mode='wb',
-    #   override=False)
-    # if self.options.get('skip_pdf', False) is False:
-    #   if self.options.get('pdf_async', False):
-    #     download_from_url.delay(**download_args)
-    #   else:
-    #     download_from_url(**download_args)
+    from tasks import download_from_url
+    if pdf['url'] is None:
+      return
+
+    download_args = dict(
+      url=pdf['url'],
+      dest=pdf['dest'],
+      output_uri=self.output.uri,
+      headers=self.header_generator.generate(),
+      content_type='application/pdf',
+      write_mode='wb',
+      override=False)
+
+    if self.options.get('skip_pdf', False) is False:
+      if self.options.get('pdf_async', False):
+        download_from_url.delay(**download_args)
+      else:
+        download_from_url(**download_args)
 
   def chunks(self):
     for start_date, end_date in \
@@ -100,11 +108,25 @@ class TRF2:
 
       for row in rows:
         links = row.find_all('a', {'class': 'font_bold'})
+        pdf_url  = None
+        doc, pdf = None, None
+
         for link in links:
+          # pdf (available on listing)
+          if link.get_text() == 'Inteiro teor':
+            pdf_url = link['href']
+
+          # content
           if link.get_text() == 'Pré-visualização':
             preview_path = link['href']
             url = f'https://www10.trf2.jus.br/consultas/{preview_path}'
-            yield self.fetch_doc(url=url)
+            doc, pdf = self.fetch_doc(url=url)
+
+        # Pdf wasn't available on html -- use what we got from listing.
+        if pdf['url'] is None:
+          pdf['url'] = pdf_url
+
+        yield doc, pdf
 
       if last_page:
         break
@@ -115,8 +137,6 @@ class TRF2:
     from urllib.parse import parse_qs, urlsplit
     doc_info = parse_qs(
       parse_qs(urlsplit(url).query)['q'][0].split('?')[-1])
-
-    print("fetching doc", doc_info)
 
     filename       = f"{doc_info['processo'][0]}_{doc_info['coddoc'][0]}"
     year, month, _ = doc_info['datapublic'][0].split('-')
@@ -138,18 +158,15 @@ class TRF2:
 
   @utils.retryable(max_retries=3)   # type: ignore
   def _perform_search(self, query):
-    headers = {
-      'Accept': '*/*',
-      'Origin': 'https://www10.trf2.jus.br',
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=&start={offset}&num=1&site=v2_jurisprudencia'.format(
+    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
       start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'])
+
     response = requests.post(
       query_url,
-      headers=headers,
+      headers=self.header_generator.generate(),
       verify=False,
       timeout=3)
+
     if response.status_code != 200:
       self.logger.warn(f'Expects 200. Got {response.status_code}.')
       self.logger.warn(response.text)

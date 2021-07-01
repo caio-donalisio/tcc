@@ -18,6 +18,7 @@ import wrapt
 from urllib.parse import urlencode
 
 from storage import (get_bucket_ref, )
+from fake_useragent import UserAgent
 
 
 class GSOutput:
@@ -246,7 +247,7 @@ class Chunk:
 
   @property
   def filepath(self):
-    return f'.state/{self.hash}.json'
+    return f'.state/{self.hash}.state'
 
   def commit(self):
     self._output.save_from_contents(
@@ -269,3 +270,29 @@ class Chunk:
 
   def rows(self):
     yield from self._rows_generator
+
+
+def generate_headers(origin=None, accept='*/*', user_agent=None, xhr=False):
+  headers = {
+    'Accept': accept,
+    'User-Agent': (user_agent or 'Mozilla/5.0 (X11; Linux x86_64; rv:53.0.2) Gecko/20100101 Firefox/53.0.2'),
+    'Referer': 'https://www.google.com/',
+  }
+  if origin:
+    headers['Origin'] = origin
+  if xhr:
+    headers['X-Requested-With'] = 'XMLHttpRequest'
+  return headers
+
+
+class HeaderGenerator:
+    def __init__(self, **defaults):
+        self.ua = UserAgent()
+        self.defaults = defaults
+
+    def generate(self):
+        return generate_headers(
+            accept=self.defaults.get('accept'),
+            origin=self.defaults.get('origin'),
+            xhr=self.defaults.get('xhr', False),
+        )
