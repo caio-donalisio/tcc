@@ -123,6 +123,7 @@ class TRF2:
             preview_path = link['href']
             url = f'https://www10.trf2.jus.br/consultas/{preview_path}'
             doc, pdf = self.fetch_doc(url=url)
+            time.sleep(random.uniform(0, 1))
 
         # Pdf wasn't available on html -- use what we got from listing.
         if pdf['url'] is None:
@@ -132,7 +133,7 @@ class TRF2:
 
       if last_page:
         break
-      time.sleep(random.uniform(2, 5))
+      time.sleep(random.uniform(1, 3))
 
   @utils.retryable(max_retries=3)   # type: ignore
   def fetch_doc(self, url):
