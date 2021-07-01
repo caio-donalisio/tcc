@@ -12,6 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from crawlers.trf2.trf2_crawler import trf2_task
+from crawlers.stf.stf_api_crawler import stf_task
 
 
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')

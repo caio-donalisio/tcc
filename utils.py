@@ -25,7 +25,6 @@ class GSOutput:
     def __init__(self, bucket_name):
         self._bucket_name = bucket_name
         self._bucket = get_bucket_ref(bucket_name)
-
     def exists(self, filepath):
         blob = self._bucket.blob(filepath)
         return blob.exists()
