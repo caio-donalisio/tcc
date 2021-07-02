@@ -58,7 +58,6 @@ class STF:
         records_fetch += chunk_records
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
-        self.logger.info(f'Got {records_fetch} of {total_records}.')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
