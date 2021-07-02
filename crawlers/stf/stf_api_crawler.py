@@ -4,6 +4,7 @@ import requests
 import pendulum
 import utils
 import logging
+import random
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
@@ -79,6 +80,7 @@ class STF:
         download_from_url.delay(**download_args)
       else:
         download_from_url(**download_args)
+        time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
     for start_date, end_date in \
@@ -104,7 +106,7 @@ class STF:
       total_records = result['total']['value']
       for hit in result['hits']:
         yield self.get_doc(hit)
-      time.sleep(sleeptime)
+      time.sleep(random.uniform(sleeptime, sleeptime * 2.))
       offset += page_size
 
   def count(self):
