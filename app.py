@@ -3,9 +3,7 @@ import click
 from celery import Celery
 from celery.signals import after_setup_logger, after_setup_task_logger
 
-import logging
-
-from logconfig import setup_logger
+from logconfig import setup_logger, setup_cloud_logger
 
 
 celery = Celery('inspira',
@@ -15,15 +13,14 @@ celery = Celery('inspira',
 
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
-  logger.handlers.clear()
   setup_logger(logger, output='workers.log')
+  setup_cloud_logger(logger)
 
 
 @after_setup_task_logger.connect
-def setup_task_logger(**kw):
-  logger = logging.getLogger('tasks')
-  logger.handlers.clear()
+def setup_task_logger(logger, *args, **kwargs):
   setup_logger(logger, output='workers.log')
+  setup_cloud_logger(logger)
 
 
 @click.group()

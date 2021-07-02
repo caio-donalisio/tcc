@@ -3,6 +3,10 @@ from google.cloud.logging import Client
 from google.cloud.logging.handlers import CloudLoggingHandler
 
 
+DEFAULT_FORMATTER =\
+  '[%(asctime)s] %(levelname)s %(name)s: %(message)s'
+
+
 class ContextFilter(logging.Filter):
   def filter(self, record):
     record.crawler_args = ''
@@ -12,27 +16,30 @@ class ContextFilter(logging.Filter):
 
 
 def setup_logger(logger, output, level=logging.INFO, cloud=True):
-  # TODO:
-  # logger.addFilter(ContextFilter())
-  # formatter = logging.Formatter('[%(asctime)s] %(name)s [args:%(crawler_args)s] %(levelname)s: %(message)s')
-  # if logger.handlers:
-  #   return
+  formatter = logging.Formatter(DEFAULT_FORMATTER)
 
-  formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(name)s: %(message)s')
-
-  file_handler = logging.FileHandler(f'logs/{output}')
+  file_handler = logging.FileHandler(f'logs/app.log')
   file_handler.setFormatter(formatter)
-  if cloud:
-    client = Client()
-    cloud_handler = CloudLoggingHandler(client)
-    destination =\
-      'logging.googleapis.com/projects/inspira-development/locations/us-east1/buckets/log-crawlers'
-    client.sink('log-crawlers', destination=destination)
-    cloud_handler.setFormatter(formatter)
-    logger.addHandler(cloud_handler)
-
   logger.addHandler(file_handler)
+
+  stream_handler = logging.StreamHandler()
+  stream_handler.setFormatter(formatter)
+  logger.addHandler(stream_handler)
+
   logger.setLevel(level)
+  logger.propagate = False
+
+
+def setup_cloud_logger(logger):
+  formatter = logging.Formatter(DEFAULT_FORMATTER)
+
+  client = Client()
+  cloud_handler = CloudLoggingHandler(client)
+  destination =\
+    'logging.googleapis.com/projects/inspira-development/locations/us-east1/buckets/log-crawlers'
+  client.sink('log-crawlers', destination=destination)
+  cloud_handler.setFormatter(formatter)
+  logger.addHandler(cloud_handler)
 
 
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -40,6 +47,6 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 def logger_factory(name, level=logging.INFO, output='workers.log'):
   logger = logging.getLogger(name)
-  # if not logger.handlers:
-  #  setup_logger(logger, output=output, level=level)
+  setup_cloud_logger(logger)
+  setup_logger(logger, output=output, level=level)
   return logger
