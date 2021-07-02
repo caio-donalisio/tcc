@@ -27,6 +27,11 @@ def download_from_url(url, dest, output_uri, **kwargs):
     allow_redirects=True,
     verify=kwargs.get('verify_ssl', False),
     headers=kwargs.get('headers', {}))
+
+  if response.status_code == 404 and \
+    kwargs.get('ignore_not_found', False):
+    return
+
   assert response.status_code == 200
 
   output.save_from_contents(

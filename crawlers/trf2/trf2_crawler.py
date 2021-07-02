@@ -6,6 +6,7 @@ import utils
 import random
 import logging
 from tqdm import tqdm
+from slugify import slugify
 
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -40,8 +41,9 @@ class TRF2:
           continue
 
         chunk_records = 0
-        for doc, pdf in chunk.rows():
-          self.handle_doc(doc)
+        for doc_short, doc_full, pdf in chunk.rows():
+          self.handle_doc(doc_short)
+          self.handle_doc(doc_full)
           self.handle_pdf(pdf)
           chunk_records += 1
 
@@ -50,7 +52,6 @@ class TRF2:
         records_fetch += chunk_records
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
-        self.logger.info(f'Got {records_fetch} so far.')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
@@ -74,6 +75,7 @@ class TRF2:
       headers=self.header_generator.generate(),
       content_type='application/pdf',
       write_mode='wb',
+      ignore_not_found=True,
       override=False)
 
     if self.options.get('skip_pdf', False) is False:
@@ -86,7 +88,7 @@ class TRF2:
   def chunks(self):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='days', step=3))
-    for start_date, end_date in list(ranges):
+    for start_date, end_date in reversed(ranges):
       chunk_params = {
         'start_date': start_date.to_date_string(),
         'end_date'  : end_date.to_date_string()
@@ -110,26 +112,49 @@ class TRF2:
       offset += len(results)
 
       for result in results:
-        links    = result.find_all('a', {'class': 'font_bold'})
-        pdf_url  = None
-        doc, pdf = None, None
+        item_html = result.prettify()
 
+        # get `data de publicacao`
+        data_els = result.find_all('div', {'class': 'data-relator'})
+        assert len(data_els) == 1
+        data_raw = data_els[0].find_all('span', {'class': 'valor'})[1].get_text()
+        _, month, year = data_raw.split('/')
+
+        # get a possible name for the file.
+        doc_title = result.find_all('span', {'class': 'number_link'}, resursive=False)
+        assert len(doc_title) == 1
+        doc_id   = slugify(doc_title[0].get_text())
+        filename = doc_id
+
+        doc_short = {
+          'source': item_html,
+          'dest'  :  f'{year}/{month}/{filename}.html',
+        }
+        doc_full = {
+          'source': '',
+          'dest'  :  f'{year}/{month}/{filename}_full.html',
+        }
+        pdf = {
+          'url'   : None,
+          'dest'  :  f'{year}/{month}/{filename}.pdf',
+        }
+
+        links = result.find_all('a', {'class': 'font_bold'})
         for link in links:
           # pdf (available on listing)
           if link.get_text() == 'Inteiro teor':
-            pdf_url = link['href']
+            pdf['url'] = link['href']
 
           # content
           if link.get_text() == 'Pré-visualização':
             preview_path = link['href']
             url = f'https://www10.trf2.jus.br/consultas/{preview_path}'
-            doc, pdf = self.fetch_doc(url=url)
+            doc_page = self.fetch_doc(url=url)
+            doc_full['source'] = doc_page['content']
+            if doc_page['pdf_url']:
+              pdf['url'] = doc_page['pdf_url']
 
-        # Pdf wasn't available on html -- use what we got from listing.
-        if pdf['url'] is None:
-          pdf['url'] = pdf_url
-
-        yield doc, pdf
+        yield doc_short, doc_full, pdf
 
       if not page.has_next():
         break
@@ -137,27 +162,15 @@ class TRF2:
 
   @utils.retryable(max_retries=3)   # type: ignore
   def fetch_doc(self, url):
-    from urllib.parse import parse_qs, urlsplit
-    doc_info = parse_qs(
-      parse_qs(urlsplit(url).query)['q'][0].split('?')[-1])
-
-    filename       = f"{doc_info['processo'][0]}_{doc_info['coddoc'][0]}"
-    year, month, _ = doc_info['datapublic'][0].split('-')
-
     response = requests.get(url, allow_redirects=True, verify=False, timeout=3)
 
+    soup = utils.soup_by_content(response.text)
     pdf_url = None
     for link in utils.soup_by_content(response.text).find_all('a'):
       if 'inteiro teor' in link.get_text().lower():
         pdf_url = link['href']
 
-    return {
-      'source': response.text,  # whole content
-      'dest'  : f'{year}/{month}/{filename}.html',
-    }, {
-      'url'   : pdf_url,
-      'dest'  : f'{year}/{month}/{filename}.pdf'
-    }
+    return {'content': soup.prettify(), 'pdf_url': pdf_url}
 
   def count(self):
     total = 0
