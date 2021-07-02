@@ -221,7 +221,7 @@ def timely(start_date, end_date, unit, step):
     date_range = start_date.diff(end_date)
     dates = list(date_range.range(unit, step))
     if len(dates) == 1:
-        yield dates[0], dates[0]
+        yield start_date, end_date
     else:
         if end_date > dates[-1]:
             dates.append(end_date)
