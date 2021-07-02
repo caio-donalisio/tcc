@@ -7,6 +7,7 @@ import random
 import logging
 from tqdm import tqdm
 from slugify import slugify
+import hashlib
 
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -123,8 +124,10 @@ class TRF2:
         # get a possible name for the file.
         doc_title = result.find_all('span', {'class': 'number_link'}, resursive=False)
         assert len(doc_title) == 1
+        # as we can trust this doc_id to be unique -- check whether the content is the same.
         doc_id   = slugify(doc_title[0].get_text())
-        filename = doc_id
+        filename =\
+          f"{doc_id}__{hashlib.sha1(item_html.encode()).hexdigest()}"
 
         doc_short = {
           'source': item_html,
