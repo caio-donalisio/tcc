@@ -88,8 +88,9 @@ class STF:
         time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
-    for start_date, end_date in \
-      utils.timely(self.params['start_date'], self.params['end_date'], unit='days', step=3):
+    ranges = list(utils.timely(
+      self.params['start_date'], self.params['end_date'], unit='days', step=3))
+    for start_date, end_date in reversed(ranges):
       chunk_params = {
         'start_date': start_date.to_date_string(),
         'end_date'  : end_date.to_date_string()
