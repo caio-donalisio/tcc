@@ -25,10 +25,12 @@ class TRF2:
       origin='https://www10.trf2.jus.br', xhr=True)
 
   def run(self):
+    total_records = self.count()
+    self.logger.info(f'Expects {total_records} records.')
     records_fetch = 0
 
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
-    with tqdm(file=tqdm_out) as pbar:
+    with tqdm(total=total_records, file=tqdm_out) as pbar:
       for chunk in self.chunks():
         if chunk.commited():
           chunk_records  = chunk.get_value('records')
@@ -50,7 +52,8 @@ class TRF2:
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
         self.logger.info(f'Got {records_fetch} so far.')
 
-    self.logger.info(f'Fetched {records_fetch}.')
+    self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
+    assert total_records == records_fetch
 
   def handle_doc(self, doc):
     self.output.save_from_contents(
@@ -58,6 +61,7 @@ class TRF2:
       contents=doc['source'],
       content_type='text/html')
 
+  @utils.retryable(max_retries=3)   # type: ignore
   def handle_pdf(self, pdf):
     from tasks import download_from_url
     if pdf['url'] is None:
@@ -97,22 +101,15 @@ class TRF2:
         'end_date'  : end_date.start_of('day').to_date_string(),
         'offset'    : offset,
       }
-      html = self._perform_search(query)
-      soup = utils.soup_by_content(html)
-      uls  = soup.find_all('ul', {'class': 'ul-resultados'})
-      if len(uls) == 0:
+      page = SearchPage(query, logger=self.logger)
+      if not page.has_results():
         break
-      assert len(uls) == 1
 
-      # figure out last page
-      last_page_link = soup.find_all('a', {'class': 'pagination-link'}, string='Último')
-      last_page = len(last_page_link) == 0
+      results = page.results()
+      offset += len(results)
 
-      rows = uls[0].find_all('li', recursive=False)
-      offset += len(rows)
-
-      for row in rows:
-        links = row.find_all('a', {'class': 'font_bold'})
+      for result in results:
+        links    = result.find_all('a', {'class': 'font_bold'})
         pdf_url  = None
         doc, pdf = None, None
 
@@ -133,7 +130,7 @@ class TRF2:
 
         yield doc, pdf
 
-      if last_page:
+      if not page.has_next():
         break
       time.sleep(random.uniform(0.2, 0.3))
 
@@ -161,22 +158,73 @@ class TRF2:
       'dest'  : f'{year}/{month}/{filename}.pdf'
     }
 
-  @utils.retryable(max_retries=3)   # type: ignore
-  def _perform_search(self, query):
-    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
-      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'], timeout=5)
+  def count(self):
+    total = 0
+    for start_date, end_date in \
+      utils.timely(self.params['start_date'], self.params['end_date'], unit='years', step=1):
+      total += SearchPage(query={
+        'start_date': start_date.start_of('day').to_date_string(),
+        'end_date'  : end_date.start_of('day').to_date_string(),
+        'offset'    : 0}, logger=self.logger) \
+      .count()
+    return total
 
-    response = requests.post(
+
+class SearchPage:
+  def __init__(self, query, logger):
+    self.logger = logger
+    self._text = self._perform_query(query)
+    self._soup = utils.soup_by_content(self._text)
+    self._uls  =\
+      self._soup.find_all('ul', {'class': 'ul-resultados'})
+
+  @utils.retryable(max_retries=3)   # type: ignore
+  def _perform_query(self, query):
+    header_generator = utils.HeaderGenerator(origin='https://www10.trf2.jus.br')
+    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
+      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'])
+
+    response = requests.get(
       query_url,
-      headers=self.header_generator.generate(),
+      headers=header_generator.generate(),
       verify=False,
-      timeout=3)
+      timeout=15)
 
     if response.status_code != 200:
       self.logger.warn(f'Expects 200. Got {response.status_code}.')
       self.logger.warn(response.text)
       raise utils.PleaseRetryException()
     return response.text
+
+  @property
+  def text(self):
+    return self._text
+
+  @property
+  def html(self):
+    return self._text
+
+  def has_results(self):
+    return len(self._uls) == 1
+
+  def has_next(self):
+    last_page_link =\
+      self._soup.find_all('a', {'class': 'pagination-link'}, string='Último')
+    return len(last_page_link) > 0
+
+  def results(self):
+    assert len(self._uls) == 1
+    return self._uls[0].find_all('li', recursive=False)
+
+  def count(self):
+    import re
+    facets = self._soup.find_all('a', {'title': 'Inteiro Teor'})
+    if len(facets) == 0:
+      return 0
+    match = re.match(r'.*\((\d+)\)$', facets[0].get_text())
+    if match:
+      return int(match.group(1))
+    return 0  # warn -- unable to estimate.
 
 
 @celery.task(queue='crawlers', rate_limit='1/h')
