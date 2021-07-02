@@ -47,14 +47,8 @@ class STF:
           self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
-        chunk_records = 0
-        for doc, pdf in chunk.rows():
-          self.handle_doc(doc)
-          self.handle_pdf(pdf)
-          chunk_records += 1
+        chunk_records = self.process_chunk(chunk)
 
-        chunk.set_value('records', chunk_records)
-        chunk.commit()
         records_fetch += chunk_records
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
@@ -62,12 +56,24 @@ class STF:
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
 
+  def process_chunk(self, chunk):
+    chunk_records = 0
+    for doc, pdf in chunk.rows():
+      self.handle_doc(doc)
+      self.handle_pdf(pdf)
+      chunk_records += 1
+
+    chunk.set_value('records', chunk_records)
+    chunk.commit()
+    return chunk_records
+
   def handle_doc(self, doc):
     self.output.save_from_contents(
       filepath=doc['dest'],
       contents=json.dumps(doc['source']),
       content_type='application/json')
 
+  @utils.retryable(max_retries=3)   # type: ignore
   def handle_pdf(self, pdf):
     from tasks import download_from_url
     download_args = dict(
