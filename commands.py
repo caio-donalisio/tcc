@@ -7,6 +7,8 @@ from crawlers.trf2.trf2_crawler import (
   trf2_command)
 from crawlers.stf.stf_api_crawler import (
   stf_command)
+from crawlers.tjsp2.tjsp_crawler import (
+  tjsp_command)
 
 
 @cli.command()
@@ -33,11 +35,6 @@ def tjba(start_date, end_date, items_per_page, chunk_size, output_uri):
         all([isinstance(val, int) for val in values]):
       total += sum(values)
   print('done', total)
-
-
-@cli.command()
-def tjsp():
-  pass
 
 
 if __name__ == '__main__':

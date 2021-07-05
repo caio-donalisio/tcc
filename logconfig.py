@@ -1,3 +1,4 @@
+import os
 import logging
 from google.cloud.logging import Client
 from google.cloud.logging.handlers import CloudLoggingHandler
@@ -31,6 +32,9 @@ def setup_logger(logger, output, level=logging.INFO, cloud=True):
 
 
 def setup_cloud_logger(logger):
+  if not os.getenv('CLOUD_LOGGING_ENABLED'):
+    return
+
   formatter = logging.Formatter(DEFAULT_FORMATTER)
 
   client = Client()

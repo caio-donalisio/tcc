@@ -17,6 +17,8 @@ from functools import wraps
 import wrapt
 from urllib.parse import urlencode
 
+from selenium.common.exceptions import TimeoutException
+
 from storage import (get_bucket_ref, )
 from fake_useragent import UserAgent
 
@@ -139,6 +141,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                   requests.exceptions.ConnectionError,
                   requests.exceptions.ReadTimeout,
                   http.client.HTTPException,
+                  TimeoutException,
                   PleaseRetryException)):
     assert max_retries > 0 and sleeptime > 1
 
@@ -147,7 +150,10 @@ def retryable(*, max_retries=3, sleeptime=5,
         retry_count = 0
         while retry_count < max_retries:
             try:
-                return wrapped(*args, **kwargs)
+                val = wrapped(*args, **kwargs)
+                if retry_count > 0:
+                    instance.logger.info(f'Succeed after {retry_count} retries.')
+                return val
             except retryable_exceptions as ex:
                 retry_count = retry_count + 1
                 if retry_count > max_retries:
