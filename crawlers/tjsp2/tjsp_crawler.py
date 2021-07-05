@@ -9,7 +9,6 @@ import random
 import logging
 from tqdm import tqdm
 from slugify import slugify
-import hashlib
 
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -64,7 +63,7 @@ class tjsp:
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
-        time.sleep(random.uniform(.1, .2))
+        time.sleep(random.uniform(0.1, 0.2))
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
@@ -150,7 +149,7 @@ class tjsp:
         content_type='text/html')
       raise PleaseRetryException()
 
-    time.sleep(random.uniform(.5, 2.))
+    time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
     import math
@@ -208,23 +207,25 @@ class tjsp:
         # NOTE: Should we replace `<em>` to something else first?
         value = re.sub(r'\s+', ' ', field.get_text()).strip()
         value = value.replace(label, '')
-        kvs[slugify(label)] = value
+        kvs[slugify(label)] = value.strip()
+
+      _, month, year = kvs['data-de-publicacao'].split('/')
 
       #
       pdf_url = f'https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
 
       yield {
           'source': item.prettify(),
-          'dest'  : f'doc_{doc_id}.html'
+          'dest'  : f'{year}/{month}/doc_{doc_id}.html'
         }, {
           'source': json.dumps(kvs),
-          'dest'  : f'doc_{doc_id}.json'
+          'dest'  : f'{year}/{month}/doc_{doc_id}.json'
         }, {
           'url'   : pdf_url,
-          'dest'  : f'doc_{doc_id}.pdf'
+          'dest'  : f'{year}/{month}/doc_{doc_id}.pdf'
         }
 
-  @utils.retryable(max_retries=3)  # type: ignore
+  @utils.retryable(max_retries=9)  # type: ignore
   def _get_search_results(self, page):
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
@@ -235,6 +236,7 @@ class tjsp:
       .until(EC.presence_of_element_located((By.ID, 'totalResultadoAbaRetornoFiltro-A')))
     return self.driver.page_source
 
+  @utils.retryable(max_retries=9)  # type: ignore
   def _set_search(self, start_date, end_date):
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
@@ -270,6 +272,7 @@ class tjsp:
     records = elements[0]['value']
     return int(records)
 
+  @utils.retryable(max_retries=9)  # type: ignore
   def count(self):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='months', step=1))
