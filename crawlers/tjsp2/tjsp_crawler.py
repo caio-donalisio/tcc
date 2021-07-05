@@ -198,6 +198,13 @@ class tjsp:
 
       # Will parse and store key values on this dict
       kvs = {}
+      kvs['registro'] = links[0].get_text().strip()
+
+      ementa_sem_formatacao_el = item.find_all('div', {'class': 'mensagemSemFormatacao'})
+      assert len(ementa_sem_formatacao_el) == 1
+      ementa_sem_formatacao = ementa_sem_formatacao_el[0].get_text()
+      kvs['ementa_sem_formatacao'] = ementa_sem_formatacao
+
       fields_el = item.find_all('tr', {'class': 'ementaClass2'})
       for field in fields_el:
         # Clear label & values as we built a dict of them
