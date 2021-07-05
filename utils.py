@@ -150,7 +150,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                 return wrapped(*args, **kwargs)
             except retryable_exceptions as ex:
                 retry_count = retry_count + 1
-                if retry_count == max_retries:
+                if retry_count > max_retries:
                     instance.logger.fatal(
                         f'Retry count exceeded (>{max_retries})')
                     raise ex
