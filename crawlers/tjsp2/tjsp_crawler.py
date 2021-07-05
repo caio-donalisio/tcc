@@ -57,13 +57,14 @@ class tjsp:
           self.handle_doc(json, content_type='application/json')
           self.handle_pdf(pdf)
           chunk_records += 1
-          pbar.update(1)
 
         chunk.set_value('records', chunk_records)
         chunk.commit()
         records_fetch += chunk_records
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
+
+        time.sleep(random.uniform(.1, .2))
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
@@ -77,7 +78,8 @@ class tjsp:
 
     from selenium.webdriver.chrome.options import Options
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    if not self.options.get('browser', False):
+      chrome_options.add_argument("--headless")
 
     self.driver = webdriver.Chrome(options=chrome_options)
     self.driver.implicitly_wait(20)
@@ -116,6 +118,9 @@ class tjsp:
     if self.output.exists(pdf['dest']):
       return
 
+    if self.options.get('skip_pdf', False):
+      return
+
     for c in self.request_cookies_browser:
       self.session.cookies.set(c['name'], c['value'])
 
@@ -148,96 +153,76 @@ class tjsp:
     time.sleep(random.uniform(.5, 2.))
 
   def chunks(self):
+    import math
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='days', step=1))
     for start_date, end_date in reversed(ranges):
-      chunk_params = {
-        'start_date': start_date.to_date_string(),
-        'end_date'  : end_date.to_date_string()
-      }
-      # TODO: create smaller chunks -- page based?
-      yield utils.Chunk(params=chunk_params, output=self.output,
-        rows_generator=self.rows(start_date=start_date, end_date=end_date))
+      number_of_records = self._set_search(start_date, end_date)
+      number_of_pages   = math.ceil(number_of_records / 20)
 
-  def rows(self, start_date, end_date):
-    # Will validate the number of records every fetch
-    expects = self._set_search(start_date, end_date)
-    page = 1
-    while True:
-      # page_control_file_name =\
-      #   f'page_control/page_{start_date.to_date_string()}_{end_date.to_date_string()}_num_{page}.txt'
-      # if self.output.exists(page_control_file_name):
-      #   self.logger.info(f'Page {page} already ok -- probably.')
-      #   page += 1
-      #   continue
+      for page in range(1, number_of_pages + 1):
+        chunk_params = {
+          'start_date': start_date.to_date_string(),
+          'end_date'  : end_date.to_date_string(),
+          'page'      : page,
+        }
+        yield utils.Chunk(params=chunk_params, output=self.output,
+          rows_generator=self.rows(
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            expects=number_of_records))
+
+  def rows(self, start_date, end_date, page, expects):
+    text = self._get_search_results(page=page)
+    soup = utils.soup_by_content(text)
+
+    # Check whether the page matches the expected count of elements and page number.
+    count_elements = soup.find_all('input', {'id': 'totalResultadoAbaRetornoFiltro-A'})
+    assert len(count_elements) == 1
+    records = int(count_elements[0]['value'])
+    assert expects == records
+
+    current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
+    if len(current_page_links) == 1:  # otherwise might be the last page.
+      assert page == int(current_page_links[0].get_text().strip())
+
+    # Firstly, get rows that matters
+    items = soup.find_all('tr', {'class': 'fundocinza1'})
+
+    for item in items:
+      links = item.find_all('a', {'class': 'downloadEmenta'})
+      assert len(links) > 0
+      doc_id = links[0]['cdacordao']
+      foro   = links[0]['cdforo']
+      assert doc_id and foro
+
+      # Will parse and store key values on this dict
+      kvs = {}
+      fields_el = item.find_all('tr', {'class': 'ementaClass2'})
+      for field in fields_el:
+        # Clear label & values as we built a dict of them
+        label = field.find_all('strong')[0].get_text().strip()
+        label = re.sub(r'$:', '', label)
+
+        # NOTE: Should we replace `<em>` to something else first?
+        value = re.sub(r'\s+', ' ', field.get_text()).strip()
+        value = value.replace(label, '')
+        kvs[slugify(label)] = value
 
       #
-      text = self._get_search_results(page=page)
-      soup = utils.soup_by_content(text)
+      pdf_url = f'https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
 
-      #
-      # Validate page
-      #
-      # Check whether the page matches the expected count of elements and page number.
-      count_elements = soup.find_all('input', {'id': 'totalResultadoAbaRetornoFiltro-A'})
-      assert len(count_elements) == 1
-      records = int(count_elements[0]['value'])
-      assert expects == records
-
-      current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
-      if len(current_page_links) == 1:  # otherwise might be the last page.
-        assert page == int(current_page_links[0].get_text().strip())
-
-      # Firstly, get rows that matters
-      items = soup.find_all('tr', {'class': 'fundocinza1'})
-
-      for item in items:
-        links = item.find_all('a', {'class': 'downloadEmenta'})
-        assert len(links) > 0
-        doc_id = links[0]['cdacordao']
-        foro   = links[0]['cdforo']
-        assert doc_id and foro
-
-        # Will parse and store key values on this dict
-        kvs = {}
-        fields_el = item.find_all('tr', {'class': 'ementaClass2'})
-        for field in fields_el:
-          # Clear label & values as we built a dict of them
-          label = field.find_all('strong')[0].get_text().strip()
-          label = re.sub(r'$:', '', label)
-
-          # NOTE: Should we replace `<em>` to something else first?
-          value = re.sub(r'\s+', ' ', field.get_text()).strip()
-          value = value.replace(label, '')
-          kvs[slugify(label)] = value
-
-        #
-        pdf_url = f'https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
-
-        yield {
-            'source': item.prettify(),
-            'dest'  : f'doc_{doc_id}.html'
-          }, {
-            'source': json.dumps(kvs),
-            'dest'  : f'doc_{doc_id}.json'
-          }, {
-            'url'   : pdf_url,
-            'dest'  : f'doc_{doc_id}.pdf'
-          }
-
-      # yield {
-      #     'source': str(hashlib.sha1(text.encode()).hexdigest()),
-      #     'dest'  : page_control_file_name,
-      #   }, \
-      #   None, \
-      #   None,\
-      #   None
-
-      page += 1
-      if len(items) == 0:
-        break
-
-      time.sleep(random.uniform(0.2, 0.5))
+      yield {
+          'source': item.prettify(),
+          'dest'  : f'doc_{doc_id}.html'
+        }, {
+          'source': json.dumps(kvs),
+          'dest'  : f'doc_{doc_id}.json'
+        }, {
+          'url'   : pdf_url,
+          'dest'  : f'doc_{doc_id}.pdf'
+        }
 
   @utils.retryable(max_retries=3)  # type: ignore
   def _get_search_results(self, page):
@@ -295,7 +280,7 @@ class tjsp:
 
 
 @celery.task(queue='crawlers', rate_limit='1/h')
-def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
+def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
 
@@ -305,7 +290,7 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 
   crawler = tjsp(params={
     'start_date': start_date, 'end_date': end_date
-  }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf)
+  }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf, browser=browser)
   crawler.run()
 
 
@@ -316,8 +301,9 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
-def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
+@click.option('--browser'   , default=False, help='Open browser'          , is_flag=True)
+def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue, browser):
+  args = (start_date, end_date, output_uri, pdf_async, skip_pdf, browser)
   if enqueue:
     tjsp_task.delay(*args)
   else:
