@@ -63,7 +63,7 @@ class TRF2:
       contents=doc['source'],
       content_type='text/html')
 
-  @utils.retryable(max_retries=3)   # type: ignore
+  @utils.retryable(max_retries=9)   # type: ignore
   def handle_pdf(self, pdf):
     from tasks import download_from_url
     if pdf['url'] is None:
@@ -153,6 +153,7 @@ class TRF2:
             preview_path = link['href']
             url = f'https://www10.trf2.jus.br/consultas/{preview_path}'
             doc_page = self.fetch_doc(url=url)
+            time.sleep(random.uniform(0.1, 0.2))
             doc_full['source'] = doc_page['content']
             if doc_page['pdf_url']:
               pdf['url'] = doc_page['pdf_url']
@@ -163,9 +164,9 @@ class TRF2:
         break
       time.sleep(random.uniform(0.2, 0.3))
 
-  @utils.retryable(max_retries=3)   # type: ignore
+  @utils.retryable(max_retries=9)   # type: ignore
   def fetch_doc(self, url):
-    response = requests.get(url, allow_redirects=True, verify=False, timeout=3)
+    response = requests.get(url, allow_redirects=True, verify=False, timeout=15)
 
     soup = utils.soup_by_content(response.text)
     pdf_url = None
