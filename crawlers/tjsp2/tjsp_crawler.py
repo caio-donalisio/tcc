@@ -225,7 +225,7 @@ class tjsp:
       pdf_url = f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
 
       yield {
-          'source': item.prettify(),
+          'source': item.prettify(encoding='cp1252'),
           'dest'  : f'{year}/{month}/doc_{doc_id}.html'
         }, {
           'source': json.dumps(kvs),
