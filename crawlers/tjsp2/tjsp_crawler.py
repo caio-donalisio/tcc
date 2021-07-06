@@ -34,6 +34,8 @@ class tjsp:
     self.request_cookies_browser = []
 
   def run(self):
+    import concurrent.futures
+
     self.signin()
 
     total_records = self.count()
@@ -46,20 +48,35 @@ class tjsp:
         if chunk.commited():
           chunk_records  = chunk.get_value('records')
           records_fetch += chunk_records
+          pbar.set_postfix(chunk.params)
           pbar.update(chunk_records)
           self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
-        chunk_records = 0
-        for html, json, pdf in chunk.rows():
-          self.handle_doc(html, content_type='text/html')
-          self.handle_doc(json, content_type='application/json')
-          self.handle_pdf(pdf)
-          chunk_records += 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+          chunk_records = 0
+          futures = []
+          for html, json, pdf in chunk.rows():
+            futures.extend([
+              executor.submit(self.persist, html, content_type='text/html'),
+              executor.submit(self.persist, json, content_type='application/json'),
+            ])
+            # We have to download pdfs sync due to the rate limiter.
+            # This slows down the process a lot -- nothing to do for now.
+            pdf['source'] = self.download_pdf(pdf)
+            time.sleep(random.uniform(0.5, 1.0))
+            if pdf['source'] is not None:
+              futures.append(
+                executor.submit(self.persist, pdf, mode='wb', content_type='application/pdf'))
+
+          for future in concurrent.futures.as_completed(futures):
+            future.result()
+            chunk_records += 1
 
         chunk.set_value('records', chunk_records)
         chunk.commit()
         records_fetch += chunk_records
+        pbar.set_postfix(chunk.params)
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
@@ -79,6 +96,7 @@ class tjsp:
     chrome_options = Options()
     if not self.options.get('browser', False):
       chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
 
     self.driver = webdriver.Chrome(options=chrome_options)
     self.driver.implicitly_wait(20)
@@ -103,14 +121,14 @@ class tjsp:
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.CLASS_NAME, 'esajTabelaServico')))
 
-  def handle_doc(self, doc, content_type):
+  def persist(self, record, **kwargs):
     self.output.save_from_contents(
-      filepath=doc['dest'],
-      contents=doc['source'],
-      content_type=content_type)
+      filepath=record['dest'],
+      contents=record['source'],
+      **kwargs)
 
   @utils.retryable(max_retries=9, sleeptime=10.)   # type: ignore
-  def handle_pdf(self, pdf):
+  def download_pdf(self, pdf):
     if pdf['url'] is None:
       return
 
@@ -130,26 +148,11 @@ class tjsp:
       timeout=10)
 
     if response.headers.get('Content-type') == 'application/pdf;charset=UTF-8':
-      self.output.save_from_contents(
-        filepath=pdf['dest'],
-        contents=response.content,
-        mode='wb',
-        content_type='application/pdf')
+      return response.content
     else:
       self.logger.warn(
         f"Got {response.status_code} when fetching {pdf['url']}. Content-type: {response.headers.get('Content-type')}.")
-
-      # Save for debug / retry
-      # We are assuming they returned a html for us.
-      # let's use this to investigate what's going on. Maybe they are throttling us.
-      self.output.save_from_contents(
-        filepath=pdf['dest'].replace('.pdf', '_error.html'),
-        contents=response.text,
-        mode='w',
-        content_type='text/html')
       raise PleaseRetryException()
-
-    time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
     import math
@@ -219,7 +222,7 @@ class tjsp:
       _, month, year = kvs['data-de-publicacao'].split('/')
 
       #
-      pdf_url = f'https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
+      pdf_url = f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
 
       yield {
           'source': item.prettify(),
