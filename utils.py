@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import logging
 import urllib.request
@@ -17,8 +18,14 @@ from functools import wraps
 import wrapt
 from urllib.parse import urlencode
 
+from selenium.common.exceptions import TimeoutException
+
 from storage import (get_bucket_ref, )
 from fake_useragent import UserAgent
+
+import logconfig
+
+logger = logconfig.logger_factory(name='utils')
 
 
 class GSOutput:
@@ -135,27 +142,35 @@ class PleaseRetryException(Exception):
 
 
 def retryable(*, max_retries=3, sleeptime=5,
-              retryable_exceptions=(
+                retryable_exceptions=(
                   requests.exceptions.ConnectionError,
                   requests.exceptions.ReadTimeout,
                   http.client.HTTPException,
-                  PleaseRetryException)):
+                  TimeoutException,
+                  PleaseRetryException),
+                logger=None):
     assert max_retries > 0 and sleeptime > 1
 
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
         retry_count = 0
+        loginstance = instance.logger if instance else logger
         while retry_count < max_retries:
             try:
-                return wrapped(*args, **kwargs)
+                val = wrapped(*args, **kwargs)
+                if retry_count > 0 and loginstance:
+                    loginstance.info(f'Succeed after {retry_count} retries.')
+                return val
             except retryable_exceptions as ex:
                 retry_count = retry_count + 1
                 if retry_count > max_retries:
-                    instance.logger.fatal(
-                        f'Retry count exceeded (>{max_retries})')
+                    if loginstance:
+                        loginstance.fatal(
+                            f'Retry count exceeded (>{max_retries})')
                     raise ex
-                instance.logger.warn(
-                    f'Got connection issues -- retrying in {retry_count * 5}s.')
+                if loginstance:
+                    loginstance.warn(
+                        f'Got connection issues -- retrying in {retry_count * 5}s.')
                 time.sleep(sleeptime * retry_count)
 
     return wrapper
@@ -245,6 +260,10 @@ class Chunk:
     self._values = json.loads(raw_value)
 
   @property
+  def params(self):
+    return self._params
+
+  @property
   def filepath(self):
     return f'.state/{self.hash}.state'
 
@@ -295,3 +314,13 @@ class HeaderGenerator:
             origin=self.defaults.get('origin'),
             xhr=self.defaults.get('xhr', False),
         )
+
+
+def timeit(f):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = f(*args, **kw)
+        te = time.time()
+        print('func:%r took: %2.4f sec' % (f.__name__, te-ts))
+        return result
+    return timed
