@@ -53,7 +53,7 @@ class tjsp:
           self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
           chunk_records = 0
           futures = []
           for html, json, pdf in chunk.rows():
