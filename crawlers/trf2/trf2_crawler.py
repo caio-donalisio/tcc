@@ -25,8 +25,11 @@ class TRF2:
     self.options = (options or {})
     self.header_generator = utils.HeaderGenerator(
       origin='https://www10.trf2.jus.br', xhr=True)
+    self.session = requests.Session()
 
   def run(self):
+    import concurrent.futures
+
     total_records = self.count()
     self.logger.info(f'Expects {total_records} records.')
     records_fetch = 0
@@ -37,33 +40,41 @@ class TRF2:
         if chunk.commited():
           chunk_records  = chunk.get_value('records')
           records_fetch += chunk_records
+          pbar.set_postfix(chunk.params)
           pbar.update(chunk_records)
           self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
           continue
 
-        chunk_records = 0
-        for doc_short, doc_full, pdf in chunk.rows():
-          self.handle_doc(doc_short)
-          self.handle_doc(doc_full)
-          self.handle_pdf(pdf)
-          chunk_records += 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+          chunk_records = 0
+          futures = []
+          for doc_short, doc_full, pdf in chunk.rows():
+            chunk_records += 1
+            futures.extend([
+              executor.submit(self.persist, doc_short, content_type='text/html'),
+              executor.submit(self.persist, doc_full , content_type='text/html'),
+              executor.submit(self.handle_pdf, pdf)
+            ])
+
+          for future in concurrent.futures.as_completed(futures):
+            future.result()
 
         chunk.set_value('records', chunk_records)
         chunk.commit()
         records_fetch += chunk_records
+        pbar.set_postfix(chunk.params)
         pbar.update(chunk_records)
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
     assert total_records == records_fetch
 
-  def handle_doc(self, doc):
+  def persist(self, doc, **kwargs):
     self.output.save_from_contents(
       filepath=doc['dest'],
       contents=doc['source'],
-      content_type='text/html')
+      **kwargs)
 
-  @utils.retryable(max_retries=9)   # type: ignore
   def handle_pdf(self, pdf):
     from tasks import download_from_url
     if pdf['url'] is None:
@@ -84,7 +95,6 @@ class TRF2:
         download_from_url.delay(**download_args)
       else:
         download_from_url(**download_args)
-        time.sleep(random.uniform(0.1, 0.2))
 
   def chunks(self):
     ranges = list(utils.timely(
@@ -105,7 +115,7 @@ class TRF2:
         'end_date'  : end_date.start_of('day').to_date_string(),
         'offset'    : offset,
       }
-      page = SearchPage(query, logger=self.logger)
+      page = SearchPage(self.session, query, logger=self.logger)
       if not page.has_results():
         break
 
@@ -113,7 +123,7 @@ class TRF2:
       offset += len(results)
 
       for result in results:
-        item_html = result.prettify()
+        item_html = result.prettify(encoding='cp1252')
 
         # get `data de publicacao`
         data_els = result.find_all('div', {'class': 'data-relator'})
@@ -180,7 +190,7 @@ class TRF2:
     total = 0
     for start_date, end_date in \
       utils.timely(self.params['start_date'], self.params['end_date'], unit='years', step=1):
-      total += SearchPage(query={
+      total += SearchPage(session=self.session, query={
         'start_date': start_date.start_of('day').to_date_string(),
         'end_date'  : end_date.start_of('day').to_date_string(),
         'offset'    : 0}, logger=self.logger) \
@@ -189,8 +199,9 @@ class TRF2:
 
 
 class SearchPage:
-  def __init__(self, query, logger):
+  def __init__(self, session, query, logger):
     self.logger = logger
+    self._session = session
     self._text = self._perform_query(query)
     self._soup = utils.soup_by_content(self._text)
     self._uls  =\
@@ -202,7 +213,7 @@ class SearchPage:
     query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
       start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'])
 
-    response = requests.get(
+    response = self._session.get(
       query_url,
       headers=header_generator.generate(),
       verify=False,
