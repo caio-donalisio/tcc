@@ -57,6 +57,7 @@ class tjsp:
           chunk_records = 0
           futures = []
           for html, json, pdf in chunk.rows():
+            chunk_records += 1
             futures.extend([
               executor.submit(self.persist, html, content_type='text/html'),
               executor.submit(self.persist, json, content_type='application/json'),
@@ -71,7 +72,6 @@ class tjsp:
 
           for future in concurrent.futures.as_completed(futures):
             future.result()
-            chunk_records += 1
 
         chunk.set_value('records', chunk_records)
         chunk.commit()
