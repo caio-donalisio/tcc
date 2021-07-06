@@ -123,7 +123,7 @@ class TRF2:
       offset += len(results)
 
       for result in results:
-        item_html = result.prettify(encoding='cp1252')
+        item_html = result.prettify()
 
         # get `data de publicacao`
         data_els = result.find_all('div', {'class': 'data-relator'})
@@ -140,7 +140,7 @@ class TRF2:
           f"{doc_id}__{hashlib.sha1(item_html.encode()).hexdigest()}"
 
         doc_short = {
-          'source': item_html,
+          'source': result.prettify(encoding='cp1252'),
           'dest'  :  f'{year}/{month}/{filename}.html',
         }
         doc_full = {
