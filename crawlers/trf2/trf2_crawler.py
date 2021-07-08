@@ -256,7 +256,8 @@ class SearchPage:
     return 0  # warn -- unable to estimate.
 
 
-@celery.task(queue='crawlers', rate_limit='1/h')
+@celery.task(queue='crawlers', rate_limit='1/h', default_retry_delay=30 * 60,
+             autoretry_for=(Exception,))
 def trf2_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
