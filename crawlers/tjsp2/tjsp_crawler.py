@@ -43,7 +43,7 @@ class tjsp:
     records_fetch = 0
 
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
       with tqdm(total=total_records, file=tqdm_out) as pbar:
         for chunk in self.chunks():
           if chunk.commited():
