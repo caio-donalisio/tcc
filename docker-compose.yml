@@ -9,8 +9,22 @@ services:
     build: .
     network_mode: 'service:redis'
     container_name: 'inspira-crawlers-celery'
-    command: 'celery -A tasks worker -Q crawlers --concurrency=2'
+    command: 'celery -A tasks worker -Q persistence,crawlers,downloader --concurrency=2 -E --loglevel=INFO'
     environment:
+      - CELERYD_HIJACK_ROOT_LOGGER=false
       - C_FORCE_ROOT='true'
     volumes:
-      - ".:/opt/service"
+      - .:/opt/service
+
+  flower:
+    build: .
+    network_mode: 'service:redis'
+    container_name: 'inspira-crawlers-flower'
+    command: 'celery -A tasks flower --port=5555'
+    ports:
+      - 5555:5555
+    environment:
+      - CELERYD_HIJACK_ROOT_LOGGER=false
+      - C_FORCE_ROOT='true'
+    volumes:
+      - .:/opt/service
