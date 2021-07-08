@@ -32,6 +32,7 @@ class GSOutput:
     def __init__(self, bucket_name):
         self._bucket_name = bucket_name
         self._bucket = get_bucket_ref(bucket_name)
+        self._cache  = {}
         # self._cache  = {b.name: True for b in self.list_by_prefix()}
 
     def list_by_prefix(self, prefix=None):
