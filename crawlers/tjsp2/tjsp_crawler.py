@@ -36,56 +36,60 @@ class tjsp:
   def run(self):
     import concurrent.futures
 
-    self.signin()
+    try:
+      self.signin()
 
-    total_records = self.count()
-    self.logger.info(f'Expects {total_records} records.')
-    records_fetch = 0
+      total_records = self.count()
+      self.logger.info(f'Expects {total_records} records.')
+      records_fetch = 0
 
-    tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-      with tqdm(total=total_records, file=tqdm_out) as pbar:
-        for chunk in self.chunks():
-          if chunk.commited():
-            chunk_records  = chunk.get_value('records')
+      tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
+      with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with tqdm(total=total_records, file=tqdm_out) as pbar:
+          for chunk in self.chunks():
+            if chunk.commited():
+              chunk_records  = chunk.get_value('records')
+              records_fetch += chunk_records
+              pbar.set_postfix(chunk.params)
+              pbar.update(chunk_records)
+              self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+              continue
+
+            chunk_records = 0
+            futures = []
+            for html, json, pdf in chunk.rows():
+              chunk_records += 1
+              futures.extend([
+                executor.submit(self.persist, html, content_type='text/html'),
+                executor.submit(self.persist, json, content_type='application/json'),
+              ])
+              # We have to download pdfs sync due to the rate limiter.
+              # This slows down the process a lot -- nothing to do for now.
+              if self.options.get('skip_pdf', False) == False:
+                pdf['source'] = self.download_pdf(pdf)
+                time.sleep(random.uniform(0.5, 1.0))
+                # Then, persist.
+                if pdf['source'] is not None:
+                  futures.append(
+                    executor.submit(self.persist, pdf, mode='wb', content_type='application/pdf'))
+
+            for future in concurrent.futures.as_completed(futures):
+              future.result()
+
+            chunk.set_value('records', chunk_records)
+            chunk.commit()
             records_fetch += chunk_records
             pbar.set_postfix(chunk.params)
             pbar.update(chunk_records)
-            self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
-            continue
+            self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
-          chunk_records = 0
-          futures = []
-          for html, json, pdf in chunk.rows():
-            chunk_records += 1
-            futures.extend([
-              executor.submit(self.persist, html, content_type='text/html'),
-              executor.submit(self.persist, json, content_type='application/json'),
-            ])
-            # We have to download pdfs sync due to the rate limiter.
-            # This slows down the process a lot -- nothing to do for now.
-            if self.options.get('skip_pdf', False) == False:
-              pdf['source'] = self.download_pdf(pdf)
-              time.sleep(random.uniform(0.5, 1.0))
-              # Then, persist.
-              if pdf['source'] is not None:
-                futures.append(
-                  executor.submit(self.persist, pdf, mode='wb', content_type='application/pdf'))
+            # time.sleep(random.uniform(0.1, 0.2))
 
-          for future in concurrent.futures.as_completed(futures):
-            future.result()
-
-          chunk.set_value('records', chunk_records)
-          chunk.commit()
-          records_fetch += chunk_records
-          pbar.set_postfix(chunk.params)
-          pbar.update(chunk_records)
-          self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
-
-          # time.sleep(random.uniform(0.1, 0.2))
-
-      self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
-      assert total_records == records_fetch
+        self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
+        assert total_records == records_fetch
+    finally:
+      if self.driver:
+        self.driver.quit()
 
   def signin(self):
     from selenium import webdriver
