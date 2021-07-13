@@ -64,11 +64,13 @@ class tjsp:
             ])
             # We have to download pdfs sync due to the rate limiter.
             # This slows down the process a lot -- nothing to do for now.
-            pdf['source'] = self.download_pdf(pdf)
-            time.sleep(random.uniform(0.5, 1.0))
-            if pdf['source'] is not None:
-              futures.append(
-                executor.submit(self.persist, pdf, mode='wb', content_type='application/pdf'))
+            if self.options.get('skip_pdf', False) == False:
+              pdf['source'] = self.download_pdf(pdf)
+              time.sleep(random.uniform(0.5, 1.0))
+              # Then, persist.
+              if pdf['source'] is not None:
+                futures.append(
+                  executor.submit(self.persist, pdf, mode='wb', content_type='application/pdf'))
 
           for future in concurrent.futures.as_completed(futures):
             future.result()
@@ -80,7 +82,7 @@ class tjsp:
           pbar.update(chunk_records)
           self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
-          time.sleep(random.uniform(0.1, 0.2))
+          # time.sleep(random.uniform(0.1, 0.2))
 
       self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
       assert total_records == records_fetch
@@ -292,8 +294,8 @@ class tjsp:
     return total
 
 
-@celery.task(queue='crawlers', rate_limit='1/h', default_retry_delay=30 * 60,
-             autoretry_for=(Exception,))
+@celery.task(queue='crawlers', default_retry_delay=5 * 60,
+             autoretry_for=(BaseException,))
 def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
   start_date, end_date =\
     pendulum.parse(start_date), pendulum.parse(end_date)
