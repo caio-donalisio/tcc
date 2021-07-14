@@ -60,7 +60,7 @@ class tjsp:
             for html, json, pdf in chunk.rows():
               chunk_records += 1
               futures.extend([
-                executor.submit(self.persist, html, content_type='text/html'),
+                executor.submit(self.persist, html, content_type='text/html', mode='wb'),
                 executor.submit(self.persist, json, content_type='application/json'),
               ])
               # We have to download pdfs sync due to the rate limiter.
@@ -192,11 +192,14 @@ class tjsp:
     assert expects == records
 
     current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
-    if len(current_page_links) == 1:  # otherwise might be the last page.
+    is_last_page = len(current_page_links) == 1
+    if not is_last_page:  # otherwise might be the last page.
       assert page == int(current_page_links[0].get_text().strip())
 
     # Firstly, get rows that matters
     items = soup.find_all('tr', {'class': 'fundocinza1'})
+    if not is_last_page:
+      assert 20 == len(items)  # sanity check
 
     for item in items:
       links = item.find_all('a', {'class': 'downloadEmenta'})
