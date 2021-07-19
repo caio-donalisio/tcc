@@ -180,6 +180,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                     loginstance.warn(
                         f'Got connection issues -- retrying in {retry_count * 5}s.')
                 time.sleep(sleeptime * retry_count)
+        raise Exception("should not get here")
 
     return wrapper
 
@@ -255,9 +256,10 @@ def timely(start_date, end_date, unit, step):
 
 
 class Chunk:
-  def __init__(self, params, output, rows_generator):
+  def __init__(self, params, output, rows_generator, prefix=''):
     self._params = params
     self._output = output
+    self._prefix = prefix
     self._rows_generator = rows_generator
     self._values = {**{}, **params}
     if self.commited():
@@ -273,7 +275,7 @@ class Chunk:
 
   @property
   def filepath(self):
-    return f'.state/{self.hash}.state'
+    return f'.state/{self._prefix}{self.hash}.state'
 
   def commit(self):
     self._output.save_from_contents(
