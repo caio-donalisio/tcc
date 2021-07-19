@@ -337,17 +337,22 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--browser'   , default=False, help='Open browser'          , is_flag=True)
-@click.option('--split-tasks-monthly',
-  default=False, help='Split in tasks (use with --enqueue)', is_flag=True)
-def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue, browser, split_tasks_monthly):
+@click.option('--split-tasks',
+  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue, browser, split_tasks):
   args = (start_date, end_date, output_uri, pdf_async, skip_pdf, browser)
   if enqueue:
-    if split_tasks_monthly:
+    if split_tasks:
       start_date, end_date =\
         pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit='months', step=1):
-        tjsp_task.delay(start, end,  output_uri, pdf_async, skip_pdf, browser)
+      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
+        task_id = tjsp_task.delay(
+          start.to_date_string(),
+          end.to_date_string(),
+          output_uri, pdf_async, skip_pdf, browser)
+        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
     else:
+      args.pop()
       tjsp_task.delay(*args)
   else:
     tjsp_task(*args)
