@@ -174,12 +174,17 @@ class tjsp:
           'end_date'  : end_date.to_date_string(),
           'page'      : page,
         }
-        yield utils.Chunk(params=chunk_params, output=self.output,
-          rows_generator=self.rows(
+        rows_generator =\
+          self.rows(
             start_date=start_date,
             end_date=end_date,
             page=page,
-            expects=number_of_records))
+            expects=number_of_records)
+        yield utils.Chunk(
+          params=chunk_params,
+          output=self.output,
+          rows_generator=rows_generator,
+          prefix=f'{start_date.year}/{start_date.month:02d}/')
 
   def rows(self, start_date, end_date, page, expects):
     text = self._get_search_results(page=page)
@@ -189,17 +194,24 @@ class tjsp:
     count_elements = soup.find_all('input', {'id': 'totalResultadoAbaRetornoFiltro-A'})
     assert len(count_elements) == 1
     records = int(count_elements[0]['value'])
-    assert expects == records
+
+    assert expects == records, "page {page} was expecting {expects} got {records} (start_date: {start_date}, end_date: {end_date})".format(
+      page=page, expects=expects, records=records, start_date=start_date, end_date=end_date)
 
     current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
-    is_last_page = len(current_page_links) == 1
-    if not is_last_page:  # otherwise might be the last page.
+
+    # Verify if we are at the right page... (at least when possible)
+    if len(current_page_links) == 1:
       assert page == int(current_page_links[0].get_text().strip())
+
+    is_last_page = len(soup.find_all('a', {'title': 'Próxima página'})) == 0
 
     # Firstly, get rows that matters
     items = soup.find_all('tr', {'class': 'fundocinza1'})
     if not is_last_page:
-      assert 20 == len(items)  # sanity check
+      page_records = len(items)
+      assert 20 == page_records, \
+        f'expecting 20 records on page {page}, got {page_records} (start_date: {start_date}, end_date: {end_date})'  # sanity check
 
     for item in items:
       links = item.find_all('a', {'class': 'downloadEmenta'})
@@ -228,7 +240,7 @@ class tjsp:
         value = value.replace(label, '')
         kvs[slugify(label)] = value.strip()
 
-      _, month, year = kvs['data-de-publicacao'].split('/')
+      _, month, year = kvs['data-do-julgamento'].split('/')
 
       #
       pdf_url = f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
@@ -269,9 +281,9 @@ class tjsp:
 
     search_box = self.driver.find_element_by_id('iddados.buscaInteiroTeor')
     search_box.send_keys('a ou de ou o')
-    start_box = self.driver.find_element_by_id('iddados.dtPublicacaoInicio')
+    start_box = self.driver.find_element_by_id('iddados.dtJulgamentoInicio')
     start_box.send_keys(start_)
-    end_box = self.driver.find_element_by_id('iddados.dtPublicacaoFim')
+    end_box = self.driver.find_element_by_id('iddados.dtJulgamentoFim')
     end_box.send_keys(end_)
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.ID, 'pbSubmit')))
