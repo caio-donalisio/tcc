@@ -79,7 +79,7 @@ class TJRJ(base.BaseCrawler):
       else:
         raise Exception('Unable to handle ', event)
 
-  @utils.retryable(max_retries=3, sleeptime=10., ignore_if_exceeds=True)   # type: ignore
+  @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)   # type: ignore
   def download_pdf(self, content_from_url):
     if content_from_url.src is None:
       return
