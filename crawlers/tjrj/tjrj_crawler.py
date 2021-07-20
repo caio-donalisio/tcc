@@ -100,6 +100,7 @@ class TJRJ(base.BaseCrawler):
       self.output.save_from_contents(
         filepath=content_from_url.dest,
         contents=response.content,
+        content_type='application/pdf',
         mode='wb')
     else:
       if response.status_code == 200 and \
