@@ -79,7 +79,7 @@ class TJRJ(base.BaseCrawler):
       else:
         raise Exception('Unable to handle ', event)
 
-  @utils.retryable(max_retries=3, sleeptime=10.)   # type: ignore
+  @utils.retryable(max_retries=3, sleeptime=10., ignore_if_exceeds=True)   # type: ignore
   def download_pdf(self, content_from_url):
     if content_from_url.src is None:
       return
@@ -106,9 +106,8 @@ class TJRJ(base.BaseCrawler):
         'text/html' in response.headers.get('Content-type'):
         # Got a warning message -- Shuld we retry?
         logger.warn(
-          f"Got a wait page when fetching {content_from_url.src} -- won't retry.")
-        # raise utils.PleaseRetryException()
-        return  # will warn for now
+          f"Got a wait page when fetching {content_from_url.src} -- will retry.")
+        raise utils.PleaseRetryException()
 
       logger.warn(
         f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
