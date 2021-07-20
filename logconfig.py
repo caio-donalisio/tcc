@@ -5,7 +5,7 @@ from google.cloud.logging.handlers import CloudLoggingHandler
 
 
 DEFAULT_FORMATTER =\
-  '[%(asctime)s] %(levelname)s %(name)s: %(message)s'
+  '[%(asctime)s] p%(process)s %(levelname)s %(name)s: %(message)s'
 
 
 class ContextFilter(logging.Filter):

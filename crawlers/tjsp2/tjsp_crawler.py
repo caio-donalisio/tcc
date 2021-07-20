@@ -19,14 +19,15 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 import click
 from app import cli, celery
-from logconfig import logger_factory
+from logconfig import logger_factory, setup_cloud_logger
+
+logger = logger_factory('tjsp')
 
 
 class tjsp:
-  def __init__(self, params, output, logger, **options):
+  def __init__(self, params, output, **options):
     self.params = params
     self.output = output
-    self.logger = logger
     self.options = (options or {})
     self.header_generator = utils.HeaderGenerator(
       origin='https://esaj.tjsp.jus.br', xhr=False)
@@ -40,10 +41,10 @@ class tjsp:
       self.signin()
 
       total_records = self.count()
-      self.logger.info(f'Expects {total_records} records.')
+      logger.info(f'Expects {total_records} records.')
       records_fetch = 0
 
-      tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
+      tqdm_out = utils.TqdmToLogger(logger, level=logging.INFO)
       with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         with tqdm(total=total_records, file=tqdm_out) as pbar:
           for chunk in self.chunks():
@@ -52,7 +53,7 @@ class tjsp:
               records_fetch += chunk_records
               pbar.set_postfix(chunk.params)
               pbar.update(chunk_records)
-              self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+              logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
               continue
 
             chunk_records = 0
@@ -81,9 +82,9 @@ class tjsp:
             records_fetch += chunk_records
             pbar.set_postfix(chunk.params)
             pbar.update(chunk_records)
-            self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
+            logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
-        self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
+        logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
         assert total_records == records_fetch
     finally:
       if self.driver:
@@ -154,7 +155,7 @@ class tjsp:
     if response.headers.get('Content-type') == 'application/pdf;charset=UTF-8':
       return response.content
     else:
-      self.logger.warn(
+      logger.warn(
         f"Got {response.status_code} when fetching {pdf['url']}. Content-type: {response.headers.get('Content-type')}.")
       raise PleaseRetryException()
 
@@ -318,8 +319,9 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
     pendulum.parse(start_date), pendulum.parse(end_date)
 
   output = utils.get_output_strategy_by_path(path=output_uri)
-  logger = logger_factory('tjsp')
+
   logger.info(f'Output: {output}.')
+  setup_cloud_logger(logger)
 
   crawler = tjsp(params={
     'start_date': start_date, 'end_date': end_date
@@ -350,7 +352,6 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue,
           output_uri, pdf_async, skip_pdf, browser)
         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
     else:
-      args.pop()
       tjsp_task.delay(*args)
   else:
     tjsp_task(*args)

@@ -162,7 +162,7 @@ def retryable(*, max_retries=3, sleeptime=5,
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
         retry_count = 0
-        loginstance = instance.logger if instance else logger
+        loginstance = logger
         while retry_count < max_retries:
             try:
                 val = wrapped(*args, **kwargs)
