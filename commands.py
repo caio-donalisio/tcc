@@ -9,6 +9,8 @@ from crawlers.stf.stf_api_crawler import (
   stf_command)
 from crawlers.tjsp2.tjsp_crawler import (
   tjsp_command)
+from crawlers.tjrj.tjrj_crawler import (
+  tjrj_command)
 
 
 @cli.command()
