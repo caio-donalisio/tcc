@@ -23,9 +23,7 @@ from selenium.common.exceptions import TimeoutException
 from storage import (get_bucket_ref, )
 from fake_useragent import UserAgent
 
-import logconfig
-
-logger = logconfig.logger_factory(name='utils')
+from logconfig import logger
 
 
 class GSOutput:
@@ -155,30 +153,26 @@ def retryable(*, max_retries=3, sleeptime=5,
                   requests.exceptions.ReadTimeout,
                   http.client.HTTPException,
                   TimeoutException,
-                  PleaseRetryException),
-                logger=None):
+                  PleaseRetryException)):
     assert max_retries > 0 and sleeptime > 1
 
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
         retry_count = 0
-        loginstance = logger
         while retry_count < max_retries:
             try:
                 val = wrapped(*args, **kwargs)
-                if retry_count > 0 and loginstance:
-                    loginstance.info(f'Succeed after {retry_count} retries.')
+                if retry_count > 0:
+                    logger.info(f'Succeed after {retry_count} retries.')
                 return val
             except retryable_exceptions as ex:
                 retry_count = retry_count + 1
                 if retry_count > max_retries:
-                    if loginstance:
-                        loginstance.fatal(
-                            f'Retry count exceeded (>{max_retries})')
+                    logger.fatal(
+                        f'Retry count exceeded (>{max_retries})')
                     raise ex
-                if loginstance:
-                    loginstance.warn(
-                        f'Got connection issues -- retrying in {retry_count * 5}s.')
+                logger.warn(
+                    f'Got connection issues -- retrying in {retry_count * 5}s.')
                 time.sleep(sleeptime * retry_count)
         raise Exception(f'Retry count exceeded (>{max_retries})')
 

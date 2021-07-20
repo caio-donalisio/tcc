@@ -10,7 +10,9 @@ import base
 import click
 import browsers
 from app import cli, celery
-from logconfig import logger_factory
+from logconfig import logger_factory, setup_cloud_logger
+
+logger = logger_factory('tjrj')
 
 
 BASE_URL = 'http://www4.tjrj.jus.br'
@@ -56,7 +58,7 @@ class TJRJ(base.BaseCrawler):
       chunks_generator=self.chunks(total_pages),
       row_to_futures=self.handle,
       total_records=total_records,
-      logger=self.logger,
+      logger=logger,
     )
 
     runner.run()
@@ -103,12 +105,12 @@ class TJRJ(base.BaseCrawler):
       if response.status_code == 200 and \
         'text/html' in response.headers.get('Content-type'):
         # Got a warning message -- Shuld we retry?
-        self.logger.warn(
+        logger.warn(
           f"Got a wait page when fetching {content_from_url.src} -- won't retry.")
         # raise utils.PleaseRetryException()
         return  # will warn for now
 
-      self.logger.warn(
+      logger.warn(
         f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
 
   def chunks(self, number_of_pages):
@@ -159,7 +161,7 @@ class TJRJ(base.BaseCrawler):
       'pCPF': '',
       'pLogin': ''
     }
-    self.logger.debug(f"POST {act['NumAntigo']}: {data_url}")
+    logger.debug(f"POST {act['NumAntigo']}: {data_url}")
     data_response = self.requester.post(
         data_url, json=data_payload, headers=headers)
     data_result = data_response.json()['d']
@@ -188,7 +190,7 @@ class TJRJ(base.BaseCrawler):
   def _get_acts(self, page, payload, headers):
     payload['numPagina'] = page
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
-    self.logger.debug(f'POST (get_acts) {url}')
+    logger.debug(f'POST (get_acts) {url}')
     response = self.requester.post(url, json=payload, headers=headers)
     result = response.json()['d']
     return result['DocumentosConsulta']
@@ -197,7 +199,7 @@ class TJRJ(base.BaseCrawler):
   def count(self, payload, headers):
     payload['numPagina'] = 0
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
-    self.logger.debug(f'POST (count) {url}')
+    logger.debug(f'POST (count) {url}')
     response = self.requester.post(url, json=payload, headers=headers)
     result = response.json()['d']
     return result['TotalDocs']
@@ -207,7 +209,7 @@ class TJRJ(base.BaseCrawler):
 
   def _get_session_id(self):
     url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx'
-    self.logger.debug(f'GET {url}')
+    logger.debug(f'GET {url}')
 
     self.browser.get(url)
     self.browser.fill_in(
@@ -222,23 +224,26 @@ class TJRJ(base.BaseCrawler):
     for cookie in cookies:
       if cookie.get('name') == 'ASP.NET_SessionId':
         session_id = cookie['value']
-        self.logger.info(f'Got ASP.NET_SessionId: {session_id}')
+        logger.info(f'Got ASP.NET_SessionId: {session_id}')
     return session_id
 
 
 @celery.task(queue='crawlers', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
-  output = utils.get_output_strategy_by_path(path=output_uri)
-  logger = logger_factory('tjrj')
-  logger.info(f'Output: {output}.')
+  from logutils import logging_context
 
-  options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
+  with logging_context(crawler='tjrj'):
+    output = utils.get_output_strategy_by_path(path=output_uri)
+    logger.info(f'Output: {output}.')
+    setup_cloud_logger(logger)
 
-  crawler = TJRJ(params={
-    'start_year': start_year, 'end_year': end_year
-  }, output=output, logger=logger, browser=browsers.FirefoxBrowser(), **options)
-  crawler.run()
+    options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
+
+    crawler = TJRJ(params={
+      'start_year': start_year, 'end_year': end_year
+    }, output=output, logger=logger, browser=browsers.FirefoxBrowser(), **options)
+    crawler.run()
 
 
 @cli.command(name='tjrj')

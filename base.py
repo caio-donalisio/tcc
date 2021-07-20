@@ -91,7 +91,7 @@ class Runner:
               records_fetch += chunk_records
               pbar.set_postfix(chunk.params)
               pbar.update(chunk_records)
-              self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+              self.logger.info(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
               continue
 
             chunk_records = 0

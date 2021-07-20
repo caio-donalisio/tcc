@@ -1,9 +1,9 @@
 import conf
 import click
 from celery import Celery
-from celery.signals import after_setup_logger, after_setup_task_logger
+from celery.signals import setup_logging
 
-from logconfig import setup_logger, setup_cloud_logger
+from logconfig import logger_factory
 
 
 celery = Celery('inspira',
@@ -11,16 +11,9 @@ celery = Celery('inspira',
   backend=conf.get('CELERY_BACKEND_URL'))
 
 
-@after_setup_logger.connect
-def setup_loggers(logger, *args, **kwargs):
-  setup_logger(logger, output='workers.log')
-  setup_cloud_logger(logger)
-
-
-@after_setup_task_logger.connect
-def setup_task_logger(logger, *args, **kwargs):
-  setup_logger(logger, output='workers.log')
-  setup_cloud_logger(logger)
+@setup_logging.connect
+def on_setup_logging(**kwargs):
+  logger_factory('celery')
 
 
 @click.group()

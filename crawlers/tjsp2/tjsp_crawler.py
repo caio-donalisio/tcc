@@ -315,18 +315,21 @@ class tjsp:
 @celery.task(queue='crawlers', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
-  start_date, end_date =\
-    pendulum.parse(start_date), pendulum.parse(end_date)
+  from logutils import logging_context
 
-  output = utils.get_output_strategy_by_path(path=output_uri)
+  with logging_context(crawler='tjsp'):
+    start_date, end_date =\
+      pendulum.parse(start_date), pendulum.parse(end_date)
 
-  logger.info(f'Output: {output}.')
-  setup_cloud_logger(logger)
+    output = utils.get_output_strategy_by_path(path=output_uri)
 
-  crawler = tjsp(params={
-    'start_date': start_date, 'end_date': end_date
-  }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf, browser=browser)
-  crawler.run()
+    logger.info(f'Output: {output}.')
+    setup_cloud_logger(logger)
+
+    crawler = tjsp(params={
+      'start_date': start_date, 'end_date': end_date
+    }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf, browser=browser)
+    crawler.run()
 
 
 @cli.command(name='tjsp')

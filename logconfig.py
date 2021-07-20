@@ -3,20 +3,26 @@ import logging
 from google.cloud.logging import Client
 from google.cloud.logging.handlers import CloudLoggingHandler
 
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
 
 DEFAULT_FORMATTER =\
-  '[%(asctime)s] p%(process)s %(levelname)s %(name)s: %(message)s'
+  '[%(asctime)s] p%(process)s %(module)s %(levelname)s %(name)s: %(message)s'
 
+# DEFAULT_FORMATTER =\
+# '[%(asctime)s] [%(crawler)s] p%(process)s %(module)s %(levelname)s %(name)s: %(message)s'
+
+
+from logutils import logging_context_handler
 
 class ContextFilter(logging.Filter):
   def filter(self, record):
-    record.crawler_args = ''
-    if hasattr(record, 'start_date') and hasattr(record, 'end_date'):
-      record.crawler_args = f'start_date={record.start_date}, end_date={record.end_date}'
+    record.crawler =\
+      (logging_context_handler.get('crawler') or 'unknown')
     return True
 
 
-def setup_logger(logger, output, level=logging.INFO, cloud=True):
+def setup_logger(logger, level=logging.INFO, cloud=True):
   formatter = logging.Formatter(DEFAULT_FORMATTER)
 
   file_handler = logging.FileHandler(f'logs/app.log')
@@ -35,6 +41,8 @@ def setup_cloud_logger(logger):
   if not os.getenv('CLOUD_LOGGING_ENABLED'):
     return
 
+  print("Notice: CLOUD_LOGGING_ENABLED enabled.")
+
   formatter = logging.Formatter(DEFAULT_FORMATTER)
 
   client = Client()
@@ -46,11 +54,14 @@ def setup_cloud_logger(logger):
   logger.addHandler(cloud_handler)
 
 
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-
-
-def logger_factory(name, level=logging.INFO, output='workers.log'):
+def logger_factory(name, level=logging.INFO):
   logger = logging.getLogger(name)
+  context_filter = ContextFilter()
+  logger.addFilter(context_filter)
+
   setup_cloud_logger(logger)
-  setup_logger(logger, output=output, level=level)
+  setup_logger(logger, level=level)
   return logger
+
+
+logger = logger_factory('crawlers')

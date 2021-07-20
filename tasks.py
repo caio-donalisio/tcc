@@ -1,5 +1,4 @@
 from app import celery
-import crawlers.tjba.tjba_crawler
 
 import requests
 import utils
@@ -8,12 +7,10 @@ import utils
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-import logging
-logger = logging.getLogger(__name__)
-
 from crawlers.trf2.trf2_crawler import trf2_task
 from crawlers.stf.stf_api_crawler import stf_task
 from crawlers.tjsp2.tjsp_crawler import tjsp_task
+from crawlers.tjrj.tjrj_crawler import tjrj_task
 
 
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')
