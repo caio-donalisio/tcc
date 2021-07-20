@@ -102,10 +102,11 @@ class TJRJ(base.BaseCrawler):
     else:
       if response.status_code == 200 and \
         'text/html' in response.headers.get('Content-type'):
-        # Got a warning message -- retry
+        # Got a warning message -- Shuld we retry?
         self.logger.warn(
-          f"Got a wait page when fetching {content_from_url.src} -- will retry.")
-        raise utils.PleaseRetryException()
+          f"Got a wait page when fetching {content_from_url.src} -- won't retry.")
+        # raise utils.PleaseRetryException()
+        return  # will warn for now
 
       self.logger.warn(
         f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
@@ -187,7 +188,7 @@ class TJRJ(base.BaseCrawler):
   def _get_acts(self, page, payload, headers):
     payload['numPagina'] = page
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
-    self.logger.info(f'POST (get_acts) {url}')
+    self.logger.debug(f'POST (get_acts) {url}')
     response = self.requester.post(url, json=payload, headers=headers)
     result = response.json()['d']
     return result['DocumentosConsulta']
@@ -222,7 +223,6 @@ class TJRJ(base.BaseCrawler):
       if cookie.get('name') == 'ASP.NET_SessionId':
         session_id = cookie['value']
         self.logger.info(f'Got ASP.NET_SessionId: {session_id}')
-
     return session_id
 
 
