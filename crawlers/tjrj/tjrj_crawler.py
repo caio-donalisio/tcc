@@ -228,7 +228,7 @@ class TJRJ(base.BaseCrawler):
     return session_id
 
 
-@celery.task(queue='crawlers', default_retry_delay=5 * 60,
+@celery.task(queue='crawlers.tjrj', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
   from logutils import logging_context

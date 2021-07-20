@@ -312,7 +312,7 @@ class tjsp:
     return total
 
 
-@celery.task(queue='crawlers', default_retry_delay=5 * 60,
+@celery.task(queue='crawlers.tjsp', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
   from logutils import logging_context
