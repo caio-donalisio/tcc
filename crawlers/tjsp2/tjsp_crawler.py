@@ -83,8 +83,6 @@ class tjsp:
             pbar.update(chunk_records)
             self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
-            # time.sleep(random.uniform(0.1, 0.2))
-
         self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
         assert total_records == records_fetch
     finally:
@@ -138,10 +136,10 @@ class tjsp:
     if pdf['url'] is None:
       return
 
-    if self.output.exists(pdf['dest']):
+    if self.options.get('skip_pdf', False):
       return
 
-    if self.options.get('skip_pdf', False):
+    if self.output.exists(pdf['dest']):
       return
 
     for c in self.request_cookies_browser:
