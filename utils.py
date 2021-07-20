@@ -27,9 +27,10 @@ from logconfig import logger
 
 
 class GSOutput:
-    def __init__(self, bucket_name):
+    def __init__(self, bucket_name, prefix=''):
         self._bucket_name = bucket_name
         self._bucket = get_bucket_ref(bucket_name)
+        self._prefix = prefix
         self._cache  = {}
         # self._cache  = {b.name: True for b in self.list_by_prefix()}
 
@@ -37,27 +38,27 @@ class GSOutput:
         return list(self._bucket.list_blobs(prefix=prefix))
 
     def exists(self, filepath):
-        if self._cache.get(filepath):
+        if self._cache.get(f'{self._prefix}{filepath}'):
             return True
-        blob = self._bucket.blob(filepath)
+        blob = self._bucket.blob(f'{self._prefix}{filepath}')
         return blob.exists()
 
     def save_from_contents(self, filepath, contents, **kwargs):
-        blob = self._bucket.blob(filepath)
+        blob = self._bucket.blob(f'{self._prefix}{filepath}')
         blob.upload_from_string(contents,
             content_type=kwargs.get('content_type', 'text/plain'))
 
     def load_as_string(self, filepath):
-        blob = self._bucket.blob(filepath)
+        blob = self._bucket.blob(f'{self._prefix}{filepath}')
         if blob.exists():
             return blob.download_as_bytes()
 
     @property
     def uri(self):
-        return f'gs://{self._bucket_name}'
+        return f'gs://{self._bucket_name}{self._prefix}'
 
     def __repr__(self):
-        return f"GS({self._bucket})"
+        return f"GS({self._bucket}, prefix={self._prefix})"
 
 
 class LSOutput:
@@ -90,7 +91,7 @@ def get_output_strategy_by_path(path):
     from urllib.parse import urlparse
     url = urlparse(path)
     if url.scheme == 'gs':
-        return GSOutput(bucket_name=url.netloc)
+        return GSOutput(bucket_name=url.netloc, prefix=url.path[1:])
     elif url.scheme == '':  # assume as local filesystem.
         return LSOutput(output_folder=path)
     raise Exception(f'Unable to detect proper output strategy for {path}')
@@ -148,7 +149,8 @@ class PleaseRetryException(Exception):
 
 
 def retryable(*, max_retries=3, sleeptime=5,
-                retryable_exceptions=(
+              ignore_if_exceeds=False,
+              retryable_exceptions=(
                   requests.exceptions.ConnectionError,
                   requests.exceptions.ReadTimeout,
                   http.client.HTTPException,
@@ -174,7 +176,8 @@ def retryable(*, max_retries=3, sleeptime=5,
                 logger.warn(
                     f'Got connection issues -- retrying in {retry_count * 5}s.')
                 time.sleep(sleeptime * retry_count)
-        raise Exception(f'Retry count exceeded (>{max_retries})')
+        if not ignore_if_exceeds:
+            raise Exception(f'Retry count exceeded (>{max_retries})')
 
     return wrapper
 
