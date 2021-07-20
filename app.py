@@ -9,6 +9,7 @@ from logconfig import logger_factory
 celery = Celery('inspira',
   broker=conf.get('CELERY_BROKER_URL'),
   backend=conf.get('CELERY_BACKEND_URL'))
+celery.config_from_object('celeryconf')
 
 
 @setup_logging.connect
