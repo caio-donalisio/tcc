@@ -174,7 +174,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                         f'Retry count exceeded (>{max_retries})')
                     raise ex
                 logger.warn(
-                    f'Got connection issues -- retrying in {retry_count * 5}s.')
+                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
                 time.sleep(sleeptime * retry_count)
         if not ignore_if_exceeds:
             raise Exception(f'Retry count exceeded (>{max_retries})')
