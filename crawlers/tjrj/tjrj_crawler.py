@@ -170,10 +170,10 @@ class TJRJ(base.BaseCrawler):
 
     extra_contents = []
     documents = data_result.get('InteiroTeor', [])
-    for index, document in enumerate(documents):
+    for document in enumerate(documents):
       gedid = document['ArqGED']
       pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
-      pdf_filename = f'{act_id}-IT{index + 1}'
+      pdf_filename = f'{act_id}-{gedid}'
       pdf_filepath = utils.get_filepath(
           date=str(updated_at), filename=pdf_filename, extension='pdf')
       extra_contents.append(base.ContentFromURL(
