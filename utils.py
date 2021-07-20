@@ -180,7 +180,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                     loginstance.warn(
                         f'Got connection issues -- retrying in {retry_count * 5}s.')
                 time.sleep(sleeptime * retry_count)
-        raise Exception("should not get here")
+        raise Exception(f'Retry count exceeded (>{max_retries})')
 
     return wrapper
 
