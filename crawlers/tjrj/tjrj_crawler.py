@@ -170,7 +170,7 @@ class TJRJ(base.BaseCrawler):
 
     extra_contents = []
     documents = data_result.get('InteiroTeor', [])
-    for document in enumerate(documents):
+    for document in documents:
       gedid = document['ArqGED']
       pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
       pdf_filename = f'{act_id}-{gedid}'
