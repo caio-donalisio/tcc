@@ -28,6 +28,7 @@ class Content(pydantic.BaseModel):
   """
   content : str
   dest : str
+  content_type : str
 
   def __repr__(self):
     return f'Content(value={self.content[:10]}..., dest={self.dest})'
@@ -38,6 +39,7 @@ class ContentFromURL(pydantic.BaseModel):
   """
   src : str
   dest : str
+  content_type : str
 
   def __repr__(self):
     return f'ContentFromURL(src={self.src}..., dest={self.dest})'
@@ -91,7 +93,7 @@ class Runner:
               records_fetch += chunk_records
               pbar.set_postfix(chunk.params)
               pbar.update(chunk_records)
-              self.logger.info(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
+              self.logger.debug(f"Chunk {chunk.hash} already commited ({chunk_records} records) -- skipping.")
               continue
 
             chunk_records = 0

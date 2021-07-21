@@ -69,7 +69,7 @@ class TJRJ(base.BaseCrawler):
         args = {
           'filepath': event.dest,
           'contents': event.content,
-          'content_type': 'application/json'
+          'content_type': event.content_type
         }
         yield self.output.save_from_contents, args
       elif isinstance(event, base.ContentFromURL):
@@ -148,7 +148,8 @@ class TJRJ(base.BaseCrawler):
       # fetch extra content as well
       contents = self.fetch_data(act, headers, act_id, updated_at)
       yield [
-        base.Content(content=json.dumps(act, ensure_ascii=False), dest=filepath),
+        base.Content(content=json.dumps(act, ensure_ascii=False), dest=filepath,
+                     content_type='application/json'),
         *contents
       ]
       time.sleep(random.uniform(.05, .20))
@@ -178,11 +179,12 @@ class TJRJ(base.BaseCrawler):
       pdf_filepath = utils.get_filepath(
           date=str(updated_at), filename=pdf_filename, extension='pdf')
       extra_contents.append(base.ContentFromURL(
-        src=pdf_url, dest=pdf_filepath,
+        src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
       ))
 
     return [
-      base.Content(content=self._dump(data_result), dest=filepath),
+      base.Content(content=self._dump(data_result), dest=filepath,
+                  content_type='application/json'),
       *extra_contents
     ]
 
