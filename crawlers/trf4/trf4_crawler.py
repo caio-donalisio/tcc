@@ -103,7 +103,8 @@ class TRF4(base.BaseCrawler):
       response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
         data=params, headers=self.header_generator.generate())
 
-      assert response.status_code == 200
+      assert response.status_code == 200, \
+        f'Got {response.status_code} params {params}'
       if 'Não foram encontrados registros com estes critérios de pesquisa.' in response.text:
         continue
 
@@ -183,6 +184,7 @@ class TRF4(base.BaseCrawler):
     assert len(next_btn) == 0, 'No next button'
 
   def _find_optimal_ranges(self, start_date, end_date, referendary):
+    import math
     def _count(start, end):
       params = self._get_query_params(
         cboRelator=referendary,
@@ -204,13 +206,14 @@ class TRF4(base.BaseCrawler):
       logger.warn(
         f'More than 1000 records found on a query (got {num_of_docs}) -- finding for optimal ranges.')
       days  = start_date.diff(end_date).in_days()
-      div   = 2
-      while div <= days:
-        ranges = list(utils.timely(start_date, end_date, unit='days', step=days/div))
-        if all([
-          _count(start, end) <= 1000 for start, end in ranges]):
+      step  = math.ceil(days / 2)
+      while True:
+        ranges = list(utils.timely(start_date, end_date, unit='days', step=step))
+        if all([_count(start, end) <= 1000 for start, end in ranges]):
           return ranges
-        div += 1
+        if step == 1:
+          break
+        step = math.ceil(step / 2)
       raise Exception(
         f'Unable to find optional ranges for {start_date}, {end_date} and {referendary}.')
     else:
@@ -231,7 +234,7 @@ class TRF4(base.BaseCrawler):
       'cboRelator': '',
       'dataIni': '',
       'dataFim': '',
-      'tipodata': 'DEC',
+      'tipodata': 'PUB',
       'docsPagina': '1000',
       'hdnAcao': 'nova_pesquisa',
       'arrclasses': '',
