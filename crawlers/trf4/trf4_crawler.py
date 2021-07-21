@@ -219,7 +219,7 @@ class TRF4(base.BaseCrawler):
         ]
 
         counts_by_params = [(params, self.count(params)) for params in params_list]
-        if all([count[-1] < 1000 for count in counts_by_params]):
+        if all([count[-1] <= 1000 for count in counts_by_params]):
           for params, _ in counts_by_params:
             yield params
           return
