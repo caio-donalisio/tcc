@@ -234,7 +234,7 @@ class TRF4(base.BaseCrawler):
       'cboRelator': '',
       'dataIni': '',
       'dataFim': '',
-      'tipodata': 'PUB',
+      'tipodata': 'DEC',
       'docsPagina': '1000',
       'hdnAcao': 'nova_pesquisa',
       'arrclasses': '',
