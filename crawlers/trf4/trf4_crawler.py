@@ -5,8 +5,6 @@ import requests
 import pendulum
 from collections import defaultdict
 
-from tasks import download_from_url
-
 import base
 import click
 from app import cli, celery
@@ -37,6 +35,8 @@ class TRF4(base.BaseCrawler):
     runner.run()
 
   def handle(self, events):
+    from tasks import download_from_url
+
     for event in events:
       if isinstance(event, base.Content):
         args = {
