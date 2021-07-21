@@ -130,9 +130,8 @@ class TRF4(base.BaseCrawler):
 
       # Doc data has started
       if len(tds) == 1:
-        assert tds[0]['rowspan'] == '4' or \
-          tds[0]['rowspan'] == '5', f"got rowspan {tds[0]['rowspan']} params {params}"
         doc_index = tds[0].get_text()
+        assert int(doc_index)  # Must be a number
 
       # Are we reading a doc and it looks like a data table row?
       if len(tds) == 2 and doc_index is not None:
