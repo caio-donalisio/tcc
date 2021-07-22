@@ -234,7 +234,7 @@ class TRF4(base.BaseCrawler):
       yield [
         base.Content(content=doc_html,
           dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
-        base.Content(src=doc_url,
+        base.Content(content=doc_url,
            dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
         # base.ContentFromURL(src=doc_url,
         #   dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
