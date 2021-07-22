@@ -74,17 +74,18 @@ class TRF4(base.BaseCrawler):
   @utils.retryable(max_retries=9)  # type: ignore
   def count(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=5)
+      data=params, headers=self.header_generator.generate(), timeout=30)
     return self._extract_count_from_text(response.text)
 
   @utils.retryable(max_retries=9)  # type: ignore
   def _vet_pagination(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=5)
+      data=params, headers=self.header_generator.generate(), timeout=30)
     soup = utils.soup_by_content(response.text)
+    vet_pagination = soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})
     return {
       'total': self._extract_count_from_text(response.text),
-      'vetPaginacao':  soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})['value']
+      'vetPaginacao': (vet_pagination['value'] if vet_pagination else '')
     }
 
   def chunks(self):
@@ -120,8 +121,11 @@ class TRF4(base.BaseCrawler):
 
   def _rows_from_params(self, params, page_size=200):
     pagination = self._vet_pagination({**params, **{'docsPagina': page_size}})
+    if pagination['total'] == 0:
+      return []
+
     expected_docs_per_page = pagination['vetPaginacao'].split("#")
-    fetched = 0
+    rows = []
 
     for page in range(len(expected_docs_per_page)):
       req_params = {**params, **{
@@ -153,13 +157,11 @@ class TRF4(base.BaseCrawler):
       # We know exactly which records we will get
       doc_ids = expected_docs_per_page[page].split(',')
       expects = len(doc_ids)
+      rows.extend(self._extract_rows(text, expects=expects, params=params))
 
-      for row in self._extract_rows(text, expects=expects, params=params):
-        yield row
-        fetched += 1
-
-    assert fetched == pagination['total'], \
-      f"got {fetched} was expecting {pagination['total']}"
+    assert len(rows) == pagination['total'], \
+      f"got {len(rows)} was expecting {pagination['total']}"
+    return rows
 
   @utils.retryable(max_retries=3)
   def _make_request(self, params):
@@ -272,6 +274,8 @@ class TRF4(base.BaseCrawler):
         if all([count[-1] <= 1000 for count in counts_by_params]):
           for params, _ in counts_by_params:
             yield params
+          logger.info(
+            f'Found optimal ranges for {start_date}, {end_date} and {referendary}.')
           return
 
         step = math.ceil(step / 2)
