@@ -33,6 +33,18 @@ class TRF4(base.BaseCrawler):
       docsPagina=10
     ))
 
+    self.orgs = self._get_orgs()
+
+    total_using_orgs = sum([
+      self.count(params=self._get_query_params(
+        arrorgaos=org,
+        dataIni=self.params['start_date'].strftime(DATE_FORMAT),
+        dataFim=self.params['end_date'].strftime(DATE_FORMAT),
+        docsPagina=10
+      )) for org in self.orgs
+    ])
+    assert total_records == total_using_orgs
+
     self.classes = self._get_classes()
     max_cls_id   = max([int(c) for c in self.classes])
 
@@ -92,17 +104,16 @@ class TRF4(base.BaseCrawler):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='weeks', step=2))
 
-    referendaries = self._get_referendaries()
 
     for start_date, end_date in reversed(ranges):
-      for referendary in referendaries:
+      for org in self.orgs:
         chunk_params = {
           'start_date'  : start_date.to_date_string(),
           'end_date'    : end_date.to_date_string(),
-          'referendary' : referendary,
+          'org'         : org,
         }
         rows_generator =\
-          self.rows(start_date=start_date, end_date=end_date, referendary=referendary)
+          self.rows(start_date=start_date, end_date=end_date, arrorgaos=org)
         yield utils.Chunk(
           params=chunk_params,
           output=self.output,
@@ -112,8 +123,8 @@ class TRF4(base.BaseCrawler):
         time.sleep(.1)
       time.sleep(.5)
 
-  def rows(self, start_date, end_date, referendary):
-    params_list = self._find_optimal_filters(start_date, end_date, referendary)
+  def rows(self, start_date, end_date, **filters):
+    params_list = self._find_optimal_filters(start_date, end_date, **filters)
 
     for params in params_list:
       for row in self._rows_from_params(params):
@@ -240,14 +251,14 @@ class TRF4(base.BaseCrawler):
         #   dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
       ]
 
-  def _find_optimal_filters(self, start_date, end_date, referendary):
+  def _find_optimal_filters(self, start_date, end_date, **filters):
     # This site limits the number of records to 1000.
     # We must make sure it won't surpass this limit.
     default_params = self._get_query_params(
-      cboRelator=referendary,
       dataIni=start_date.strftime(DATE_FORMAT),
       dataFim=end_date.strftime(DATE_FORMAT),
-      docsPagina=10)
+      docsPagina=10,
+      **filters)
     num_of_docs = self.count(default_params)
 
     if num_of_docs == 0:
@@ -265,10 +276,10 @@ class TRF4(base.BaseCrawler):
         ranges = list(utils.timely(start_date, end_date, unit='days', step=step))
         params_list = [
           self._get_query_params(
-            cboRelator=referendary,
             dataIni=start.strftime(DATE_FORMAT),
             dataFim=end.strftime(DATE_FORMAT),
-            docsPagina=10)
+            docsPagina=10,
+            **filters)
           for start, end in ranges
         ]
 
@@ -277,7 +288,7 @@ class TRF4(base.BaseCrawler):
           for params, _ in counts_by_params:
             yield params
           logger.info(
-            f'Found optimal ranges for {start_date}, {end_date} and {referendary}.')
+            f'Found optimal ranges for {start_date}, {end_date} and {filters}.')
           return
 
         step = math.ceil(step / 2)
@@ -285,7 +296,7 @@ class TRF4(base.BaseCrawler):
           break
 
       logger.warn(
-        f'Unable to find optional ranges for {start_date}, {end_date} and {referendary}.')
+        f'Unable to find optional ranges for {start_date}, {end_date} and {filters}.')
 
       # Fallback to classes for those results
       for params, count in counts_by_params:
@@ -333,6 +344,18 @@ class TRF4(base.BaseCrawler):
     values = []
     for classtype in classtypes:
       response = self.requester.get(f'{BASE_URL}/listar_classes.php?tipo={classtype}')
+      options = utils.soup_by_content(response.text) \
+        .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
+      values.extend(
+        [option['value'] for option in options if len(option['value']) > 0]
+      )
+    return list(set(values))
+
+  def _get_orgs(self):
+    classtypes = list(range(1, 5))
+    values = []
+    for classtype in classtypes:
+      response = self.requester.get(f'{BASE_URL}/listar_orgaos.php?tipo={classtype}')
       options = utils.soup_by_content(response.text) \
         .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
       values.extend(
