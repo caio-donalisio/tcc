@@ -73,20 +73,14 @@ class TJRJ(base.BaseCrawler):
         }
         yield self.output.save_from_contents, args
       elif isinstance(event, base.ContentFromURL):
-        yield self.download_pdf, {
+        yield self.download_from_url, {
           'content_from_url': event
         }
       else:
         raise Exception('Unable to handle ', event)
 
   @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)   # type: ignore
-  def download_pdf(self, content_from_url):
-    if content_from_url.src is None:
-      return
-
-    if self.options.get('skip_pdf', False):
-      return
-
+  def download_from_url(self, content_from_url):
     if self.output.exists(content_from_url.dest):
       return
 
@@ -95,23 +89,36 @@ class TJRJ(base.BaseCrawler):
       verify=False,
       timeout=10)
 
-    if 'application/pdf' in response.headers.get('Content-type') or \
-        'application/x-zip-compressed' in response.headers.get('Content-type'):
-      self.output.save_from_contents(
-        filepath=content_from_url.dest,
-        contents=response.content,
-        content_type='application/pdf',
-        mode='wb')
-    else:
-      if response.status_code == 200 and \
-        'text/html' in response.headers.get('Content-type'):
-        # Got a warning message -- Shuld we retry?
+    if content_from_url.content_type == 'text/html':
+      if response.status_code == 200:
+        self.output.save_from_contents(
+          filepath=content_from_url.dest,
+          contents=response.content,
+          content_type=content_from_url.content_type)
+      else:
         logger.warn(
           f"Got a wait page when fetching {content_from_url.src} -- will retry.")
         raise utils.PleaseRetryException()
 
-      logger.warn(
-        f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
+    # For TJRJ we usually downloads some pdfs but as well as some htmls.
+    # Sometimes they return a html page when we are downloading the pdf... We have to deal with this.
+    if content_from_url.content_type == 'application/pdf':
+      if 'application/pdf' in response.headers.get('Content-type') or \
+          'application/x-zip-compressed' in response.headers.get('Content-type'):
+        self.output.save_from_contents(
+          filepath=content_from_url.dest,
+          contents=response.content,
+          content_type='application/pdf')
+      else:
+        if response.status_code == 200 and \
+          'text/html' in response.headers.get('Content-type'):
+          # Got a warning message -- Shuld we retry?
+          logger.warn(
+            f"Got a wait page when fetching {content_from_url.src} -- will retry.")
+          raise utils.PleaseRetryException()
+
+        logger.warn(
+          f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
 
   def chunks(self, number_of_pages):
     for page in range(1, number_of_pages + 1):
@@ -126,8 +133,6 @@ class TJRJ(base.BaseCrawler):
         output=self.output,
         rows_generator=self.rows(page=page),
         prefix=f"{self.params['start_year']}/")
-
-      time.sleep(random.uniform(0.5, 1.0))
 
   def rows(self, page):
     headers = {
@@ -145,17 +150,34 @@ class TJRJ(base.BaseCrawler):
       updated_at = decode_epoch_time(act['DtHrMov'])
       filepath   = utils.get_filepath(str(updated_at), act_id, 'json')
 
+      extra_contents = []
+      fetch_all_pdfs = True
+
+      if act['TemBlobValido']:
+        doc_path = utils.get_filepath(date=str(updated_at), filename=f'{act_id}_inteiro_teor', extension='html')
+        extra_contents.append(base.ContentFromURL(
+          src=f"http://www4.tjrj.jus.br/EJURIS/ExportaInteiroTeor.aspx?CodDoc={act_id}&PageSeq=0&EFT=1",
+          dest=doc_path,
+          content_type='text/html'
+        ))
+
+      # INFO: We might won't download all pdfs now. Regardless `TemBlobValid` is False.
+      # What we have in `ExportaInteiroTeor` is what matters, not always available though.
+      fetch_all_pdfs = self.options.get('skip_pdf', False) == False
+
       # fetch extra content as well
-      contents = self.fetch_data(act, headers, act_id, updated_at)
+      extra_contents.extend(self.fetch_data(act, headers, act_id, updated_at,
+        fetch_all_pdfs=fetch_all_pdfs))
+
       yield [
         base.Content(content=json.dumps(act, ensure_ascii=False), dest=filepath,
                      content_type='application/json'),
-        *contents
+        *extra_contents
       ]
       time.sleep(random.uniform(.05, .20))
 
   @utils.retryable(max_retries=3)
-  def fetch_data(self, act, headers, act_id, updated_at):
+  def fetch_data(self, act, headers, act_id, updated_at, fetch_all_pdfs=False):
     data_url = f'{EJUD_URL}/ConsultaEjud.asmx/DadosProcesso_1'
     data_payload = {
       'nAntigo': act['NumAntigo'],
@@ -171,16 +193,18 @@ class TJRJ(base.BaseCrawler):
         str(updated_at), doc_filename, 'json')
 
     extra_contents = []
-    documents = data_result.get('InteiroTeor', [])
-    for document in documents:
-      gedid = document['ArqGED']
-      pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
-      pdf_filename = f'{act_id}-{gedid}'
-      pdf_filepath = utils.get_filepath(
-          date=str(updated_at), filename=pdf_filename, extension='pdf')
-      extra_contents.append(base.ContentFromURL(
-        src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
-      ))
+
+    if fetch_all_pdfs:
+      documents = data_result.get('InteiroTeor', [])
+      for document in documents:
+        gedid = document['ArqGED']
+        pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
+        pdf_filename = f'{act_id}-{gedid}'
+        pdf_filepath = utils.get_filepath(
+            date=str(updated_at), filename=pdf_filename, extension='pdf')
+        extra_contents.append(base.ContentFromURL(
+          src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
+        ))
 
     return [
       base.Content(content=self._dump(data_result), dest=filepath,

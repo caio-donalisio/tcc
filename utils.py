@@ -71,7 +71,7 @@ class LSOutput:
 
     def save_from_contents(self, filepath, contents, **kwargs):
         target = f'{self._output_folder}/{filepath}'
-        write_file(target, contents, mode=kwargs.get('mode', 'w'))
+        write_file(target, contents)
 
     def load_as_string(self, filepath):
         source = f'{self._output_folder}/{filepath}'
@@ -118,12 +118,15 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def write_file(filename, content, mode='a'):
+def write_file(filename, content):
     path = os.path.dirname(filename)
     Path(path).mkdir(parents=True, exist_ok=True)
-    file = open(filename, mode)
-    file.write(content)
-    file.close()
+    if isinstance(content, bytes):
+        mode = 'wb'
+    elif isinstance(content, str):
+        mode = 'w'
+    with open(filename, mode) as file:
+        file.write(content)
 
 
 def soup_by_content(content):
