@@ -90,7 +90,7 @@ class TRF4(base.BaseCrawler):
 
   def chunks(self):
     ranges = list(utils.timely(
-      self.params['start_date'], self.params['end_date'], unit='months', step=1))
+      self.params['start_date'], self.params['end_date'], unit='weeks', step=2))
 
     referendaries = self._get_referendaries()
 
