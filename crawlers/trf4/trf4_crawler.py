@@ -74,13 +74,13 @@ class TRF4(base.BaseCrawler):
   @utils.retryable(max_retries=9)  # type: ignore
   def count(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=30)
+      data=params, headers=self.header_generator.generate(), timeout=60)
     return self._extract_count_from_text(response.text)
 
   @utils.retryable(max_retries=9)  # type: ignore
   def _vet_pagination(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=30)
+      data=params, headers=self.header_generator.generate(), timeout=60)
     soup = utils.soup_by_content(response.text)
     vet_pagination = soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})
     return {
@@ -166,7 +166,7 @@ class TRF4(base.BaseCrawler):
   @utils.retryable(max_retries=3)
   def _make_request(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=10)
+      data=params, headers=self.header_generator.generate(), timeout=60)
 
     if response.status_code != 200:
       logger.warn(f'Got {response.status_code} for {params}')
@@ -233,9 +233,11 @@ class TRF4(base.BaseCrawler):
       doc_html = '\n'.join([col.prettify() for col in cols])
       yield [
         base.Content(content=doc_html,
-          dest=f'{base_path}/{doc_id}_row.html'   , content_type='text/html'),
-        base.ContentFromURL(src=doc_url,
-          dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
+          dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
+        base.Content(src=doc_url,
+           dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
+        # base.ContentFromURL(src=doc_url,
+        #   dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
       ]
 
   def _find_optimal_filters(self, start_date, end_date, referendary):
