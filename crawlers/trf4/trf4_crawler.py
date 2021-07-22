@@ -1,6 +1,8 @@
 import re
+import math
 import time
 import utils
+import random
 import requests
 import pendulum
 from collections import defaultdict
@@ -14,6 +16,7 @@ logger = logger_factory('trf4')
 
 
 BASE_URL = 'https://jurisprudencia.trf4.jus.br/pesquisa'
+DATE_FORMAT = '%d/%m/%Y'
 
 
 class TRF4(base.BaseCrawler):
@@ -24,7 +27,18 @@ class TRF4(base.BaseCrawler):
       origin='https://jurisprudencia.trf4.jus.br', xhr=False)
 
   def run(self):
-    total_records = self.count()
+    total_records = self.count(params=self._get_query_params(
+      dataIni=self.params['start_date'].strftime(DATE_FORMAT),
+      dataFim=self.params['end_date'].strftime(DATE_FORMAT),
+      docsPagina=10
+    ))
+
+    self.classes = self._get_classes()
+    max_cls_id   = max([int(c) for c in self.classes])
+
+    # ask me if you want to understand this
+    self.classes = [str(cls) for cls in range(1, max_cls_id + 100)]
+
     runner = base.Runner(
       chunks_generator=self.chunks(),
       row_to_futures=self.handle,
@@ -57,15 +71,21 @@ class TRF4(base.BaseCrawler):
       else:
         raise Exception('Unable to handle ', event)
 
-  def count(self):
-    params = self._get_query_params(
-      dataIni=self.params['start_date'].strftime('%d/%m/%Y'),
-      dataFim=self.params['end_date'].strftime('%d/%m/%Y'),
-      docsPagina=10
-    )
+  @utils.retryable(max_retries=9)  # type: ignore
+  def count(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate())
+      data=params, headers=self.header_generator.generate(), timeout=5)
     return self._extract_count_from_text(response.text)
+
+  @utils.retryable(max_retries=9)  # type: ignore
+  def _vet_pagination(self, params):
+    response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
+      data=params, headers=self.header_generator.generate(), timeout=5)
+    soup = utils.soup_by_content(response.text)
+    return {
+      'total': self._extract_count_from_text(response.text),
+      'vetPaginacao':  soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})['value']
+    }
 
   def chunks(self):
     ranges = list(utils.timely(
@@ -92,27 +112,63 @@ class TRF4(base.BaseCrawler):
       time.sleep(.5)
 
   def rows(self, start_date, end_date, referendary):
-    optimal_ranges = self._find_optimal_ranges(start_date, end_date, referendary)
+    params_list = self._find_optimal_filters(start_date, end_date, referendary)
 
-    for opt_start_date, opt_end_date in optimal_ranges:
-      params = self._get_query_params(
-        cboRelator=referendary,
-        dataIni=opt_start_date.strftime('%d/%m/%Y'),
-        dataFim=opt_end_date.strftime('%d/%m/%Y'),
-      )
-      response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-        data=params, headers=self.header_generator.generate())
+    for params in params_list:
+      for row in self._rows_from_params(params):
+        yield row
 
-      assert response.status_code == 200, \
-        f'Got {response.status_code} params {params}'
-      if 'Não foram encontrados registros com estes critérios de pesquisa.' in response.text:
+  def _rows_from_params(self, params, page_size=200):
+    pagination = self._vet_pagination({**params, **{'docsPagina': page_size}})
+    expected_docs_per_page = pagination['vetPaginacao'].split("#")
+    fetched = 0
+
+    for page in range(len(expected_docs_per_page)):
+      req_params = {**params, **{
+        'checkTabela': 'true',
+        'selEscolhaPagina': page,
+        'pesquisaLivre': '',
+        'registrosSelecionados': '',
+        'vetPaginacao': pagination['vetPaginacao'],
+        'paginaAtual': page,
+        'totalRegistros': pagination['total'],
+        'rdoCampoPesquisa': '',
+        'chkAcordaos': '',
+        'chkDecMono': '',
+        'textoPesqLivre': '',
+        'chkDocumentosSelecionados': '',
+        'numProcesso': '',
+        'tipodata': 'DEC',
+        'docsPagina': '50',
+        'arrorgaos': '',
+        'arrclasses': '',
+        'hdnAcao': '',
+        'hdnTipo': 4
+      }}
+      text = self._make_request(req_params)
+
+      if 'Não foram encontrados registros com estes critérios de pesquisa.' in text:
         continue
 
-      # Assert number of docs
-      num_of_docs = self._extract_count_from_text(response.text)
-      assert num_of_docs <= 1000
-      for row in self._extract_rows(response.text, expects=num_of_docs, params=params):
+      # We know exactly which records we will get
+      doc_ids = expected_docs_per_page[page].split(',')
+      expects = len(doc_ids)
+
+      for row in self._extract_rows(text, expects=expects, params=params):
         yield row
+        fetched += 1
+
+    assert fetched == pagination['total'], \
+      f"got {fetched} was expecting {pagination['total']}"
+
+  @utils.retryable(max_retries=3)
+  def _make_request(self, params):
+    response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
+      data=params, headers=self.header_generator.generate(), timeout=10)
+
+    if response.status_code != 200:
+      logger.warn(f'Got {response.status_code} for {params}')
+    return response.text
 
   def _extract_rows(self, text, expects, params):
     soup = utils.soup_by_content(text)
@@ -153,8 +209,8 @@ class TRF4(base.BaseCrawler):
         # Figure out doc ids
         citation_links = col_value.find_all('img', {'title': 'Visualizar Citação'})
         if len(citation_links) == 1:
-          docs_ids[doc_index] =\
-            re.match(r".*\('(.*)'\).*", citation_links[0]['onclick']).group(1)
+          doc_id = re.match(r".*\('(.*)'\).*", citation_links[0]['onclick']).group(1)
+          docs_ids[doc_index] = doc_id
 
         for link in col_value.find_all('a'):
           if 'inteiro_teor.php' in link['href']:
@@ -180,50 +236,103 @@ class TRF4(base.BaseCrawler):
           dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
       ]
 
-    next_btn = soup.find_all('input', {'id': 'sbmProximaPagina'})
-    assert len(next_btn) == 0, 'No next button'
-
-  def _find_optimal_ranges(self, start_date, end_date, referendary):
-    import math
-    def _count(start, end):
-      params = self._get_query_params(
-        cboRelator=referendary,
-        dataIni=start.strftime('%d/%m/%Y'),
-        dataFim=end.strftime('%d/%m/%Y'),
-        docsPagina=10
-      )
-      response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-        data=params, headers=self.header_generator.generate())
-      return self._extract_count_from_text(response.text)
-
+  def _find_optimal_filters(self, start_date, end_date, referendary):
     # This site limits the number of records to 1000.
     # We must make sure it won't surpass this limit.
-    num_of_docs = _count(start_date, end_date)
+    default_params = self._get_query_params(
+      cboRelator=referendary,
+      dataIni=start_date.strftime(DATE_FORMAT),
+      dataFim=end_date.strftime(DATE_FORMAT),
+      docsPagina=10)
+    num_of_docs = self.count(default_params)
+
     if num_of_docs == 0:
       return []
 
+    # Ouch! Exceeded the 1000 records limit.
     if num_of_docs > 1000:
       logger.warn(
         f'More than 1000 records found on a query (got {num_of_docs}) -- finding for optimal ranges.')
-      days  = start_date.diff(end_date).in_days()
-      step  = math.ceil(days / 2)
-      while True:
+      days   = start_date.diff(end_date).in_days()
+      step   = max(1, math.ceil(days / 2))
+      counts_by_params = []
+
+      while step >= 1:
         ranges = list(utils.timely(start_date, end_date, unit='days', step=step))
-        if all([_count(start, end) <= 1000 for start, end in ranges]):
-          return ranges
+        params_list = [
+          self._get_query_params(
+            cboRelator=referendary,
+            dataIni=start.strftime(DATE_FORMAT),
+            dataFim=end.strftime(DATE_FORMAT),
+            docsPagina=10)
+          for start, end in ranges
+        ]
+
+        counts_by_params = [(params, self.count(params)) for params in params_list]
+        if all([count[-1] <= 1000 for count in counts_by_params]):
+          for params, _ in counts_by_params:
+            yield params
+          return
+
+        step = math.ceil(step / 2)
         if step == 1:
           break
-        step = math.ceil(step / 2)
-      raise Exception(
+
+      logger.warn(
         f'Unable to find optional ranges for {start_date}, {end_date} and {referendary}.')
+
+      # Fallback to classes for those results
+      for params, count in counts_by_params:
+        if count > 1000:
+          params_list =\
+            self._find_optimal_params_by_classes(params)
+          for params in params_list:
+            yield params
+        else:
+          yield params
+
     else:
-      yield [start_date, end_date]
+      yield default_params
+
+  def _find_optimal_params_by_classes(self, params, max_attempts=3):
+    arr = self.classes
+    n   = math.ceil(len(arr) / 2)
+    attempt = 0
+
+    while attempt < max_attempts:
+      arr         = random.sample(arr, len(arr))
+      partitions  = [arr[i:i + n] for i in range(0, len(arr), n)]
+      params_list = [
+        {**self._get_query_params(**params), **{'arrclasses': ','.join(partition)}}
+        for partition in partitions
+      ]
+
+      counts_by_params = [(params, self.count(params)) for params in params_list]
+      if all([count[-1] < 1000 for count in counts_by_params]):
+        return [
+          params for params, _ in counts_by_params
+        ]
+      attempt += 1
+
+    raise Exception('Impossible situation here!')
 
   def _get_referendaries(self):
     response = self.requester.get(f'{BASE_URL}/pesquisa.php?tipo=4')
     options = utils.soup_by_content(response.text) \
       .find('select', {'id': 'cboRelator'}).find_all('option')
     return [option['value'] for option in options if len(option['value']) > 0]
+
+  def _get_classes(self):
+    classtypes = list(range(1, 5))
+    values = []
+    for classtype in classtypes:
+      response = self.requester.get(f'{BASE_URL}/listar_classes.php?tipo={classtype}')
+      options = utils.soup_by_content(response.text) \
+        .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
+      values.extend(
+        [option['value'] for option in options if len(option['value']) > 0]
+      )
+    return list(set(values))
 
   def _get_query_params(self, **overrides):
     return {**{
