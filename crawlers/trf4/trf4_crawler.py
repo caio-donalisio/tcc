@@ -71,10 +71,21 @@ class TRF4(base.BaseCrawler):
       else:
         raise Exception('Unable to handle ', event)
 
+  @utils.retryable(max_retries=9)  # type: ignore
   def count(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate())
+      data=params, headers=self.header_generator.generate(), timeout=5)
     return self._extract_count_from_text(response.text)
+
+  @utils.retryable(max_retries=9)  # type: ignore
+  def _vet_pagination(self, params):
+    response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
+      data=params, headers=self.header_generator.generate(), timeout=5)
+    soup = utils.soup_by_content(response.text)
+    return {
+      'total': self._extract_count_from_text(response.text),
+      'vetPaginacao':  soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})['value']
+    }
 
   def chunks(self):
     ranges = list(utils.timely(
@@ -104,19 +115,60 @@ class TRF4(base.BaseCrawler):
     params_list = self._find_optimal_filters(start_date, end_date, referendary)
 
     for params in params_list:
-      response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-        data={**params, **{'docsPagina': 1000}}, headers=self.header_generator.generate())
+      for row in self._rows_from_params(params):
+        yield row
 
-      assert response.status_code == 200, \
-        f'Got {response.status_code} params {params}'
-      if 'Não foram encontrados registros com estes critérios de pesquisa.' in response.text:
+  def _rows_from_params(self, params, page_size=200):
+    pagination = self._vet_pagination({**params, **{'docsPagina': page_size}})
+    expected_docs_per_page = pagination['vetPaginacao'].split("#")
+    fetched = 0
+
+    for page in range(len(expected_docs_per_page)):
+      req_params = {**params, **{
+        'checkTabela': 'true',
+        'selEscolhaPagina': page,
+        'pesquisaLivre': '',
+        'registrosSelecionados': '',
+        'vetPaginacao': pagination['vetPaginacao'],
+        'paginaAtual': page,
+        'totalRegistros': pagination['total'],
+        'rdoCampoPesquisa': '',
+        'chkAcordaos': '',
+        'chkDecMono': '',
+        'textoPesqLivre': '',
+        'chkDocumentosSelecionados': '',
+        'numProcesso': '',
+        'tipodata': 'DEC',
+        'docsPagina': '50',
+        'arrorgaos': '',
+        'arrclasses': '',
+        'hdnAcao': '',
+        'hdnTipo': 4
+      }}
+      text = self._make_request(req_params)
+
+      if 'Não foram encontrados registros com estes critérios de pesquisa.' in text:
         continue
 
-      # Assert number of docs
-      num_of_docs = self._extract_count_from_text(response.text)
-      assert num_of_docs <= 1000
-      for row in self._extract_rows(response.text, expects=num_of_docs, params=params):
+      # We know exactly which records we will get
+      doc_ids = expected_docs_per_page[page].split(',')
+      expects = len(doc_ids)
+
+      for row in self._extract_rows(text, expects=expects, params=params):
         yield row
+        fetched += 1
+
+    assert fetched == pagination['total'], \
+      f"got {fetched} was expecting {pagination['total']}"
+
+  @utils.retryable(max_retries=3)
+  def _make_request(self, params):
+    response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
+      data=params, headers=self.header_generator.generate(), timeout=10)
+
+    if response.status_code != 200:
+      logger.warn(f'Got {response.status_code} for {params}')
+    return response.text
 
   def _extract_rows(self, text, expects, params):
     soup = utils.soup_by_content(text)
@@ -157,8 +209,8 @@ class TRF4(base.BaseCrawler):
         # Figure out doc ids
         citation_links = col_value.find_all('img', {'title': 'Visualizar Citação'})
         if len(citation_links) == 1:
-          docs_ids[doc_index] =\
-            re.match(r".*\('(.*)'\).*", citation_links[0]['onclick']).group(1)
+          doc_id = re.match(r".*\('(.*)'\).*", citation_links[0]['onclick']).group(1)
+          docs_ids[doc_index] = doc_id
 
         for link in col_value.find_all('a'):
           if 'inteiro_teor.php' in link['href']:
@@ -184,17 +236,15 @@ class TRF4(base.BaseCrawler):
           dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
       ]
 
-    next_btn = soup.find_all('input', {'id': 'sbmProximaPagina'})
-    assert len(next_btn) == 0, 'No next button'
-
   def _find_optimal_filters(self, start_date, end_date, referendary):
     # This site limits the number of records to 1000.
     # We must make sure it won't surpass this limit.
-    num_of_docs = self.count(self._get_query_params(
+    default_params = self._get_query_params(
       cboRelator=referendary,
       dataIni=start_date.strftime(DATE_FORMAT),
       dataFim=end_date.strftime(DATE_FORMAT),
-      docsPagina=10))
+      docsPagina=10)
+    num_of_docs = self.count(default_params)
 
     if num_of_docs == 0:
       return []
@@ -242,12 +292,7 @@ class TRF4(base.BaseCrawler):
           yield params
 
     else:
-      yield self._get_query_params(
-        cboRelator=referendary,
-        dataIni=start_date.strftime(DATE_FORMAT),
-        dataFim=end_date.strftime(DATE_FORMAT),
-        docsPagina=10
-      )
+      yield default_params
 
   def _find_optimal_params_by_classes(self, params, max_attempts=3):
     arr = self.classes
