@@ -25,6 +25,9 @@ class TRF4(base.BaseCrawler):
     self.requester = requests.Session()
     self.header_generator = utils.HeaderGenerator(
       origin='https://jurisprudencia.trf4.jus.br', xhr=False)
+    self.referendaries = None
+    self.orgs          = None
+    self.classes       = None
 
   def run(self):
     total_records = self.count(params=self._get_query_params(
@@ -33,9 +36,22 @@ class TRF4(base.BaseCrawler):
       docsPagina=10
     ))
 
-    self.orgs = self._get_orgs()
+    # range of ids cause some might be deleted changed on their base
+    self.referendaries = self._get_referendaries()
+    max_referendary_id   = max([int(c) for c in self.referendaries])
+    self.referendaries = [str(cls) for cls in range(1, max_referendary_id + 1)]
 
-    total_using_orgs = sum([
+    # same for organizations
+    self.orgs     = self._get_orgs()
+    max_orgs_id   = max([int(c) for c in self.orgs])
+    self.orgs     = [str(cls) for cls in range(1, max_orgs_id + 1)]
+
+    # classes as well
+    self.classes  = self._get_classes()
+    max_cls_id    = max([int(c) for c in self.classes])
+    self.classes  = [str(cls) for cls in range(1, max_cls_id + 10)]
+
+    total_filtered = sum([
       self.count(params=self._get_query_params(
         arrorgaos=org,
         dataIni=self.params['start_date'].strftime(DATE_FORMAT),
@@ -43,13 +59,7 @@ class TRF4(base.BaseCrawler):
         docsPagina=10
       )) for org in self.orgs
     ])
-    assert total_records == total_using_orgs
-
-    self.classes = self._get_classes()
-    max_cls_id   = max([int(c) for c in self.classes])
-
-    # ask me if you want to understand this
-    self.classes = [str(cls) for cls in range(1, max_cls_id + 100)]
+    assert total_records == total_filtered
 
     runner = base.Runner(
       chunks_generator=self.chunks(),
@@ -103,7 +113,6 @@ class TRF4(base.BaseCrawler):
   def chunks(self):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='weeks', step=2))
-
 
     for start_date, end_date in reversed(ranges):
       for org in self.orgs:
@@ -246,7 +255,7 @@ class TRF4(base.BaseCrawler):
         base.Content(content=doc_html,
           dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
         base.Content(content=doc_url,
-           dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
+          dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
         # base.ContentFromURL(src=doc_url,
         #   dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
       ]
@@ -259,77 +268,91 @@ class TRF4(base.BaseCrawler):
       dataFim=end_date.strftime(DATE_FORMAT),
       docsPagina=10,
       **filters)
-    num_of_docs = self.count(default_params)
-
-    if num_of_docs == 0:
+    count = self.count(default_params)
+    if count == 0:
       return []
 
     # Ouch! Exceeded the 1000 records limit.
-    if num_of_docs > 1000:
+    if count > 1000:
       logger.warn(
-        f'More than 1000 records found on a query (got {num_of_docs}) -- finding for optimal ranges.')
-      days   = start_date.diff(end_date).in_days()
-      step   = max(1, math.ceil(days / 2))
-      counts_by_params = []
+        f'More than 1000 records found on a query (got {count}) -- finding for optimal ranges.')
 
-      while step >= 1:
-        ranges = list(utils.timely(start_date, end_date, unit='days', step=step))
-        params_list = [
-          self._get_query_params(
-            dataIni=start.strftime(DATE_FORMAT),
-            dataFim=end.strftime(DATE_FORMAT),
-            docsPagina=10,
-            **filters)
-          for start, end in ranges
-        ]
+      all_params = []
 
-        counts_by_params = [(params, self.count(params)) for params in params_list]
-        if all([count[-1] <= 1000 for count in counts_by_params]):
-          for params, _ in counts_by_params:
-            yield params
-          logger.info(
-            f'Found optimal ranges for {start_date}, {end_date} and {filters}.')
-          return
+      # Reduce the range to the minimal possible.
+      params_list = [
+        self._get_query_params(
+          dataIni=start.strftime(DATE_FORMAT),
+          dataFim=end.strftime(DATE_FORMAT),
+          docsPagina=10,
+          **filters)
+        for start, end in utils.timely(start_date, end_date, unit='days', step=1)
+      ]
+      counts_by_params = [(params, self.count(params)) for params in params_list]
 
-        step = math.ceil(step / 2)
-        if step == 1:
-          break
-
-      logger.warn(
-        f'Unable to find optional ranges for {start_date}, {end_date} and {filters}.')
-
-      # Fallback to classes for those results
+      # Fallback to referendaries first
+      # Assume they work better
       for params, count in counts_by_params:
         if count > 1000:
-          params_list =\
-            self._find_optimal_params_by_classes(params)
-          for params in params_list:
-            yield params
-        else:
-          yield params
+          # Firstly -- get by referendary and for those results
+          # where the count still greater than 1000s records...
+          logger.info(f"{count} records. Filtering by referendary based on {params}.")
+          counts_by_params_by_referendary =\
+              self._find_optimal_params_by_referendaries(params)
 
+          # Filter again by classes only when needed
+          for params_by_referendary, count in counts_by_params_by_referendary:
+            if count > 1000:
+              logger.info(f"{count} records. Filtering by classes based on {params_by_referendary}.")
+              counts_by_params_by_classes = self._find_optimal_params_by_classes(params_by_referendary)
+              all_params.extend([params for params, _ in counts_by_params_by_classes])
+            elif count > 0:
+              logger.info(f"{count} records. Ok for referendary.")
+              all_params.append(params_by_referendary)
+
+        elif count > 0:
+          logger.info(f"{count} records. Ok for range.")
+          all_params.append(params)
+
+      return all_params
     else:
-      yield default_params
+      return [default_params]
 
-  def _find_optimal_params_by_classes(self, params, max_attempts=3):
+  def _find_optimal_params_by_referendaries(self, params):
+    params_list = [
+      {**self._get_query_params(**params), **{'cboRelator': referendary}}
+      for referendary in self.referendaries
+    ]
+    counts_by_params = [(params, self.count(params)) for params in params_list]
+    return counts_by_params
+
+  def _find_optimal_params_by_classes(self, params):
     arr = self.classes
-    n   = math.ceil(len(arr) / 2)
-    attempt = 0
+    div = 64
+    spl = div
 
-    while attempt < max_attempts:
+    while True:
+      n           = math.ceil(len(arr) / div)
       arr         = random.sample(arr, len(arr))
       partitions  = [arr[i:i + n] for i in range(0, len(arr), n)]
+      logger.info(f'Partitions {len(partitions)} of {len(arr)}.')
       params_list = [
         {**self._get_query_params(**params), **{'arrclasses': ','.join(partition)}}
         for partition in partitions
       ]
 
       counts_by_params = [(params, self.count(params)) for params in params_list]
-      if all([count[-1] < 1000 for count in counts_by_params]):
-        return [
-          params for params, _ in counts_by_params
-        ]
-      attempt += 1
+      offenders = [(params, self.count(params)) for count in counts_by_params if count[-1] > 1000]
+      logger.info(f'Partitions > 1000 records: {offenders}.')
+
+      if all([count[-1] <= 1000 for count in counts_by_params]):
+        return counts_by_params
+
+      div *= 2
+      if spl == len(arr):
+        break
+      spl = min(div, len(arr))
+      n = math.ceil(len(arr) / spl)
 
     raise Exception('Impossible situation here!')
 
