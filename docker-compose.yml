@@ -14,6 +14,7 @@ services:
     container_name: 'inspira-crawlers-celery'
     command: 'celery -A tasks worker -Q persistence,crawlers,crawlers.tjrj,crawlers.trf4,crawlers.tjsp,downloader --concurrency=2 -E --loglevel=INFO'
     environment:
+      - SENTRY_DSN=https://ca631cca1ff44e1d8c95e233b603eb0a@o926432.ingest.sentry.io/5880279
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcloud/service-account.json
       - CELERYD_HIJACK_ROOT_LOGGER=false
       - C_FORCE_ROOT='true'
