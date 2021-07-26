@@ -178,7 +178,7 @@ class TJRJ(base.BaseCrawler):
       ]
       time.sleep(random.uniform(.05, .20))
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=6)
   def fetch_data(self, act, headers, act_id, updated_at, fetch_all_pdfs=False):
     data_url = f'{EJUD_URL}/ConsultaEjud.asmx/DadosProcesso_1'
     data_payload = {
@@ -189,7 +189,13 @@ class TJRJ(base.BaseCrawler):
     logger.debug(f"POST {act['NumAntigo']}: {data_url}")
     data_response = self.requester.post(
         data_url, json=data_payload, headers=headers)
-    data_result = data_response.json()['d']
+
+    json_response = data_response.json()
+    if json_response.get('d') is None:
+      logger.info(f"POST {data_url} (payload={data_payload}) returned invalid data.")
+      raise utils.PleaseRetryException()
+
+    data_result  = json_response['d']
     doc_filename = f'{act_id}-data'
     filepath = utils.get_filepath(
         str(updated_at), doc_filename, 'json')
@@ -198,15 +204,16 @@ class TJRJ(base.BaseCrawler):
 
     if fetch_all_pdfs:
       documents = data_result.get('InteiroTeor', [])
-      for document in documents:
-        gedid = document['ArqGED']
-        pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
-        pdf_filename = f'{act_id}-{gedid}'
-        pdf_filepath = utils.get_filepath(
-            date=str(updated_at), filename=pdf_filename, extension='pdf')
-        extra_contents.append(base.ContentFromURL(
-          src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
-        ))
+      if documents:
+        for document in documents:
+          gedid = document['ArqGED']
+          pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
+          pdf_filename = f'{act_id}-{gedid}'
+          pdf_filepath = utils.get_filepath(
+              date=str(updated_at), filename=pdf_filename, extension='pdf')
+          extra_contents.append(base.ContentFromURL(
+            src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
+          ))
 
     return [
       base.Content(content=self._dump(data_result), dest=filepath,
@@ -214,23 +221,41 @@ class TJRJ(base.BaseCrawler):
       *extra_contents
     ]
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=6)
   def _get_acts(self, page, payload, headers):
     payload['numPagina'] = page
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
     logger.debug(f'POST (get_acts) {url}')
     response = self.requester.post(url, json=payload, headers=headers)
-    result = response.json()['d']
-    return result['DocumentosConsulta']
 
-  @utils.retryable(max_retries=3)
+    if response.status_code != 200:
+      logger.info(f"Ops, expecting 200 got {response.status_code}.")
+      raise utils.PleaseRetryException()
+
+    if response.json().get('d'):
+      result = response.json()['d']
+      return result['DocumentosConsulta']
+
+    logger.info(f"POST {url} (payload={payload}) returned invalid data.")
+    raise utils.PleaseRetryException()
+
+  @utils.retryable(max_retries=6)
   def count(self, payload, headers):
     payload['numPagina'] = 0
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
     logger.debug(f'POST (count) {url}')
     response = self.requester.post(url, json=payload, headers=headers)
-    result = response.json()['d']
-    return result['TotalDocs']
+
+    if response.status_code != 200:
+      logger.info(f"Ops, expecting 200 got {response.status_code}.")
+      raise utils.PleaseRetryException()
+
+    if response.json().get('d'):
+      result = response.json()['d']
+      return result['TotalDocs']
+
+    logger.info(f"POST {url} (payload={payload}) returned invalid data.")
+    raise utils.PleaseRetryException()
 
   def _dump(self, dictionary):
     return json.dumps(dictionary, ensure_ascii=False)
