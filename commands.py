@@ -13,6 +13,8 @@ from crawlers.tjsp2.tjsp_crawler import (
   tjsp_command)
 from crawlers.tjrj.tjrj_crawler import (
   tjrj_command)
+from crawlers.tjba.tjba_crawler2 import (
+  tjba_command)
 
 
 @cli.command()

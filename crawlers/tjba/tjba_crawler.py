@@ -2,6 +2,7 @@ import json
 import math
 import pendulum
 import storage
+import utils
 
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
@@ -33,13 +34,17 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
 
 class TJBAClient:
   def __init__(self):
-    self.transport  = RequestsHTTPTransport(url="https://jurisprudenciaws.tjba.jus.br/graphql")
+    self.transport  = RequestsHTTPTransport(
+      url="https://jurisprudenciaws.tjba.jus.br/graphql",
+      verify=False, retries=3, timeout=60)
     self.gql_client = Client(transport=self.transport)
 
+  @utils.retryable(max_retries=3)
   def count(self, filters):
     result = self.fetch(filters, page_number=0, items_per_page=1)
     return result['filter']['itemCount']
 
+  @utils.retryable(max_retries=3)
   def fetch(self, filters, page_number=0, items_per_page=10):
     try:
       params = {
@@ -52,6 +57,7 @@ class TJBAClient:
       logger.error(f"page fetch error params: {params}")
       raise e
 
+  @utils.retryable(max_retries=3)
   def paginator(self, filters, items_per_page=10):
     item_count = self.count(filters)
     page_count = math.ceil(item_count / items_per_page)
