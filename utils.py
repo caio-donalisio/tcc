@@ -247,7 +247,7 @@ def timely(start_date, end_date, unit, step):
     if len(dates) == 1:
         yield start_date, end_date
     else:
-        if end_date > dates[-1]:
+        if end_date >= dates[-1]:
             dates.append(end_date)
         pairs = list(pairwise(dates))
         for x, y in pairs[:-1]:
