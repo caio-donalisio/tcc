@@ -24,6 +24,7 @@ fake-useragent = "^0.1.11"
 google-cloud-logging = "^2.5.0"
 python-slugify = {version = "^5.0.2", extras = ["unidecode"]}
 flower = "^1.0.0"
+celery-singleton = "^0.3.1"
 
 [tool.poetry.dev-dependencies]
 

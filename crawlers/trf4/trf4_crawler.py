@@ -7,6 +7,8 @@ import requests
 import pendulum
 from collections import defaultdict
 
+from celery_singleton import Singleton
+
 import base
 import click
 from app import cli, celery
@@ -410,7 +412,8 @@ class TRF4(base.BaseCrawler):
 
 
 @celery.task(queue='crawlers.trf4', default_retry_delay=5 * 60,
-             autoretry_for=(BaseException,))
+             autoretry_for=(BaseException,),
+             base=Singleton)
 def trf4_task(start_date, end_date, output_uri):
   from logutils import logging_context
 

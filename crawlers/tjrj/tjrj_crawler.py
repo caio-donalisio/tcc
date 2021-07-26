@@ -6,6 +6,8 @@ import json
 import datetime
 import re
 
+from celery_singleton import Singleton
+
 import base
 import click
 import browsers
@@ -255,7 +257,8 @@ class TJRJ(base.BaseCrawler):
 
 
 @celery.task(queue='crawlers.tjrj', default_retry_delay=5 * 60,
-             autoretry_for=(BaseException,))
+             autoretry_for=(BaseException,),
+             base=Singleton)
 def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
   from logutils import logging_context
 

@@ -10,6 +10,8 @@ import logging
 from tqdm import tqdm
 from slugify import slugify
 
+from celery_singleton import Singleton
+
 from selenium.webdriver.support.ui import WebDriverWait
 
 from urllib3.exceptions import InsecureRequestWarning
@@ -313,7 +315,8 @@ class tjsp:
 
 
 @celery.task(queue='crawlers.tjsp', default_retry_delay=5 * 60,
-             autoretry_for=(BaseException,))
+             autoretry_for=(BaseException,),
+             base=Singleton)
 def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
   from logutils import logging_context
 
