@@ -1,5 +1,6 @@
 import concurrent.futures
 import sys
+import time
 import utils
 import logging
 import pydantic
@@ -293,6 +294,7 @@ class ChunkRunner:
     self.processor  = processor
     self.repository = repository
     self.logger     = logger
+    self.min_snapshot_interval = 30  # secs
 
   def run(self, snapshot : Snapshot = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
@@ -306,6 +308,7 @@ class ChunkRunner:
     try:
       self.collector.setup()
 
+      last_snapshot_taken = 0
       expects = self.collector.count()
       records = 0
 
@@ -313,11 +316,13 @@ class ChunkRunner:
         for chunk in self.collector.chunks():
           if chunk.hash in hashmap:
             chunk_records = hashmap[chunk.hash]['records']
+            pbar.set_postfix(chunk.keys)
             pbar.update(chunk_records)
             records += chunk_records
             continue
 
           chunk_result = self.processor.process(chunk)
+          pbar.set_postfix(chunk.keys)
           pbar.update(chunk_result.updates)
           records += chunk_result.updates
 
@@ -330,8 +335,14 @@ class ChunkRunner:
               'records': chunk_result.updates,
               'state': chunk.state
             })
+
+          if snapshot and \
+            time.time() - last_snapshot_taken >= self.min_snapshot_interval:
             self.repository.commit(snapshot)
+            last_snapshot_taken = time.time()
     finally:
+      if snapshot:
+        self.repository.commit(snapshot)
       self.processor.close()
       self.collector.teardown()
 
