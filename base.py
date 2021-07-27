@@ -182,7 +182,7 @@ class HashedKeyValue:
     self._state[key] = value
 
   def get_value(self, key):
-    return self._state[key]
+    return self._state.get(key)
 
   def add_value(self, key, value):
     if self._state.get(key) is None:
@@ -303,11 +303,13 @@ class ChunkRunner:
     if snapshot and self.repository.exists(snapshot):
       self.repository.restore(snapshot)
       chunks   = snapshot.get_value('chunks')
-      hashmap  = {chunk['hash']: chunk for chunk in chunks}
+      if chunks:
+        hashmap  = {chunk['hash']: chunk for chunk in chunks}
 
     try:
       self.collector.setup()
 
+      dirty   = False
       last_snapshot_taken = 0
       expects = self.collector.count()
       records = 0
@@ -335,8 +337,9 @@ class ChunkRunner:
               'records': chunk_result.updates,
               'state': chunk.state
             })
+            dirty = True
 
-          if snapshot and \
+          if dirty and snapshot and \
             time.time() - last_snapshot_taken >= self.min_snapshot_interval:
             self.repository.commit(snapshot)
             last_snapshot_taken = time.time()
