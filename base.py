@@ -236,12 +236,15 @@ class FutureChunkProcessor(IChunkProcessor):
 
 class ChunkRunner:
 
-  def __init__(self, collector : ICollector, processor : IChunkProcessor):
+  def __init__(self, collector : ICollector, processor : IChunkProcessor, logger):
     self.collector = collector
     self.processor = processor
+    self.logger    = logger
 
   def run(self):
-    with tqdm(total=self.collector.count()) as pbar:
+    tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
+
+    with tqdm(total=self.collector.count(), file=tqdm_out) as pbar:
       for chunk in self.collector.chunks():
         chunk_result = self.processor.process(chunk)
         pbar.update(chunk_result.updates)
