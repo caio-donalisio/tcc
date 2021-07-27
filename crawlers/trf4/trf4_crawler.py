@@ -226,10 +226,12 @@ class TRF4(base.BaseCrawler):
 
       # Are we reading a doc and it looks like a data table row?
       if len(tds) == 2 and doc_index is not None:
+        col_label = tds[0]
         col_value = tds[1]
 
         # Figure out judgment date -- will use it as date ref.
-        if 'Inteiro Teor:' in col_value.get_text():
+        if 'Inteiro Teor:' in col_value.get_text() and \
+            col_label.get_text() in ['Acórdão', 'DecisãoMonocrática']:
           judgment_date_match =\
             re.match(r'.*Data da Decisão: (\d{2}/\d{2}/\d{4}).*', col_value.get_text(),
                     re.MULTILINE | re.DOTALL)
@@ -308,22 +310,22 @@ class TRF4(base.BaseCrawler):
         if count > 1000:
           # Firstly -- get by referendary and for those results
           # where the count still greater than 1000s records...
-          logger.info(f"{count} records. Filtering by referendary based on {params}.")
+          logger.debug(f"{count} records. Filtering by referendary based on {params}.")
           counts_by_params_by_referendary =\
               self._find_optimal_params_by_referendaries(params)
 
           # Filter again by classes only when needed
           for params_by_referendary, count in counts_by_params_by_referendary:
             if count > 1000:
-              logger.info(f"{count} records. Filtering by classes based on {params_by_referendary}.")
+              logger.debug(f"{count} records. Filtering by classes based on {params_by_referendary}.")
               counts_by_params_by_classes = self._find_optimal_params_by_classes(params_by_referendary)
               all_params.extend([params for params, _ in counts_by_params_by_classes])
             elif count > 0:
-              logger.info(f"{count} records. Ok for referendary.")
+              logger.debug(f"{count} records. Ok for referendary.")
               all_params.append(params_by_referendary)
 
         elif count > 0:
-          logger.info(f"{count} records. Ok for range.")
+          logger.debug(f"{count} records. Ok for range.")
           all_params.append(params)
 
       return all_params
