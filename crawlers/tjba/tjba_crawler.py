@@ -159,23 +159,13 @@ def tjba_task(start_date, end_date, output_uri):
     start_date, end_date =\
       pendulum.parse(start_date), pendulum.parse(end_date)
 
-    collector = TJBACollector(client=TJBAClient(),
-      query={'start_date': start_date, 'end_date': end_date})
+    query_params = {'start_date': start_date, 'end_date': end_date}
+    collector = TJBACollector(client=TJBAClient(), query=query_params)
 
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-      handler = base.ContentHandler(output=output)
-      manager = base.ChunkStateManager(output=output)
-      processor =\
-        base.FutureChunkProcessor(executor=executor,
-          handler=handler, manager=manager)
-
-      runner = base.ChunkRunner(
-        collector=collector,
-        processor=processor,
-        logger=logger
-      )
-      runner.run()
+    snapshot = base.Snapshot(keys=query_params)
+    base.get_default_runner(
+        collector=collector, output=output, logger=logger, max_workers=8) \
+      .run(snapshot=snapshot)
 
 
 @cli.command(name='tjba')

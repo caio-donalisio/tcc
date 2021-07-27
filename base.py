@@ -3,6 +3,9 @@ import sys
 import utils
 import logging
 import pydantic
+import json
+import hashlib
+
 from tqdm import tqdm
 from bs4 import BeautifulSoup
 from typing import Any
@@ -141,10 +144,7 @@ class ICollector:
     return True
 
 
-import json
-import hashlib
-
-class Chunk:
+class HashedKeyValue:
 
   def __init__(self, keys : dict):
     self._keys  = keys
@@ -165,19 +165,36 @@ class Chunk:
   def get_value(self, key):
     return self._state[key]
 
+  def add_value(self, key, value):
+    if self._state.get(key) is None:
+      self._state[key] = []
+    self._state[key].append(value)
+
   def update_values(self, values : dict):
     self._state = {**self.state, **values}
 
 
-class ChunkStateManager:
+class Chunk(HashedKeyValue):
+  pass
 
-  def __init__(self, output):
+
+class Snapshot(HashedKeyValue):
+  pass
+
+
+class HashedKeyValueRepository:
+
+  def __init__(self, output, prefix):
     self._output = output
+    self._prefix = prefix
 
   def restore(self, chunk):
     stored_values = json.loads(
         self._output.load_as_string(self.path_of(chunk)))
     chunk.update_values(stored_values)
+
+  def exists(self, chunk):
+    return self.commited(chunk)
 
   def commited(self, chunk):
     return self._output.exists(self.path_of(chunk))
@@ -189,7 +206,17 @@ class ChunkStateManager:
       content_type='application/json')
 
   def path_of(self, chunk):
-    return f'.state/{chunk.hash}.state'
+    return f'{self._prefix}/{chunk.hash}.state'
+
+
+class ChunksRepository(HashedKeyValueRepository):
+  def __init__(self, output):
+    super(ChunksRepository, self).__init__(output, prefix='.state')
+
+
+class SnapshotsRepository(HashedKeyValueRepository):
+  def __init__(self, output):
+    super(SnapshotsRepository, self).__init__(output, prefix='.snapshot')
 
 
 class ChunkResult:
@@ -208,14 +235,14 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  def __init__(self, executor, handler, manager):
-    self.executor = executor
-    self.handler  = handler
-    self.manager  = manager
+  def __init__(self, executor, handler, repository : ChunksRepository):
+    self.executor   = executor
+    self.handler    = handler
+    self.repository = repository
 
   def process(self, chunk) -> ChunkResult:
-    if self.manager.commited(chunk):
-      self.manager.restore(chunk)
+    if self.repository.commited(chunk):
+      self.repository.restore(chunk)
       return ChunkResult(updates=chunk.get_value('records'))
 
     futures = []
@@ -230,25 +257,49 @@ class FutureChunkProcessor(IChunkProcessor):
       future.result()
 
     chunk.set_value('records', records)
-    self.manager.commit(chunk)
+    self.repository.commit(chunk)
     return ChunkResult(updates=records)
 
 
 class ChunkRunner:
 
-  def __init__(self, collector : ICollector, processor : IChunkProcessor, logger):
-    self.collector = collector
-    self.processor = processor
-    self.logger    = logger
+  def __init__(self, collector : ICollector, processor : IChunkProcessor,
+      repository : SnapshotsRepository, logger):
+    self.collector  = collector
+    self.processor  = processor
+    self.repository = repository
+    self.logger     = logger
 
-  def run(self):
+  def run(self, snapshot : Snapshot = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
-    with tqdm(total=self.collector.count(), file=tqdm_out) as pbar:
+    hashmap = {}
+    if snapshot and self.repository.exists(snapshot):
+      self.repository.restore(snapshot)
+      chunks   = snapshot.get_value('chunks')
+      hashmap  = {chunk['hash']: chunk for chunk in chunks}
+
+    expects = self.collector.count()
+    records = 0
+    with tqdm(total=expects, file=tqdm_out) as pbar:
       for chunk in self.collector.chunks():
+        if chunk.hash in hashmap:
+          chunk_records = hashmap[chunk.hash]['records']
+          pbar.update(chunk_records)
+          records += chunk_records
+          continue
+
         chunk_result = self.processor.process(chunk)
         pbar.update(chunk_result.updates)
+        records += chunk_result.updates
 
+        if snapshot:
+          snapshot.set_value('records', records)
+          snapshot.set_value('expects', expects)
+          snapshot.add_value('chunks' , {
+            'hash': chunk.hash, 'records': chunk_result.updates
+          })
+          self.repository.commit(snapshot)
 
 class ContentHandler:
 
@@ -284,3 +335,24 @@ class ContentHandler:
       filepath=event.dest,
       contents=response.content,
       content_type=event.content_type)
+
+
+def get_default_runner(collector, output, logger, **kwargs):
+  import concurrent.futures
+  with concurrent.futures.ThreadPoolExecutor(max_workers=kwargs.get('max_workers', 2)) as executor:
+    handler    = ContentHandler(output=output)
+    chunks_repository    = ChunksRepository(output=output)
+
+    processor =\
+      FutureChunkProcessor(executor=executor,
+        handler=handler, repository=chunks_repository)
+
+    snapshots_repository = SnapshotsRepository(output=output)
+    runner = ChunkRunner(
+      collector=collector,
+      processor=processor,
+      repository=snapshots_repository,
+      logger=logger
+    )
+
+    return runner
