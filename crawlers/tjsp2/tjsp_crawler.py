@@ -50,9 +50,33 @@ class TJSP(base.ICollector):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='days', step=1))
 
+    # Will store number of records+pages based on parameters
+    # This will avoid hitting the site to figure out the number of pages.
+    cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
+    cache_store      = base.HashedKeyValue(keys={'page_info_cache': True})
+
+    if cache_repository.exists(cache_store):
+      cache_repository.restore(cache_store)
+
     for start_date, end_date in reversed(ranges):
-      number_of_records = self.client.set_search(start_date, end_date)
-      number_of_pages   = math.ceil(number_of_records / 20)
+      cache_key = base.HashedKeyValue(keys={  # just to compute the hash
+        'start_date': start_date.to_date_string(),
+        'end_date'  : end_date.to_date_string()
+      })
+
+      if cache_key.hash in cache_store.state:
+        number_of_records = cache_store.state[cache_key.hash]['number_of_records']
+        number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
+      else:
+        number_of_records = self.client.set_search(start_date, end_date)
+        number_of_pages   = math.ceil(number_of_records / 20)
+        cache_store.set_value(cache_key.hash, {
+          'number_of_records': number_of_records,
+          'number_of_pages'  : number_of_pages,
+          'start_date'       : start_date.to_date_string(),
+          'end_date'         : end_date.to_date_string()
+        })
+        cache_repository.commit(cache_store)
 
       for page in range(1, number_of_pages + 1):
         chunk_params = {
@@ -184,6 +208,8 @@ class TJSPChunk(base.Chunk):
     self.expects    = expects
 
   def rows(self):
+    self.client.set_search(self.start_date, self.end_date)
+
     text = self.client.get_search_results(page=self.page)
     soup = utils.soup_by_content(text)
 
@@ -192,7 +218,7 @@ class TJSPChunk(base.Chunk):
     assert len(count_elements) == 1
     records = int(count_elements[0]['value'])
 
-    assert self.expects == records, "page {page} was expecting {self.expects} got {records} (start_date: {start_date}, end_date: {end_date})".format(
+    assert self.expects == records, "page {page} was expecting {expects} got {records} (start_date: {start_date}, end_date: {end_date})".format(
       page=self.page, expects=self.expects, records=records, start_date=self.start_date, end_date=self.end_date)
 
     current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
