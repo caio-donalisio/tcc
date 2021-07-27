@@ -322,7 +322,7 @@ class ChunkRunner:
             continue
 
           chunk_result = self.processor.process(chunk)
-          pbar.set_postfix(chunk.keys)
+          pbar.set_postfix({**chunk.keys, **{'updates': chunk_result.updates}})
           pbar.update(chunk_result.updates)
           records += chunk_result.updates
 
