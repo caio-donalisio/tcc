@@ -9,6 +9,7 @@ import requests
 import itertools
 import hashlib
 import io
+from functools import partial, wraps
 from tqdm import tqdm
 from datetime import datetime
 from pathlib import Path
@@ -334,3 +335,31 @@ def timeit(f):
         print('func:%r took: %2.4f sec' % (f.__name__, te-ts))
         return result
     return timed
+
+
+class CoolDownDecorator(object):
+  def __init__(self,func,interval):
+    self.func = func
+    self.interval = interval
+    self.last_run = 0
+
+  def __get__(self, obj, objtype=None):
+    if obj is None:
+      return self.func
+    return partial(self,obj)
+
+  def __call__(self, *args, **kwargs):
+    now = time.time()
+    if now - self.last_run < self.interval:
+      time.sleep(now - self.last_run)
+      return self.func(*args,**kwargs)
+    else:
+      self.last_run = now
+      return self.func(*args,**kwargs)
+
+
+def cooldown(interval):
+  def decorated(func):
+    decorator = CoolDownDecorator(func=func, interval=interval)
+    return wraps(func)(decorator)
+  return decorated
