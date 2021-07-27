@@ -109,13 +109,15 @@ class TJBACollector(base.ICollector):
          'end_date'  : end_date.to_date_string()}
 
       yield TJBAChunk(keys=keys,
-        client=self.client, filters=get_filters(start_date, end_date))
+        client=self.client,
+        filters=get_filters(start_date, end_date),
+        prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class TJBAChunk(base.Chunk):
 
-  def __init__(self, keys, client, filters):
-    super(TJBAChunk, self).__init__(keys)
+  def __init__(self, keys, client, filters, prefix):
+    super(TJBAChunk, self).__init__(keys, prefix)
     self.client  = client
     self.filters = filters
 
@@ -161,10 +163,11 @@ def tjba_task(start_date, end_date, output_uri):
 
     query_params = {'start_date': start_date, 'end_date': end_date}
     collector = TJBACollector(client=TJBAClient(), query=query_params)
+    handler   = base.ContentHandler(output=output)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(
-        collector=collector, output=output, logger=logger, max_workers=8) \
+        collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
       .run(snapshot=snapshot)
 
 
