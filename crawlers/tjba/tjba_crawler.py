@@ -109,13 +109,15 @@ class TJBACollector(base.ICollector):
          'end_date'  : end_date.to_date_string()}
 
       yield TJBAChunk(keys=keys,
-        client=self.client, filters=get_filters(start_date, end_date))
+        client=self.client,
+        filters=get_filters(start_date, end_date),
+        prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class TJBAChunk(base.Chunk):
 
-  def __init__(self, keys, client, filters):
-    super(TJBAChunk, self).__init__(keys)
+  def __init__(self, keys, client, filters, prefix):
+    super(TJBAChunk, self).__init__(keys, prefix)
     self.client  = client
     self.filters = filters
 
@@ -159,23 +161,14 @@ def tjba_task(start_date, end_date, output_uri):
     start_date, end_date =\
       pendulum.parse(start_date), pendulum.parse(end_date)
 
-    collector = TJBACollector(client=TJBAClient(),
-      query={'start_date': start_date, 'end_date': end_date})
+    query_params = {'start_date': start_date, 'end_date': end_date}
+    collector = TJBACollector(client=TJBAClient(), query=query_params)
+    handler   = base.ContentHandler(output=output)
 
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-      handler = base.ContentHandler(output=output)
-      manager = base.ChunkStateManager(output=output)
-      processor =\
-        base.FutureChunkProcessor(executor=executor,
-          handler=handler, manager=manager)
-
-      runner = base.ChunkRunner(
-        collector=collector,
-        processor=processor,
-        logger=logger
-      )
-      runner.run()
+    snapshot = base.Snapshot(keys=query_params)
+    base.get_default_runner(
+        collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
+      .run(snapshot=snapshot)
 
 
 @cli.command(name='tjba')

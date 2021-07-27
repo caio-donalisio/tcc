@@ -1,4 +1,5 @@
 import time
+import math
 import random
 import requests
 import utils
@@ -31,62 +32,101 @@ def decode_epoch_time(string):
     return time.strftime(DATE_FORMAT)
 
 
-class TJRJ(base.BaseCrawler):
+class TJRJ(base.BaseCrawler, base.ICollector):
   def __init__(self, params, output, logger, browser, **options):
     super(TJRJ, self).__init__(params, output, logger, **options)
     self.browser   = browser
     self.requester = requests.Session()
 
-  def run(self):
+  def setup(self):
     try:
       self.session_id  = self._get_session_id()
     finally:
       self.browser.quit()
 
-    headers = {
+    self.headers = {
       "cookie": f'ASP.NET_SessionId={self.session_id}',
       "Content-Type": "application/json"
     }
-    payload = {
+    self.payload = {
       'pageSeq': '0',
       'grpEssj': ''
     }
 
-    import math
-    total_records = self.count(payload, headers)
-    total_pages   = math.ceil(total_records / 10.)
+  @utils.retryable(max_retries=6)
+  def count(self):
+    url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
+    logger.debug(f'POST (count) {url}')
+    response = self.requester.post(url,
+      json={**self.payload, **{'numPagina': 0}}, headers=self.headers)
 
-    runner = base.Runner(
-      chunks_generator=self.chunks(total_pages),
-      row_to_futures=self.handle,
-      total_records=total_records,
-      logger=logger,
-    )
+    if response.status_code != 200:
+      logger.info(f"Ops, expecting 200 got {response.status_code}.")
+      raise utils.PleaseRetryException()
 
-    runner.run()
+    if response.json().get('d'):
+      result = response.json()['d']
+      return result['TotalDocs']
 
-  def handle(self, events):
-    for event in events:
-      if isinstance(event, base.Content):
-        args = {
-          'filepath': event.dest,
-          'contents': event.content,
-          'content_type': event.content_type
-        }
-        yield self.output.save_from_contents, args
-      elif isinstance(event, base.ContentFromURL):
-        yield self.download_from_url, {
-          'content_from_url': event
-        }
-      else:
-        raise Exception('Unable to handle ', event)
+    logger.info(f"POST {url} (payload={self.payload}) returned invalid data.")
+    raise utils.PleaseRetryException()
+
+  def chunks(self):
+    self.total_records = self.count()
+    self.total_pages   = math.ceil(self.total_records / 10.)
+
+    for page in range(1, self.total_pages + 1):
+      keys = {
+        'start_year': self.params['start_year'],
+        'end_year'  : self.params['end_year'],
+        'page'      : page,
+      }
+
+      yield TJRJChunk(
+        keys=keys,
+        page=page,
+        payload=self.payload,
+        headers=self.headers,
+        requester=self.requester,
+        prefix=f"{self.params['start_year']}/",
+        options=self.options)
+
+  def _get_session_id(self):
+    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx'
+    logger.debug(f'GET {url}')
+
+    self.browser.get(url)
+    self.browser.fill_in(
+        field_id='ContentPlaceHolder1_txtTextoPesq', value=QUERY)
+    self.browser.select_by_id('ContentPlaceHolder1_cmbAnoInicio', self.params['start_year'])
+    self.browser.select_by_id('ContentPlaceHolder1_cmbAnoFim', self.params['end_year'])
+    search_button = self._find(id='ContentPlaceHolder1_btnPesquisar')
+    self.browser.click(search_button)
+    session_id = None
+    cookies = self.browser.driver.get_cookies()
+
+    for cookie in cookies:
+      if cookie.get('name') == 'ASP.NET_SessionId':
+        session_id = cookie['value']
+        logger.info(f'Got ASP.NET_SessionId: {session_id}')
+    return session_id
+
+
+class TJRJHandler(base.ContentHandler):
+
+  @utils.retryable(max_retries=9)
+  def handle(self, event):
+    if isinstance(event, base.ContentFromURL):
+      self.download(event)
+    else:
+      super().handle(event)
 
   @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)   # type: ignore
-  def download_from_url(self, content_from_url):
+  def download(self, content_from_url):
     if self.output.exists(content_from_url.dest):
       return
 
-    response = self.requester.get(content_from_url.src,
+    response = requests.get(content_from_url.src,
       allow_redirects=True,
       verify=False,
       timeout=10)
@@ -102,8 +142,8 @@ class TJRJ(base.BaseCrawler):
           f"Got a wait page when fetching {content_from_url.src} -- will retry.")
         raise utils.PleaseRetryException()
 
-    # For TJRJ we usually downloads some pdfs but as well as some htmls.
-    # Sometimes they return a html page when we are downloading the pdf... We have to deal with this.
+    # Sometimes they return a html page when we are downloading the pdf.
+    # Normally trying again is suffice.
     if content_from_url.content_type == 'application/pdf':
       if 'application/pdf' in response.headers.get('Content-type') or \
           'application/x-zip-compressed' in response.headers.get('Content-type'):
@@ -114,39 +154,25 @@ class TJRJ(base.BaseCrawler):
       else:
         if response.status_code == 200 and \
           'text/html' in response.headers.get('Content-type'):
-          # Got a warning message -- Shuld we retry?
           logger.warn(
             f"Got a wait page when fetching {content_from_url.src} -- will retry.")
           raise utils.PleaseRetryException()
-
         logger.warn(
           f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
 
-  def chunks(self, number_of_pages):
-    for page in range(1, number_of_pages + 1):
-      chunk_params = {
-        'start_year': self.params['start_year'],
-        'end_year'  : self.params['end_year'],
-        'page'      : page,
-      }
 
-      yield utils.Chunk(
-        params=chunk_params,
-        output=self.output,
-        rows_generator=self.rows(page=page),
-        prefix=f"{self.params['start_year']}/")
+class TJRJChunk(base.Chunk):
 
-  def rows(self, page):
-    headers = {
-      "cookie": f'ASP.NET_SessionId={self.session_id}',
-      "Content-Type": "application/json"
-    }
-    payload = {
-      'pageSeq': '0',
-      'grpEssj': ''
-    }
+  def __init__(self, keys, requester, page, headers, payload, prefix, options):
+    super(TJRJChunk, self).__init__(keys, prefix)
+    self.requester  = requester
+    self.page       = page
+    self.headers    = headers
+    self.payload    = payload
+    self.options    = options
 
-    acts = self._get_acts(page, payload, headers)
+  def rows(self):
+    acts = self._get_acts(self.page, self.payload, self.headers)
     for act in acts:
       act_id     = act['CodDoc']
       updated_at = decode_epoch_time(act['DtHrMov'])
@@ -168,8 +194,8 @@ class TJRJ(base.BaseCrawler):
       fetch_all_pdfs = self.options.get('skip_pdf', False) == False
 
       # fetch extra content as well
-      extra_contents.extend(self.fetch_data(act, headers, act_id, updated_at,
-        fetch_all_pdfs=fetch_all_pdfs))
+      extra_contents.extend(self._fetch_data(
+        act, self.headers, act_id, updated_at, fetch_all_pdfs=fetch_all_pdfs))
 
       yield [
         base.Content(content=json.dumps(act, ensure_ascii=False), dest=filepath,
@@ -179,7 +205,7 @@ class TJRJ(base.BaseCrawler):
       time.sleep(random.uniform(.05, .20))
 
   @utils.retryable(max_retries=6)
-  def fetch_data(self, act, headers, act_id, updated_at, fetch_all_pdfs=False):
+  def _fetch_data(self, act, headers, act_id, updated_at, fetch_all_pdfs=False):
     data_url = f'{EJUD_URL}/ConsultaEjud.asmx/DadosProcesso_1'
     data_payload = {
       'nAntigo': act['NumAntigo'],
@@ -229,7 +255,7 @@ class TJRJ(base.BaseCrawler):
     response = self.requester.post(url, json=payload, headers=headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 got {response.status_code}.")
+      logger.info(f"Ops, expecting 200 on {url} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
@@ -239,46 +265,8 @@ class TJRJ(base.BaseCrawler):
     logger.info(f"POST {url} (payload={payload}) returned invalid data.")
     raise utils.PleaseRetryException()
 
-  @utils.retryable(max_retries=6)
-  def count(self, payload, headers):
-    payload['numPagina'] = 0
-    url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
-    logger.debug(f'POST (count) {url}')
-    response = self.requester.post(url, json=payload, headers=headers)
-
-    if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 got {response.status_code}.")
-      raise utils.PleaseRetryException()
-
-    if response.json().get('d'):
-      result = response.json()['d']
-      return result['TotalDocs']
-
-    logger.info(f"POST {url} (payload={payload}) returned invalid data.")
-    raise utils.PleaseRetryException()
-
   def _dump(self, dictionary):
     return json.dumps(dictionary, ensure_ascii=False)
-
-  def _get_session_id(self):
-    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx'
-    logger.debug(f'GET {url}')
-
-    self.browser.get(url)
-    self.browser.fill_in(
-        field_id='ContentPlaceHolder1_txtTextoPesq', value=QUERY)
-    self.browser.select_by_id('ContentPlaceHolder1_cmbAnoInicio', self.params['start_year'])
-    self.browser.select_by_id('ContentPlaceHolder1_cmbAnoFim', self.params['end_year'])
-    search_button = self._find(id='ContentPlaceHolder1_btnPesquisar')
-    self.browser.click(search_button)
-    session_id = None
-    cookies = self.browser.driver.get_cookies()
-
-    for cookie in cookies:
-      if cookie.get('name') == 'ASP.NET_SessionId':
-        session_id = cookie['value']
-        logger.info(f'Got ASP.NET_SessionId: {session_id}')
-    return session_id
 
 
 @celery.task(queue='crawlers.tjrj', default_retry_delay=5 * 60,
@@ -293,11 +281,19 @@ def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
     setup_cloud_logger(logger)
 
     options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
-
-    crawler = TJRJ(params={
+    query_params = {
       'start_year': start_year, 'end_year': end_year
-    }, output=output, logger=logger, browser=browsers.FirefoxBrowser(), **options)
-    crawler.run()
+    }
+
+    handler = TJRJHandler(output=output)
+
+    collector = TJRJ(params=query_params, output=output, logger=logger,
+      browser=browsers.FirefoxBrowser(), **options)
+
+    snapshot = base.Snapshot(keys=query_params)
+    base.get_default_runner(
+        collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
+      .run(snapshot=snapshot)
 
 
 @cli.command(name='tjrj')
