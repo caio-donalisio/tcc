@@ -32,7 +32,7 @@ class BaseCrawler:
 class Content(pydantic.BaseModel):
   """Represents a `saved` content to a destination uri
   """
-  content : str
+  content : Any
   dest : str
   content_type : str
 
@@ -134,6 +134,10 @@ class ICollector:
     """Anything before execution"""
     pass
 
+  def teardown(self):
+    """Anything after execution"""
+    pass
+
   def count(self) -> int:
     """Must return the number of records
     """
@@ -166,8 +170,12 @@ class HashedKeyValue:
     return self._prefix
 
   @property
-  def state(self):\
+  def state(self):
     return self._state
+
+  @property
+  def keys(self):
+    return self._keys
 
   def set_value(self, key, value):
     self._state[key] = value
@@ -317,11 +325,15 @@ class ChunkRunner:
             snapshot.set_value('records', records)
             snapshot.set_value('expects', expects)
             snapshot.add_value('chunks' , {
-              'hash': chunk.hash, 'records': chunk_result.updates
+              'hash': chunk.hash,
+              'keys': chunk.keys,
+              'records': chunk_result.updates,
+              'state': chunk.state
             })
             self.repository.commit(snapshot)
     finally:
       self.processor.close()
+      self.collector.teardown()
 
 class ContentHandler:
 
