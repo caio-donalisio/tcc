@@ -53,7 +53,8 @@ class TJSP(base.ICollector):
     # Will store number of records+pages based on parameters
     # This will avoid hitting the site to figure out the number of pages.
     cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
-    cache_store      = base.HashedKeyValue(keys={'page_info_cache': True})
+    cache_store      = base.HashedKeyValue(keys={
+      'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
 
     if cache_repository.exists(cache_store):
       cache_repository.restore(cache_store)
