@@ -5,6 +5,7 @@ import utils
 import random
 import requests
 import pendulum
+import sentry_sdk
 from collections import defaultdict
 
 from celery_singleton import Singleton
@@ -61,7 +62,16 @@ class TRF4(base.BaseCrawler):
         docsPagina=10
       )) for org in self.orgs
     ])
-    assert total_records == total_filtered
+
+    if total_records != total_filtered:
+      with sentry_sdk.push_scope() as scope:
+        scope.set_extra('crawler', TRF4)
+        scope.set_extra('total_unfiltered', total_records)
+        scope.set_extra('total_filtered'  , total_filtered)
+        scope.set_extra('params', self.params)
+        sentry_sdk.capture_message('Count does not match', 'warning')
+        logger.warn(
+          f'Count does not match. Expecting {total_records} got {total_filtered}.')
 
     runner = base.Runner(
       chunks_generator=self.chunks(),
