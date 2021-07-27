@@ -316,7 +316,7 @@ class ChunkRunner:
         for chunk in self.collector.chunks():
           if chunk.hash in hashmap:
             chunk_records = hashmap[chunk.hash]['records']
-            pbar.set_postfix(chunk.keys)
+            pbar.set_postfix({**chunk.keys, **{'ok': True}})
             pbar.update(chunk_records)
             records += chunk_records
             continue
