@@ -1,9 +1,11 @@
+import concurrent.futures
 import sys
 import utils
 import logging
 import pydantic
 from tqdm import tqdm
 from bs4 import BeautifulSoup
+from typing import Any
 
 
 class BaseCrawler:
@@ -43,6 +45,10 @@ class ContentFromURL(pydantic.BaseModel):
 
   def __repr__(self):
     return f'ContentFromURL(src={self.src}..., dest={self.dest})'
+
+
+class Late(pydantic.BaseModel):
+  postpone : Any
 
 
 class SkipWithBlock(Exception):
@@ -115,3 +121,166 @@ class Runner:
 
     finally:
       pass
+
+
+
+class ICollector:
+
+  def count(self) -> int:
+    """Must return the number of records
+    """
+    raise Exception('Must be implemented in a subclass')
+
+  def chunks(self):
+    raise Exception('Must be implemented in a subclass')
+
+  def countable(self):
+    """Whether is countable -- whereis when we
+    know beforehand the number of records
+    """
+    return True
+
+
+import json
+import hashlib
+
+class Chunk:
+
+  def __init__(self, keys : dict):
+    self._keys  = keys
+    self._state = {}
+
+  @property
+  def hash(self):
+    return hashlib.sha1(repr(sorted(self._keys.items())).encode()) \
+      .hexdigest()
+
+  @property
+  def state(self):\
+    return self._state
+
+  def set_value(self, key, value):
+    self._state[key] = value
+
+  def get_value(self, key):
+    return self._state[key]
+
+  def update_values(self, values : dict):
+    self._state = {**self.state, **values}
+
+
+class ChunkStateManager:
+
+  def __init__(self, output):
+    self._output = output
+
+  def restore(self, chunk):
+    stored_values = json.loads(
+        self._output.load_as_string(self.path_of(chunk)))
+    chunk.update_values(stored_values)
+
+  def commited(self, chunk):
+    return self._output.exists(self.path_of(chunk))
+
+  def commit(self, chunk):
+    self._output.save_from_contents(
+      filepath=self.path_of(chunk),
+      contents=json.dumps(chunk.state),
+      content_type='application/json')
+
+  def path_of(self, chunk):
+    return f'.state/{chunk.hash}.state'
+
+
+class ChunkResult:
+  def __init__(self, updates):
+    self._updates = updates
+
+  @property
+  def updates(self) -> int:
+    return self._updates
+
+
+class IChunkProcessor:
+
+  def process(self, chunk) -> ChunkResult:
+    raise Exception('Must be implemented in a subclass')
+
+
+class FutureChunkProcessor(IChunkProcessor):
+  def __init__(self, executor, handler, manager):
+    self.executor = executor
+    self.handler  = handler
+    self.manager  = manager
+
+  def process(self, chunk) -> ChunkResult:
+    if self.manager.commited(chunk):
+      self.manager.restore(chunk)
+      return ChunkResult(updates=chunk.get_value('records'))
+
+    futures = []
+    records = 0
+    for record in chunk.rows():
+      records += 1
+      for item in record:
+        futures.append(self.executor.submit(
+          self.handler.handle, item))
+
+    for future in concurrent.futures.as_completed(futures):
+      future.result()
+
+    chunk.set_value('records', records)
+    self.manager.commit(chunk)
+    return ChunkResult(updates=records)
+
+
+class ChunkRunner:
+
+  def __init__(self, collector : ICollector, processor : IChunkProcessor, logger):
+    self.collector = collector
+    self.processor = processor
+    self.logger    = logger
+
+  def run(self):
+    tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
+
+    with tqdm(total=self.collector.count(), file=tqdm_out) as pbar:
+      for chunk in self.collector.chunks():
+        chunk_result = self.processor.process(chunk)
+        pbar.update(chunk_result.updates)
+
+
+class ContentHandler:
+
+  def __init__(self, output):
+    self.output = output
+
+  def handle(self, event):
+    if isinstance(event, Content):
+      return self._handle_content_event(event)
+    elif isinstance(event, ContentFromURL):
+       return self._handle_url_event(event)
+
+  def _handle_content_event(self, event : Content):
+    return self.output.save_from_contents(
+      filepath=event.dest,
+      contents=event.content,
+      content_type=event.content_type)
+
+  def _handle_url_event(self, event : ContentFromURL):
+    # Info: How allow client code do the request instead?
+    import requests
+
+    response = requests.get(event.src,
+      allow_redirects=True,
+      verify=False)
+
+    if response.status_code == 404:
+      return
+
+    assert response.status_code == 200
+
+    self.output.save_from_contents(
+      filepath=event.dest,
+      contents=response.content,
+      content_type=event.content_type)
