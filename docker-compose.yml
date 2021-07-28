@@ -7,7 +7,7 @@ services:
     ports:
       - "5555:5555"
 
-  celery:
+  celery: &celery
     build: .
     image: inspira-crawlers
     network_mode: 'service:redis'
@@ -24,6 +24,11 @@ services:
     volumes:
       - .:/opt/service
       - .service-account.json:/etc/gcloud/service-account.json
+
+  celery_tjsp_pdf:
+    <<: *celery
+    container_name: 'inspira-crawlers-tjsp-pdf'
+    command: 'celery -A tasks worker -Q tjsp.pdf --concurrency=5 -E --loglevel=INFO -n worker.tjsp-pdf'
 
   flower:
     build: .

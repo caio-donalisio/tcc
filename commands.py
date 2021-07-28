@@ -15,6 +15,7 @@ from crawlers.tjrj.tjrj_crawler import (
   tjrj_command)
 from crawlers.tjba.tjba_crawler import (
   tjba_command)
+from crawlers.tjsp2.tjsp_pdf import tjsp_pdf_command
 
 
 if __name__ == '__main__':
