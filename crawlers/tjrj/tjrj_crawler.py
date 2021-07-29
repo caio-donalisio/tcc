@@ -96,6 +96,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     logger.debug(f'GET {url}')
 
     self.browser.get(url)
+    self.browser.driver.implicitly_wait(120)
     self.browser.fill_in(
         field_id='ContentPlaceHolder1_txtTextoPesq', value=QUERY)
     self.browser.select_by_id('ContentPlaceHolder1_cmbAnoInicio', self.params['start_year'])
