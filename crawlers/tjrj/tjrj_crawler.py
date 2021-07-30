@@ -219,8 +219,11 @@ class TJRJChunk(base.Chunk):
 
     json_response = data_response.json()
     if json_response.get('d') is None:
-      logger.info(f"POST {data_url} (payload={data_payload}) returned invalid data.")
-      raise utils.PleaseRetryException()
+      # This is bad -- the court has no detailed info about the process after all.
+      # Unfortunately we have to ignore this complementary data.
+      logger.info(
+        f"POST {data_url} (payload={data_payload}) returned invalid data (content-type: {data_response.headers.get('Content-type')}).")
+      return []
 
     data_result  = json_response['d']
     doc_filename = f'{act_id}-data'
