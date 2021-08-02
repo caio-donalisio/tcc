@@ -9,8 +9,8 @@ import click
 from app import cli, celery
 import requests
 
-def get_filters(rows=10,sort='id asc'):
-    return {
+
+existing_params = {
     # "spellcheck.collateExtendedResults":"true",
     # "df":"text",
     # "hl":"off",
@@ -25,7 +25,7 @@ def get_filters(rows=10,sort='id asc'):
     # "defType":"edismax",
     # "spellcheck.maxResultsForSuggest":"5",
     # "qf":"\n        _texto\n\n       ",
-    "wt":"json",
+    # "wt":"json",
     # "stopwords":"true",
     # "mm":"100%",
     # "q.alt":"*:*",
@@ -54,13 +54,13 @@ def get_filters(rows=10,sort='id asc'):
     #     "decisao_s"
     #     ],
     # "v.layout":"layout",
-    "rows":rows,#NUMERO DE RESULTADOS POR BUSCA
-    "sort":sort,
+    #"rows":10,#NUMERO DE RESULTADOS POR BUSCA
+    #"sort":"id asc",
     #"start":0,
     # "spellcheck.alternativeTermCount":"2",
     # "spellcheck.extendedResults":"false",
-    "q":"",#TERMO DE BUSCA
-    "fq":[
+    #"q":"",#TERMO DE BUSCA
+    # "fq":[
         #e.g. turma_s:"Quarta+Câmara"
         #e.g. ano_sessao_s:"2014"
         
@@ -91,7 +91,7 @@ def get_filters(rows=10,sort='id asc'):
         # 'secao_s',
         # 'sem_conteudo_s',
         # 'turma_s'
-        ],
+    #    ],
     # "facet.limit":"15",
     # "spellcheck":"on",
     # "mlt.fl":"ementa_s,decisao_s",
@@ -103,9 +103,6 @@ def get_filters(rows=10,sort='id asc'):
     }
 
 
-
-
-# importante fazer uma contagem dos processos a serem baixados
 logger = logger_factory('carf')
 
 
@@ -120,12 +117,11 @@ class CARFClient:
         '''
         Conta registros existentes em uma dada busca
         '''
-        result = self.fetch(filters,page=1)#,item_per_page=1)
+        result = self.fetch(filters,page=1)
         return result['response']['numFound']
-        # conta registros
 
     @utils.retryable(max_retries=3)
-    def fetch(self, filters, page=1):#, items_per_page=10):
+    def fetch(self, filters, page=1):
         '''
         Monta as buscas a serem realizadas
         '''
@@ -133,7 +129,6 @@ class CARFClient:
 
             items_per_page = filters.get('rows')
 
-            #TO DO: INCLUIR ZERO
             params = {
                 **filters,
                 **{'start': (page - 1) * items_per_page}
@@ -143,48 +138,32 @@ class CARFClient:
                                 params=params,
                                 verify=False).json()
 
-            #EXECUTAR A QUERY
-            #return []
-            #return params
-        
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
             raise e
-        
-
-    # @utils.retryable(max_retries=3)
-    # def paginator(self, filters, items_per_page=10):
-    #     item_count = self.count(filters)
-    #     page_count = math.ceil(item_count / items_per_page)
-    #     return Paginator(self, filters=filters, item_count=item_count, page_count=page_count,
-    #         items_per_page=items_per_page)
-        # retorna registros
 
 
 class CARFCollector(base.ICollector):
-    '''Precisa do count e do chunks'''
 
     def __init__(self, client, filters):
         self.client = client
         self.filters = filters
 
     def count(self):
-        '''determina quantos processos existem'''
+        '''
+        Determina quantos processos existem
+        '''
         return self.client.count(self.filters)
 
     def chunks(self):
         total = self.count()
-        #pages = math.ceil(total/10)
         pages = math.ceil(total/self.filters.get('rows'))
 
         for page in range(1, pages + 1):
-            # filters
-            # page
             yield CARFChunk(
                 keys={
                     **self.filters  , **{'page': page}
                 },
-                # subdiretório onde guardar os blocos (deixar em branco)
                 prefix='',
                 filters=self.filters,
                 page=page,
@@ -203,45 +182,36 @@ class CARFChunk(base.Chunk):
         
 
     def rows(self):
-        '''linhas de registro devolvidos pelo chunk'''
+        '''Linhas de registro devolvidos pelo chunk'''
         result = self.client.fetch(self.filters,self.page)
         for record in result['response']['docs']:
 
-                session_at = pendulum.parse(record['dt_sessao_tdt'])
+            session_at = pendulum.parse(record['dt_sessao_tdt'])
 
-                record_id = record['id']                
-                base_path   = f'{session_at.year}/{session_at.month:02d}'
-                report_id,_ = record['nome_arquivo_pdf_s'].split('.')
-                
-                
-                dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
-                
-                report_url = f'https://acordaos.economia.gov.br/acordaos2/pdfs/processados/{report_id}.pdf'
-                dest_report = f"{base_path}/doc_{record_id}_{report_id}.pdf"
-            #TODO - VAI RETORNAR UM JSON
-#Para essa linha, gerar uma quantidade N de arquivos (no caso o Json e o PDF)
-                yield [
-                    #SALVAR (não precisa chamar o codigo que faz a persistnecia - coletor só precisa indicar o conteúdo)
-                base.Content(
+            record_id = record['id']                
+            base_path   = f'{session_at.year}/{session_at.month:02d}'
+            report_id,_ = record['nome_arquivo_pdf_s'].split('.')
+            dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
+
+            report_url = f'https://acordaos.economia.gov.br/acordaos2/pdfs/processados/{report_id}.pdf'
+            dest_report = f"{base_path}/doc_{record_id}_{report_id}.pdf"
+
+            yield [
+            base.Content(
                 content=json.dumps(record), 
-                dest=dest_record, #DESTINO
+                dest=dest_record,
                 content_type='application/json'
                 )
-                ,
+            ,
+            base.ContentFromURL(
+                src=report_url, 
+                dest=dest_report,
+                content_type='text/html'
+                )
+            ]
             
-                base.ContentFromURL(
-                    src=report_url, 
-                    dest=dest_report, #base_path + doc_id.pdf
-                    content_type='text/html'
-                    )#Só representa os dados, e o destino, não é o arquivo em si
-            ]#BAIXAR O PDF
-            
-#COLETOR não precisa ficar se perguntando se baixou ou não
-#Estrurau grosseira do crawler
 @celery.task(queue='crawlers.carf', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
-
-# def carf_task(rows,sort,ano_sessao,output_uri):
 def carf_task(**kwargs):
     import utils
     setup_cloud_logger(logger)
@@ -252,11 +222,7 @@ def carf_task(**kwargs):
         output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
         logger.info(f'Output: {output}.')
 
-    #start_date, end_date =\
-    #    pendulum.parse(start_date), pendulum.parse(end_date)
-
-    #fq=(camara_s:"Quarta+Câmara" AND ano_sessao_s:"2016")
-
+    #Parâmetros fq e seus códigos correspondentes de busca
     fq = {
         'ano_publicacao':'ano_publicacao_s',
         'ano_sessao':'ano_sessao_s',
@@ -268,49 +234,19 @@ def carf_task(**kwargs):
         'id':'id'
         }
     
-    fq_keys = [key 
-            for key in kwargs 
-            if kwargs[key] and key in fq
-            ]
-
-    fq_query = ' AND '.join([
-        f'{fq[key]}:"{kwargs[key]}"' 
-        for key in fq_keys
-        ])
-    
+    fq_keys = (key for key in kwargs if kwargs[key] and key in fq)
 
     query_params = {
         'sort':kwargs.get('sort'),
         'rows':kwargs.get('rows'),
         'wt':'json',
-        'fq':fq_query,
+        'fq':' AND '.join([f'{fq[key]}:"{kwargs[key]}"'for key in fq_keys]),
         'q':kwargs.get('search_term'),
         }
                     
-    #print(query_params)
-
     collector = CARFCollector(client=CARFClient(), filters=query_params)
-    
-    handler   = base.ContentHandler(output=output) #Handler recebe as informações do yield e de fato executa alguma coisa
-
+    handler   = base.ContentHandler(output=output) 
     snapshot = base.Snapshot(keys=query_params)
-    #Snapshot é como uma evolução do mecanismo de controle
-    #O crawler se controla pelo objetivo, não de onde ele parou - 
-    #Coletor não é responsável por saber se já baixou, coletor baixa tudo
-    #O runner é quem controla o que baixar
-    #Quando eu executo de novo o crawler interrompido, o coletor vai começar do 0 e gerar os chunks. O runner vai ver o que baixar
-    
-    #Com buscas muito grandes, isso pode demorar alguns minutos no retry para gerar os chunks de novo, mesmo sem baixar
-    #O snapshot consolida tudo num arquivo só. É o conjunto de chunks num arquivo só.
-    #Snapshot é em tese supérfluo, os chunks já lidam de não baixar tudo de novo, apenas acelera o processo
-    #O runner quando cria o snapshot ele grava os chunks que eu baixei - é uma fotografia dos chunks que eu baixei
-    #O snapshot por ser um arquivo único fica difícil de funcionar simultaneamente com vários workers, problemas de read
-
-    #No RJ Snapshot ele é feito por ano
-
-
-#No fim, importar task no CLI e no celery
-#Para rodar o celery, usar o docker (rodar o docker compose - so´preciso mudar pra colocar a fila do carf na lista de crawlers)
 
     base.get_default_runner(
         collector=collector, 
@@ -334,29 +270,9 @@ def carf_task(**kwargs):
 @click.option('--id',            default=None,     help='Process ID')
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
-@click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-#def carf_command(rows, sort, ano_sessao,ano_publicacao,output_uri, enqueue, split_tasks):
 def carf_command(**kwargs):    
-    #args = (start_date, end_date, output_uri)
-    
-    # if kwargs.get('enqueue'):
-    #     if kwargs.get('split_tasks'):
-#       start_date, end_date =\
-#         pendulum.parse(start_date), pendulum.parse(end_date)
-#       for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
-#         task_id = carf_task.delay(
-#           start.to_date_string(),
-#           end.to_date_string(),
-#           output_uri)
-#         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-#     else:
-#       carf_task.delay(*args)
-#   else:
-    #print(kwargs)
-    carf_task(**kwargs)
-    # rows=rows,
-    #         sort=sort,
-    #         ano_sessao=ano_sessao,
-    #         output_uri=output_uri
-    #         )
+    if kwargs.get('enqueue'):
+        task_id = carf_task.delay(**kwargs)
+        print(f"task {task_id} sent with params {str(kwargs)}")
+    else:
+        carf_task(**kwargs)
