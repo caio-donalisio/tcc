@@ -104,7 +104,7 @@ class TRF4(base.BaseCrawler):
 
     if total_records != total_filtered:
       with sentry_sdk.push_scope() as scope:
-        scope.set_extra('crawler', TRF4)
+        scope.set_extra('crawler', 'TRF4')
         scope.set_extra('total_unfiltered', total_records)
         scope.set_extra('total_filtered'  , total_filtered)
         scope.set_extra('params', self.params)
@@ -411,7 +411,7 @@ class TRF4(base.BaseCrawler):
       n = math.ceil(len(arr) / spl)
 
     with sentry_sdk.push_scope() as scope:
-      scope.set_extra('crawler', TRF4)
+      scope.set_extra('crawler', 'TRF4')
       scope.set_extra('params', params)
       sentry_sdk.capture_message('Impossible situation found -- ignoring', 'warning')
       logger.warn(
