@@ -2,7 +2,9 @@ import conf
 import click
 
 from celery import Celery
-from celery.signals import setup_logging, worker_process_init
+from celery.signals import setup_logging, worker_process_init, worker_ready
+from celery_singleton import clear_locks
+
 
 import sentry_sdk
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -31,6 +33,11 @@ def on_setup_logging(**kwargs):
 def on_worker_process_init(**kwargs):
   if conf.get('SENTRY_DSN'):
     sentry_sdk.init(conf.get('SENTRY_DSN'), **sentry_config)
+
+
+@worker_ready.connect
+def unlock_all(**kwargs):
+  clear_locks(celery)
 
 
 @click.group()

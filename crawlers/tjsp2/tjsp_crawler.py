@@ -146,6 +146,8 @@ class TJSPClient:
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.CLASS_NAME, 'esajTabelaServico')))
 
+    self.request_cookies_browser = self.driver.get_cookies()
+
   @utils.retryable(max_retries=9)  # type: ignore
   def get_search_results(self, page):
     from selenium.webdriver.common.by import By
