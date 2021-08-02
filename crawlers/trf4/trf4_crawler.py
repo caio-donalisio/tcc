@@ -32,6 +32,45 @@ class TRF4(base.BaseCrawler):
     self.orgs          = None
     self.classes       = None
 
+  def run_for_seq(self, start, end):
+    ids = []
+    for seq in range(int(start), int(end)):
+      ids.append(f'TRF4{seq}')
+    logger.info(f'Fetching records from {len(ids)}.')
+
+    params = {}
+
+    partition_size = 50
+    partitions  = [ids[i:i + partition_size] for i in range(0, len(ids), partition_size)]
+    logger.info(f'Partitions {len(partitions)}.')
+
+    def rows_generator(pagination, params, records):
+      yield from self._rows_from_pagination(pagination, params, records)
+
+    chunks = []
+    for partition in partitions:
+      records = len(partition)
+      pagination = {
+        'total': records,
+        'vetPaginacao': ','.join(partition)
+      }
+
+      chunk = utils.Chunk(
+        params={'ids': ','.join(partition)},
+        output=self.output,
+        rows_generator=rows_generator(pagination, params, records),
+        prefix=f'by_ids/')
+      chunks.append(chunk)
+
+    runner = base.Runner(
+      chunks_generator=chunks,
+      row_to_futures=self.handle,
+      total_records=len(ids),
+      logger=logger,
+      max_workers=6,
+    )
+    runner.run()
+
   def run(self):
     total_records = self.count(params=self._get_query_params(
       dataIni=self.params['start_date'].strftime(DATE_FORMAT),
@@ -65,7 +104,7 @@ class TRF4(base.BaseCrawler):
 
     if total_records != total_filtered:
       with sentry_sdk.push_scope() as scope:
-        scope.set_extra('crawler', TRF4)
+        scope.set_extra('crawler', 'TRF4')
         scope.set_extra('total_unfiltered', total_records)
         scope.set_extra('total_filtered'  , total_filtered)
         scope.set_extra('params', self.params)
@@ -153,6 +192,9 @@ class TRF4(base.BaseCrawler):
 
   def _rows_from_params(self, params, page_size=200):
     pagination = self._vet_pagination({**params, **{'docsPagina': page_size}})
+    return self._rows_from_pagination(pagination, params, page_size)
+
+  def _rows_from_pagination(self, pagination, params, page_size=200):
     if pagination['total'] == 0:
       return []
 
@@ -368,7 +410,12 @@ class TRF4(base.BaseCrawler):
       spl = min(div, len(arr))
       n = math.ceil(len(arr) / spl)
 
-    raise Exception('Impossible situation here!')
+    with sentry_sdk.push_scope() as scope:
+      scope.set_extra('crawler', 'TRF4')
+      scope.set_extra('params', params)
+      sentry_sdk.capture_message('Impossible situation found -- ignoring', 'warning')
+      logger.warn(
+        f'Impossible situation found for params {params}.')
 
   def _get_referendaries(self):
     response = self.requester.get(f'{BASE_URL}/pesquisa.php?tipo=4')
@@ -403,6 +450,7 @@ class TRF4(base.BaseCrawler):
   def _get_query_params(self, **overrides):
     return {**{
       'rdoTipo': 4,
+      'chkAcordaos': '',
       'rdoCampoPesquisa': 'I',
       'textoPesqLivre': '',
       'numProcesso': '',
@@ -466,3 +514,15 @@ def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
       trf4_task.delay(*args)
   else:
     trf4_task(*args)
+
+
+@cli.command(name='trf4-seq')
+@click.option('--start', prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--end'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+def trf4_seq_command(start, end, output_uri):
+  output = utils.get_output_strategy_by_path(path=output_uri)
+  logger.info(f'Output: {output}.')
+
+  crawler = TRF4(params={}, output=output, logger=logger)
+  crawler.run_for_seq(start, end)
