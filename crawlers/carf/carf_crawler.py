@@ -120,23 +120,23 @@ class CARFClient:
         '''
         Conta registros existentes em uma dada busca
         '''
-        result = self.fetch(filters,start=0)#,item_per_page=1)
+        result = self.fetch(filters,page=1)#,item_per_page=1)
         return result['response']['numFound']
         # conta registros
 
     @utils.retryable(max_retries=3)
-    def fetch(self, filters, start=0):#, items_per_page=10):
+    def fetch(self, filters, page=1):#, items_per_page=10):
         '''
         Monta as buscas a serem realizadas
         '''
         try:
 
-            items_per_page = filters['rows']
+            items_per_page = filters.get('rows')
 
             #TO DO: INCLUIR ZERO
             params = {
                 **filters,
-                **{'start': start + items_per_page}
+                **{'start': (page - 1) * items_per_page}
             }
             
             return requests.get(self.url,
@@ -175,9 +175,9 @@ class CARFCollector(base.ICollector):
     def chunks(self):
         total = self.count()
         #pages = math.ceil(total/10)
-        pages = math.ceil(total/self.filters['rows'])
+        pages = math.ceil(total/self.filters.get('rows'))
 
-        for page in range(1, pages+1):
+        for page in range(1, pages + 1):
             # filters
             # page
             yield CARFChunk(
@@ -207,10 +207,10 @@ class CARFChunk(base.Chunk):
         result = self.client.fetch(self.filters,self.page)
         for record in result['response']['docs']:
 
-                published_at = pendulum.parse(record['dt_sessao_tdt'])
+                session_at = pendulum.parse(record['dt_sessao_tdt'])
 
                 record_id = record['id']                
-                base_path   = f'{published_at.year}/{published_at.month:02d}'
+                base_path   = f'{session_at.year}/{session_at.month:02d}'
                 report_id,_ = record['nome_arquivo_pdf_s'].split('.')
                 
                 
@@ -240,24 +240,55 @@ class CARFChunk(base.Chunk):
 #Estrurau grosseira do crawler
 @celery.task(queue='crawlers.carf', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
-def carf_task(rows,sort,ano_sessao,output_uri):
+
+# def carf_task(rows,sort,ano_sessao,output_uri):
+def carf_task(**kwargs):
     import utils
     setup_cloud_logger(logger)
 
     from logutils import logging_context
 
     with logging_context(crawler='carf'):
-        output = utils.get_output_strategy_by_path(path=output_uri)
+        output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
         logger.info(f'Output: {output}.')
 
     #start_date, end_date =\
     #    pendulum.parse(start_date), pendulum.parse(end_date)
 
-    query_params = {'rows':rows,
-                    'sort': sort,
-                    'wt':'json',
-                    'fq':f'ano_sessao_s:"{ano_sessao}"'
-                    }
+    #fq=(camara_s:"Quarta+Câmara" AND ano_sessao_s:"2016")
+
+    fq = {
+        'ano_publicacao':'ano_publicacao_s',
+        'ano_sessao':'ano_sessao_s',
+        'turma':'turma_s',
+        'camara':'camara_s',
+        'secao':'secao_s',
+        'materia':'materia_s',
+        'nome_relator':'nome_relator_s',
+        'id':'id'
+        }
+    
+    fq_keys = [key 
+            for key in kwargs 
+            if kwargs[key] and key in fq
+            ]
+
+    fq_query = ' AND '.join([
+        f'{fq[key]}:"{kwargs[key]}"' 
+        for key in fq_keys
+        ])
+    
+
+    query_params = {
+        'sort':kwargs.get('sort'),
+        'rows':kwargs.get('rows'),
+        'wt':'json',
+        'fq':fq_query,
+        'q':kwargs.get('search_term'),
+        }
+                    
+    #print(query_params)
+
     collector = CARFCollector(client=CARFClient(), filters=query_params)
     
     handler   = base.ContentHandler(output=output) #Handler recebe as informações do yield e de fato executa alguma coisa
@@ -290,17 +321,27 @@ def carf_task(rows,sort,ano_sessao,output_uri):
         .run(snapshot=snapshot)
 
 @cli.command(name='carf')
-@click.option('--rows'      , default=10,       help='Number of results per page')
-@click.option('--sort'      , default='id asc', help='Sorting parameter')
-@click.option('--ano-sessao', default=None,     help='Ano da sessão')
-@click.option('--output-uri', default=None,     help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   , default=False,    help='Enqueue for a worker'  , is_flag=True)
+@click.option('--rows'      ,    default=10,       help='Number of results per page')
+@click.option('--sort'      ,    default='id asc', help='Sorting parameter')
+@click.option('--ano-sessao',    default=None,     help='Session year')
+@click.option('--ano-publicacao',default=None,     help='Publication year')
+@click.option('--turma',         default=None,     help='Turma')
+@click.option('--camara',        default=None,     help='Camara')
+@click.option('--secao',         default=None,     help='Seção')
+@click.option('--materia',       default=None,     help='Matéria')
+@click.option('--nome-relator',  default=None,     help='Nome do relator')
+@click.option('--search-term',   default='',       help='Search terms')
+@click.option('--id',            default=None,     help='Process ID')
+@click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
+@click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def carf_command(rows, sort, ano_sessao, output_uri, enqueue, split_tasks):
+#def carf_command(rows, sort, ano_sessao,ano_publicacao,output_uri, enqueue, split_tasks):
+def carf_command(**kwargs):    
     #args = (start_date, end_date, output_uri)
-#   if enqueue:
-#     if split_tasks:
+    
+    # if kwargs.get('enqueue'):
+    #     if kwargs.get('split_tasks'):
 #       start_date, end_date =\
 #         pendulum.parse(start_date), pendulum.parse(end_date)
 #       for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
@@ -312,8 +353,10 @@ def carf_command(rows, sort, ano_sessao, output_uri, enqueue, split_tasks):
 #     else:
 #       carf_task.delay(*args)
 #   else:
-    carf_task(rows=rows,
-            sort=sort,
-            ano_sessao=ano_sessao,
-            output_uri=output_uri
-            )
+    #print(kwargs)
+    carf_task(**kwargs)
+    # rows=rows,
+    #         sort=sort,
+    #         ano_sessao=ano_sessao,
+    #         output_uri=output_uri
+    #         )
