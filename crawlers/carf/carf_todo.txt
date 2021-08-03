@@ -1,6 +1,0 @@
--- Incluir start = 0
--- Verificar erro do encoding Json
--- Verificar salvamento dos arquivos
--- Compor Docker
--- Limpar comentários
--- Adicionar mais parâmetros de busca
