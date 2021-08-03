@@ -37,6 +37,8 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     super(TJRJ, self).__init__(params, output, logger, **options)
     self.browser   = browser
     self.requester = requests.Session()
+    self.header_generator = utils.HeaderGenerator(
+      origin='http://www4.tjrj.jus.br', xhr=True)
 
   def setup(self):
     try:
@@ -45,9 +47,13 @@ class TJRJ(base.BaseCrawler, base.ICollector):
       self.browser.quit()
 
     self.headers = {
-      "cookie": f'ASP.NET_SessionId={self.session_id}',
-      "Content-Type": "application/json"
+      'Cookie': f'ASP.NET_SessionId={self.session_id}',
+      'Content-Type': 'application/json',
+      'Host': 'www4.tjrj.jus.br',
+      **self.header_generator.generate(),
+      **{'Referer': 'http://www4.tjrj.jus.br/EJURIS/ProcessarConsJuris.aspx?PageSeq=1&Version=1.1.14.2'}
     }
+
     self.payload = {
       'pageSeq': '0',
       'grpEssj': ''
@@ -61,7 +67,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
       json={**self.payload, **{'numPagina': 0}}, headers=self.headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 got {response.status_code}.")
+      logger.info(f"Ops, expecting 200 on {url} payload {self.payload} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
@@ -92,8 +98,12 @@ class TJRJ(base.BaseCrawler, base.ICollector):
         options=self.options)
 
   def _get_session_id(self):
-    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx'
-    logger.debug(f'GET {url}')
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx?Version=1.1.14.2'
+    logger.info(f'GET {url}')
 
     self.browser.get(url)
     self.browser.driver.implicitly_wait(120)
@@ -104,6 +114,10 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     search_button = self._find(id='ContentPlaceHolder1_btnPesquisar')
     self.browser.click(search_button)
     session_id = None
+
+    WebDriverWait(self.browser.driver, 60) \
+      .until(EC.presence_of_element_located((By.ID, 'seletorPaginasTopo')))
+
     cookies = self.browser.driver.get_cookies()
 
     for cookie in cookies:
