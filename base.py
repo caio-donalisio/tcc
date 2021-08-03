@@ -145,8 +145,6 @@ class ICollector:
     raise Exception('Must be implemented in a subclass')
 
   def chunks(self):
-    '''Lista de partes da busca específica'''
-
     raise Exception('Must be implemented in a subclass')
 
   def countable(self):
@@ -157,7 +155,7 @@ class ICollector:
 
 
 class HashedKeyValue:
-  '''representa um dict que é a chave do chunk'''
+
   def __init__(self, keys : dict, prefix=None):
     self._keys   = keys
     self._state  = {}
@@ -259,10 +257,6 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  '''Recebe um chunk, ele pega o chunk, executa e grava ele como executado. 
-  Na próxima vez ele valida se o código já foi executado ou não. 
-  Ele executa o bloco quando necessário.
-  '''
   def __init__(self, executor, handler, repository : ChunksRepository):
     self.executor   = executor
     self.handler    = handler
@@ -293,12 +287,7 @@ class FutureChunkProcessor(IChunkProcessor):
 
 
 class ChunkRunner:
-  '''
-  master - itera por todos os chunks e vai pedir para o processador executar o bloco de fato. 
-  O coletor vai gerar vários blocos e o runner vai iterar por eles
-  Este master vai iterando e mensurando o progresso
-  Arquivo que represente o chunk em disk é o arquivo de controle (chunk repository)
-  '''
+
   def __init__(self, collector : ICollector, processor : IChunkProcessor,
       repository : SnapshotsRepository, logger):
     self.collector  = collector

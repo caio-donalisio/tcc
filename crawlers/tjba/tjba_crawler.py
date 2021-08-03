@@ -32,9 +32,6 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
 
 
 class TJBAClient:
-  '''
-  Encapsula requests e retorno do CARF
-  '''
   def __init__(self):
     self.transport  = RequestsHTTPTransport(
       url="https://jurisprudenciaws.tjba.jus.br/graphql",
@@ -103,14 +100,8 @@ class TJBACollector(base.ICollector):
       self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
-    '''Pega a data de início e fim e quebra em diários'''
     ranges = list(utils.timely(
       self.query['start_date'], self.query['end_date'], unit='days', step=1))
-
-
-
-#'''função timely: devolve uma lista dia por dia (ou outros períodos)'''
-
 
     for start_date, end_date in reversed(ranges):
       keys =\
@@ -148,7 +139,7 @@ class TJBAChunk(base.Chunk):
       dest_report = f"{base_path}/doc_{doc_id}_{doc_hash}_report.html"
       report_url  =\
         f'https://jurisprudenciaws.tjba.jus.br/inteiroTeor/{doc_hash}'
-#Retorna lista de coisas
+
       yield [
         base.Content(content=json.dumps(record), dest=dest_record,
           content_type='application/json'),
@@ -157,7 +148,7 @@ class TJBAChunk(base.Chunk):
 
 
 @celery.task(queue='crawlers.tjba', default_retry_delay=5 * 60,
-            autoretry_for=(BaseException,))
+             autoretry_for=(BaseException,))
 def tjba_task(start_date, end_date, output_uri):
   setup_cloud_logger(logger)
 
