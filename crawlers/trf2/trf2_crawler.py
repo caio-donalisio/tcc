@@ -9,6 +9,11 @@ from tqdm import tqdm
 from slugify import slugify
 import hashlib
 
+import browsers
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -26,6 +31,7 @@ class TRF2:
     self.header_generator = utils.HeaderGenerator(
       origin='https://www10.trf2.jus.br', xhr=True)
     self.session = requests.Session()
+    self.browser = browsers.FirefoxBrowser()
 
   def run(self):
     import concurrent.futures
@@ -67,7 +73,6 @@ class TRF2:
           self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
       self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
-      assert total_records == records_fetch
 
   def persist(self, doc, **kwargs):
     self.output.save_from_contents(
@@ -108,14 +113,33 @@ class TRF2:
         rows_generator=self.rows(start_date=start_date, end_date=end_date))
 
   def rows(self, start_date, end_date):
+    # Check whether we can trust pagination
+    base_query = {
+      'start_date': start_date.start_of('day').to_date_string(),
+      'end_date'  : end_date.start_of('day').to_date_string()
+    }
+    page = self._get_search_page_for_query({**base_query, 'offset': 0})
+
+    total = page.count()
+    if total > 900:
+      count = 0
+      for filters in page.filters():
+        query   = {'extra_query_params': filters['query_param'], **base_query}
+        partial = 0
+        for row in self.rows_paginated(query):
+          partial += 1
+          yield row
+        count += partial
+      if count != total:
+        self.logger.warn(f'Count does not match, fetch {count} expects {total}.')
+    else:
+      yield from self.rows_paginated(base_query)
+
+  def rows_paginated(self, query):
     offset = 0
     while True:
-      query = {
-        'start_date': start_date.start_of('day').to_date_string(),
-        'end_date'  : end_date.start_of('day').to_date_string(),
-        'offset'    : offset,
-      }
-      page = SearchPage(self.session, query, logger=self.logger)
+      page = self._get_search_page_for_query({**query, 'offset': offset})
+
       if not page.has_results():
         break
 
@@ -172,7 +196,7 @@ class TRF2:
 
       if not page.has_next():
         break
-      time.sleep(random.uniform(0.2, 0.3))
+      time.sleep(random.uniform(0.1, 0.2))
 
   @utils.retryable(max_retries=9)   # type: ignore
   def fetch_doc(self, url):
@@ -190,18 +214,21 @@ class TRF2:
     total = 0
     for start_date, end_date in \
       utils.timely(self.params['start_date'], self.params['end_date'], unit='years', step=1):
-      total += SearchPage(session=self.session, query={
+      total += self._get_search_page_for_query(query={
         'start_date': start_date.start_of('day').to_date_string(),
         'end_date'  : end_date.start_of('day').to_date_string(),
-        'offset'    : 0}, logger=self.logger) \
+        'offset'    : 0}) \
       .count()
     return total
 
+  def _get_search_page_for_query(self, query):
+    return SearchPageSelenium(browser=self.browser, query=query, logger=self.logger)
 
-class SearchPage:
-  def __init__(self, session, query, logger):
+
+class SearchPageSelenium:
+  def __init__(self, browser, query, logger):
     self.logger = logger
-    self._session = session
+    self.browser = browser
     self._text = self._perform_query(query)
     self._soup = utils.soup_by_content(self._text)
     self._uls  =\
@@ -209,21 +236,20 @@ class SearchPage:
 
   @utils.retryable(max_retries=3)   # type: ignore
   def _perform_query(self, query):
-    header_generator = utils.HeaderGenerator(origin='https://www10.trf2.jus.br')
-    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q=+inmeta:gsaentity_BASE%3DInteiro%2520Teor&start={offset}&num=1&site=v2_jurisprudencia'.format(
-      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'])
+    import urllib.parse
+    q_string = '+inmeta%3Agsaentity_BASE%3DInteiro%2520Teor'
+    if query.get('extra_query_params'):
+      param = query['extra_query_params'][0]
+      q_string = f'{q_string}+inmeta%3ADescOrgaoJulgador%3D{urllib.parse.quote(param)}'
+      self.logger.debug(f'Using `extra_query_params` filters..')
 
-    response = self._session.get(
-      query_url,
-      headers=header_generator.generate(),
-      verify=False,
-      timeout=15)
+    query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q={q}&start={offset}&num=1&site=v2_jurisprudencia'.format(
+      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'], q=q_string)
 
-    if response.status_code != 200:
-      self.logger.warn(f'Expects 200. Got {response.status_code}.')
-      self.logger.warn(response.text)
-      raise utils.PleaseRetryException()
-    return response.text
+    self.browser.get(query_url)
+    WebDriverWait(self.browser.driver, 60) \
+      .until(EC.presence_of_element_located((By.ID, 'resultados')))
+    return self.browser.page_source()
 
   @property
   def text(self):
@@ -245,6 +271,37 @@ class SearchPage:
     assert len(self._uls) == 1
     return self._uls[0].find_all('li', recursive=False)
 
+  def filters(self):
+    import urllib.parse as urlparser
+
+    # expand filters
+    more_button = self._soup.find(ctype='dynnav.DescOrgaoJulgador.more')
+    if more_button:
+      self.browser.click(more_button)
+      WebDriverWait(self.browser.driver, 60) \
+        .until(EC.visibility_of_element_located((By.ID, "less_attr_3")))
+
+      # the update instance-level source
+      self._text = self.browser.page_source()
+      self._soup = utils.soup_by_content(self._text)
+
+    def extract_param(a):
+      if a.get('href'):
+        qs = urlparser.parse_qs(a['href'].replace('&amp;', '&')[1:])
+        if qs.get('q'):
+          params = qs['q'][0].split(' ')
+          return [v.strip().split('=')[-1]
+            for v in params if 'inmeta:DescOrgaoJulgador' in v]
+
+    divs = self._soup.find_all('div', {'class': 'filtros_dyNav'})
+    all_params = []
+    for div in divs:
+      for a in div.find_all('a'):
+        query_param = extract_param(a)
+        if query_param:
+          all_params.append({'query_param': query_param})
+    return all_params
+
   def count(self):
     import re
     facets = self._soup.find_all('a', {'title': 'Inteiro Teor'})
@@ -253,7 +310,7 @@ class SearchPage:
     match = re.match(r'.*\((\d+)\)$', facets[0].get_text())
     if match:
       return int(match.group(1))
-    return 0  # warn -- unable to estimate.
+    return 0
 
 
 @celery.task(queue='crawlers', rate_limit='1/h', default_retry_delay=30 * 60,
