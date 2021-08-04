@@ -105,9 +105,9 @@ class TSTChunk(base.Chunk):
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
-        for record in result['registros']:
+        base_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
 
-            
+        for record in result['registros']:
 
             session_at = pendulum.parse(record['registro']['dtaPublicacao'])
 
@@ -115,8 +115,6 @@ class TSTChunk(base.Chunk):
             base_path   = f'{session_at.year}/{session_at.month:02d}'
             
             dest_record = f"{base_path}/doc_{record_id}.json"
-            
-            base_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
 
             params = {
                 'anoProcInt':record['registro']['anoProcInt'],
