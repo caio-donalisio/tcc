@@ -16,7 +16,6 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   return {
     'acao': 'pesquisar',
     'novaConsulta': 'true',
-    'numDocsPagina': 50,
     'b': 'ACOR',
     'data': date_filter,
     'operador': 'e',
@@ -78,7 +77,6 @@ class STJClient:
     soup = utils.soup_by_content(content)
     info = soup.find('div', {'id': 'infopesquisa'})
     if not info:
-      print(soup.prettify())
       assert info is not None
     div_count = info.find_all('div', {'class': 'divCell'})[0]
     match = re.match(r'(\d+\.?\d+)', div_count.get_text())
@@ -100,40 +98,37 @@ class STJCollector(base.ICollector):
       self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
-    import math
     ranges = list(utils.timely(
       self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
     for start_date, end_date in reversed(ranges):
       filters = get_filters(start_date, end_date)
       count   = self.client.count(filters)
-      pages   = math.ceil(count / 50)
 
-      for page in range(pages):
-        keys =\
-          {'start_date': start_date.to_date_string(),
-           'end_date'  : end_date.to_date_string(),
-           'page'      : page}
+      keys =\
+        {'start_date' : start_date.to_date_string(),
+          'end_date'  : end_date.to_date_string(),
+          'limit'     : count + 1}
 
-        yield STJChunk(keys=keys,
-          client=self.client,
-          filters=filters,
-          page=page,
-          prefix=f'{start_date.year}/{start_date.month:02d}/')
+      yield STJChunk(keys=keys,
+        client=self.client,
+        filters=filters,
+        limit=count + 1,
+        prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class STJChunk(base.Chunk):
 
-  def __init__(self, keys, client, filters, page, prefix):
+  def __init__(self, keys, client, filters, limit, prefix):
     super(STJChunk, self).__init__(keys, prefix)
     self.client  = client
     self.filters = filters
-    self.page    = page
+    self.limit   = limit
 
   @utils.retryable(max_retries=3)
   def rows(self):
-    offset   = self.page * 50
-    response = self.client.fetch(self.filters, offset=offset)
+    response = self.client.fetch({
+      **self.filters, **{'l': self.limit, 'numDocsPagina': self.limit}}, offset=0)
     soup  = utils.soup_by_content(response.content)
     count = self.client._count_by_content(response.content)
     if count == 0:
