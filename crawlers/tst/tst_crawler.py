@@ -8,6 +8,8 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
+from random import random
+from time import sleep
 
 logger = logger_factory('tst')
 
@@ -60,7 +62,7 @@ class TSTClient:
             "publicacaoFinal": filters.get('end_date')
             }
             
-
+            #sleep(0.5*random())
             return requests.post(search_url,json=post_data).json()
 
         except Exception as e:
@@ -105,10 +107,12 @@ class TSTChunk(base.Chunk):
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
-        base_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
+        
+        base_pdf_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
+        base_html_report_url = 'http://jurisprudencia-backend.tst.jus.br/rest/documentos'
 
         for record in result['registros']:
-
+            
             session_at = pendulum.parse(record['registro']['dtaPublicacao'])
 
             record_id = record['registro']['id']                
@@ -120,18 +124,30 @@ class TSTChunk(base.Chunk):
                 'anoProcInt':record['registro']['anoProcInt'],
                 'numProcInt':record['registro']['numProcInt'],
                 'dtaPublicacaoStr':session_at.format('DD/MM/YYYY') + '%2007:00:00',
-                'nia':record['registro']['numInterno']
+                'nia':record['registro']['numInterno'],
+                'origem':'documento'
                 }
                 
-            params = '&'.join(f'{k}={v}' for k,v in params.items())
-            report_url = base_report_url + params
-            dest_report = f"{base_path}/doc_{record_id}.pdf"
+            rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
+            rtf_report_url = base_pdf_report_url + rtf_params
+            dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
 
+            pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
+            pdf_report_url = base_pdf_report_url + pdf_params
+            dest_pdf_report = f'{base_path}/doc_{record_id}.pdf'
+
+            html_report_url = f'{base_html_report_url}/{record_id}'
+            dest_html_report = f'{base_path}/doc_{record_id}.html'
+            
             yield [
             base.Content(content=json.dumps(record),dest=dest_record,
                 content_type='application/json'),
-            base.ContentFromURL(src=report_url,dest=dest_report,
-                content_type='application/pdf')
+            base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report,
+                 content_type='application/rtf'),
+            base.ContentFromURL(src=pdf_report_url,dest=dest_pdf_report,
+                 content_type='application/pdf'),
+            # base.ContentFromURL(src=html_report_url,dest=dest_html_report,
+            #      content_type='text/html')
             ]
             
 @celery.task(queue='crawlers.tst', default_retry_delay=5 * 60,
