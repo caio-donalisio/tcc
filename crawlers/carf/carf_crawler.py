@@ -16,7 +16,7 @@ class CARFClient:
 
     def __init__(self):
         self.url = 'https://acordaos.economia.gov.br/solr/acordaos2/browse?'
-        
+
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
@@ -33,7 +33,7 @@ class CARFClient:
                 **filters,
                 **{'start': (page - 1) * items_per_page}
             }
-            
+
             return requests.get(self.url,
                                 params=params,
                                 verify=False).json()
@@ -76,7 +76,7 @@ class CARFChunk(base.Chunk):
         self.filters  = filters
         self.page = page
         self.client = client
-        
+
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
@@ -84,7 +84,7 @@ class CARFChunk(base.Chunk):
 
             session_at = pendulum.parse(record['dt_sessao_tdt'])
 
-            record_id = record['id']                
+            record_id = record['id']
             base_path   = f'{session_at.year}/{session_at.month:02d}'
             report_id,_ = record['nome_arquivo_pdf_s'].split('.')
             dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
@@ -98,7 +98,7 @@ class CARFChunk(base.Chunk):
             base.ContentFromURL(src=report_url,dest=dest_report,
                 content_type='application/pdf')
             ]
-            
+
 @celery.task(queue='crawlers.carf', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
 def carf_task(**kwargs):
@@ -126,16 +126,16 @@ def carf_task(**kwargs):
             'wt':'json',
             'fq':time_interval,
             }
-                        
+
         collector = CARFCollector(client=CARFClient(), filters=query_params)
-        handler   = base.ContentHandler(output=output) 
+        handler   = base.ContentHandler(output=output)
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
-            collector=collector, 
-            output=output, 
-            handler=handler, 
-            logger=logger, 
+            collector=collector,
+            output=output,
+            handler=handler,
+            logger=logger,
             max_workers=8) \
             .run(snapshot=snapshot)
 
@@ -153,9 +153,9 @@ def carf_command(**kwargs):
       end_date = pendulum.parse(kwargs.get('end_date'))
       for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
         task_id = carf_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          kwargs.get('output_uri'))
+          start_date=start.to_date_string(),
+          end_date=end.to_date_string(),
+          output_uri=kwargs.get('output_uri'))
         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
     else:
       carf_task.delay(**kwargs)
