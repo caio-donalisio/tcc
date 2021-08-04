@@ -166,6 +166,10 @@ class STJChunk(base.Chunk):
     if 'text/html' in response.headers['Content-Type']:
       soup  = utils.soup_by_content(response.content)
       table = soup.find(id='listaInteiroTeor')
+      if not table:
+        logger.warn(f"{pdf_path} has no valid content.")
+        return []
+
       rows  = table.find_all('div', class_='row')[1:]
 
       for index, row in enumerate(rows):
