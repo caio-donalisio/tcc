@@ -117,7 +117,7 @@ class TSTChunk(base.Chunk):
             
             dest_record = f"{base_path}/doc_{record_id}.json"
             
-            base_report_url = 'https://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
+            base_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
 
             params = {
                 'anoProcInt':record['registro']['anoProcInt'],
