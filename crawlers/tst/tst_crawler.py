@@ -8,7 +8,6 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
-import urllib
 
 logger = logger_factory('tst')
 
