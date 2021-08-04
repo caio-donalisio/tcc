@@ -358,7 +358,9 @@ class ContentHandler:
     if isinstance(event, Content):
       return self._handle_content_event(event)
     elif isinstance(event, ContentFromURL):
-       return self._handle_url_event(event)
+      return self._handle_url_event(event)
+    else:
+      raise Exception(f'Unable to handle {event}.')
 
   def _handle_content_event(self, event : Content):
     return self.output.save_from_contents(
