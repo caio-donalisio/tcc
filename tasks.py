@@ -14,6 +14,7 @@ from crawlers.tjsp2.tjsp_crawler import tjsp_task
 from crawlers.tjsp2.tjsp_pdf import tjsp_download_task
 from crawlers.tjrj.tjrj_crawler import tjrj_task
 from crawlers.tjba.tjba_crawler import tjba_task
+from crawlers.tjmg.tjmg_crawler import tjmg_task
 
 
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')
