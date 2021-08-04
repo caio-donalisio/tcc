@@ -16,7 +16,8 @@ from crawlers.tjrj.tjrj_crawler import (
 from crawlers.tjba.tjba_crawler import (
   tjba_command)
 from crawlers.tjsp2.tjsp_pdf import tjsp_pdf_command
-
+from crawlers.tst.tst_crawler import (
+  tst_command)
 
 @cli.command(name='clear-locks')
 def clear_celery_singleton_locks():
