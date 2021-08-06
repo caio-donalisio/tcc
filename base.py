@@ -7,6 +7,8 @@ import pydantic
 import json
 import hashlib
 import requests
+from mimetypes import guess_extension
+from typing import Optional
 
 from tqdm import tqdm
 from bs4 import BeautifulSoup
@@ -46,7 +48,7 @@ class ContentFromURL(pydantic.BaseModel):
   """
   src : str
   dest : str
-  content_type : str
+  content_type : Optional[str]
 
   def __repr__(self):
     return f'ContentFromURL(src={self.src}..., dest={self.dest})'
@@ -349,6 +351,7 @@ class ChunkRunner:
       self.processor.close()
       self.collector.teardown()
 
+
 class ContentHandler:
 
   def __init__(self, output):
@@ -379,11 +382,19 @@ class ContentHandler:
     if response.status_code == 404:
       return
 
+    if event.content_type:
+      dest = event.dest
+      content_type = event.content_type
+    else:
+      content_type = response.headers['Content-type'] \
+        .split(';')[0].strip()
+      dest = f'{event.dest}{guess_extension(content_type)}'
+
     if response.status_code == 200:
       self.output.save_from_contents(
-        filepath=event.dest,
+        filepath=dest,
         contents=response.content,
-        content_type=event.content_type)
+        content_type=content_type)
 
 
 def get_default_runner(collector, output, handler, logger, **kwargs):
