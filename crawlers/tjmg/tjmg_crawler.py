@@ -1,8 +1,3 @@
-'''
->>>>>WIP
-CRAWLER AS IS
-'''
-
 #!/usr/bin/env python3
 
 # IMPORTS
@@ -12,19 +7,28 @@ import utils
 import json
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from selenium import webdriver
 import time
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
 import speech_recognition as sr
 from datetime import datetime, timedelta
+import pendulum
+import click
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
+from app import cli, celery
+from logconfig import logger_factory
+import browsers
+import base
 
 # CLI ARGUMENTS
-args_parser = utils.default_argument_parser()
+#>>>>>>>>args_parser = utils.default_argument_parser()
 
 # CONSTANTS
 #
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
-DATE_FORMAT = utils.default_date_format()
+DATE_FORMAT = "%d/%m/%Y" #utils.default_date_format()
 QUERY = 'a$ ou b$'
 
 
@@ -71,17 +75,34 @@ def format_date(date):
 #
 
 
-class TJMG(utils.BSCrawler):
+#class TJMG(utils.BSCrawler):
+class TJMG(base.BaseCrawler):
+
+    #self.browser = self.options['browser']
+    # def __init__(self,**kwargs):
+        
+        
+    #     #logger=logger, 
+    #     #output=output, 
+    #     #browser=driver,
+    #     #requester=requests.Session(), 
+    #     #query=query,
+        
+    #     #super().__init__(self,**kwargs)
+    #     self.filters = kwargs['filters']
+    #     self.browser = kwargs['browser']
+    #     self.requester = kwargs['requester']
+
     def run(self):
-        browser = self.browser
+        browser = self.options.get('browser')
         url = f'{BASE_URL}/formEspelhoAcordao.do'
         self.logger.info(f'GET {url}')
         browser.get(url)
         session_id = browser.get_cookie('JSESSIONID')
         cookie_id = browser.get_cookie('juridico')
         headers = {'cookie': f'JSESSIONID={session_id}; juridico={cookie_id}'}
-        end_date = datetime.strptime(args.start_date, DATE_FORMAT)
-        date = datetime.strptime(args.end_date, DATE_FORMAT)
+        end_date = datetime.strptime(self.options.getparams['start_date'], DATE_FORMAT)
+        date = datetime.strptime(self.params['end_date'], DATE_FORMAT)
         delta = timedelta(days=1)
         while date >= end_date:
             try:
@@ -197,31 +218,77 @@ class TJMG(utils.BSCrawler):
         return recognizer.recognize_google(audio, language='pt-BR')
 
 
-if __name__ == "__main__":
-    args = args_parser.parse_args()
-    daterange = utils.get_daterange(args)
+# if __name__ == "__main__":
+#     args = args_parser.parse_args()
+#     daterange = utils.get_daterange(args)
 
-    log_filename = f'logs/TJMG-{daterange}.log'
-    logger = utils.setup_logger(name=daterange, log_file=log_filename)
+#     log_filename = f'logs/TJMG-{daterange}.log'
+#     logger = utils.setup_logger(name=daterange, log_file=log_filename)
 
-    output = None
+#     output = None
 
-    if args.bucket:
-        output = utils.GSOutput(bucket_name=args.bucket)
-        logger.info(f'Output gs://{args.bucket}.')
-    else:
-        output_folder = f'./out/TJMG/{daterange}'
-        output = utils.LSOutput(output_folder=output_folder)  # type: ignore
-        logger.info(f'Output file:///{output_folder}.')
+#     if args.bucket:
+#         output = utils.GSOutput(bucket_name=args.bucket)
+#         logger.info(f'Output gs://{args.bucket}.')
+#     else:
+#         output_folder = f'./out/TJMG/{daterange}'
+#         output = utils.LSOutput(output_folder=output_folder)  # type: ignore
+#         logger.info(f'Output file:///{output_folder}.')
 
-    headless = bool(args.headless)
-    firefox = utils.FirefoxBrowser(headless=headless)
-    query = default_filters()
+#     headless = bool(args.headless)
+#     firefox = utils.FirefoxBrowser(headless=headless)
+#     query = default_filters()
+
+#     crawler = TJMG(
+#         logger=logger, output=output, browser=firefox,
+#         requester=requests.Session(), query=query,
+#     )
+
+#     crawler.run()
+#     logger.info(f'{args} execution ended. Files saved successfully.')
+
+
+
+@celery.task(queue='crawlers', rate_limit='2/h', default_retry_delay=30 * 60,
+             autoretry_for=(Exception,))
+def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
+    start_date, end_date =\
+        pendulum.parse(start_date), pendulum.parse(end_date)
+
+    output = utils.get_output_strategy_by_path(path=output_uri)
+    logger = logger_factory('tjmg')
+    logger.info(f'Output: {output}.')
+
+    #headless = bool(args.headless)
+    #firefox = browsers.FirefoxBrowser(headless=1)#headless)
+    driver = webdriver.Chrome()
+    driver.implicitly_wait(20)
+    params = default_filters()
+    filters = {'start_date':start_date,'end_date':end_date}
 
     crawler = TJMG(
-        logger=logger, output=output, browser=firefox,
-        requester=requests.Session(), query=query,
+        params=params,
+        output=output,
+        logger=logger, 
+        options = dict(browser=driver,
+        requester=requests.Session(), 
+        filters=filters
+        )
     )
 
     crawler.run()
-    logger.info(f'{args} execution ended. Files saved successfully.')
+
+
+@cli.command(name='tjmg')
+@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
+@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+def tjmg_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
+  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
+  if enqueue:
+    tjmg_task.delay(*args)
+  else:
+    tjmg_task(*args)
