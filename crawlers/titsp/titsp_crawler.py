@@ -1,6 +1,4 @@
 import base
-import math
-import json
 import time
 import utils
 import pendulum
@@ -192,7 +190,7 @@ def titsp_command(start_date, end_date, output_uri, enqueue, split_tasks):
     if split_tasks:
       start_date, end_date =\
         pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
+      for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
         task_id = titsp_task.delay(
           start.to_date_string(),
           end.to_date_string(),
