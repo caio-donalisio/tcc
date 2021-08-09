@@ -19,6 +19,8 @@ from crawlers.stj.stj_crawler import (
   stj_command)
 from crawlers.carf.carf_crawler import (
   carf_command)
+from crawlers.titsp.titsp_crawler import (
+  titsp_command)
 from crawlers.tjsp2.tjsp_pdf import tjsp_pdf_command
 
 
