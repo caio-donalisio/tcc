@@ -63,18 +63,19 @@ class TJRJ(base.BaseCrawler, base.ICollector):
   def count(self):
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
     logger.debug(f'POST (count) {url}')
+    payload = {**self.payload, **{'numPagina': 0}}
     response = self.requester.post(url,
-      json={**self.payload, **{'numPagina': 0}}, headers=self.headers)
+      json=payload, headers=self.headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 on {url} payload {self.payload} got {response.status_code}.")
+      logger.info(f"@count -- Ops, expecting 200 on {url} payload {payload} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
       result = response.json()['d']
       return result['TotalDocs']
 
-    logger.info(f"POST {url} (payload={self.payload}) returned invalid data.")
+    logger.info(f"POST {url} (payload={payload}) returned invalid data.")
     raise utils.PleaseRetryException()
 
   def chunks(self):
@@ -273,7 +274,7 @@ class TJRJChunk(base.Chunk):
     response = self.requester.post(url, json=payload, headers=headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 on {url} got {response.status_code}.")
+      logger.info(f"@_get_acts -- Ops, expecting 200 on {url} payload {payload} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
