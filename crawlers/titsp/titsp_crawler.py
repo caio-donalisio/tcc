@@ -120,7 +120,7 @@ class TITSPChunk(base.Chunk):
       else:
         break
 
-  @utils.retryable(max_retries=3, retryable_exceptions=(requests.exceptions.ChunkedEncodingError))
+  @utils.retryable(max_retries=3)
   def fetch_act(self, tr):
       tds = tr.find_all('td')
       publication_date = tds[0].text
@@ -134,17 +134,15 @@ class TITSPChunk(base.Chunk):
         self.fetch_pdf(pdf_href, act_id, publication_date)
       ]
 
-  @utils.retryable(max_retries=3, retryable_exceptions=(requests.exceptions.ChunkedEncodingError))
+  @utils.retryable(max_retries=3)
   def fetch_pdf(self, pdf_href, act_id, publication_date):
       data = self.client.data
       data['__EVENTTARGET'] = utils.find_between(
           pdf_href, start='WebForm_PostBackOptions\("', end='"')
       data['__EVENTARGUMENT'] = ''
       pdf_response = self.client.requester.post(self.client.base_url, data=data)
-      print("pdf status code", pdf_response.status_code)
       pdf_filepath = utils.get_filepath(
           date=publication_date, filename=act_id, extension='pdf')
-      print(pdf_response.headers['Content-type'], 'dest', pdf_filepath)
       return base.Content(content=pdf_response.content, dest=pdf_filepath,
         content_type='application/pdf')
 
