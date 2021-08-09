@@ -145,7 +145,8 @@ class TSTChunk(base.Chunk):
                 rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
                 rtf_report_url = base_pdf_report_url + rtf_params
                 dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
-                files_to_download.append(base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report))
+                files_to_download.append(base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report,
+                    content_type='application/rtf'))
 
                 pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
                 pdf_report_url = base_pdf_report_url + pdf_params
