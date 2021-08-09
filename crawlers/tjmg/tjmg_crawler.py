@@ -74,15 +74,73 @@ def format_date(date):
 # SCRIPT
 #
 
+# class STJClient:
+
+#   def __init__(self):
+#     self.base_url  = 'https://scon.stj.jus.br'
+#     self.requester = requests.Session()
+
+#   def reset_session(self):
+#     self.requester = requests.Session()
+
+#   @utils.retryable(max_retries=3)
+#   def count(self, filters):
+#     response = self._response_or_retry(
+#       self.fetch(filters, offset=0))
+#     return self._count_by_content(response.content)
+
+#   @utils.retryable(max_retries=3)
+#   def fetch(self, filters, offset):
+#     return self._response_or_retry(self.requester.post(
+#       f'{self.base_url}/SCON/pesquisar.jsp',
+#       headers={'ContentType': 'application/X-www-form-urlencoded'},
+#       data={**filters, 'i': offset}))
+
+#   @utils.retryable(max_retries=3)
+#   def get(self, path):
+#     return self.requester.get(f'{self.base_url}/{path}')
+
+#   def _response_or_retry(self, response):
+#     soup = utils.soup_by_content(response.content)
+
+#     if soup \
+#         .find('div', id='idCaptchaLinha'):
+#       logger.warn('Got captcha -- reseting session.')
+#       self.reset_session()
+#       raise utils.PleaseRetryException()
+
+#     if soup \
+#         .find('div', {'id': 'infopesquisa'}) is None:
+#       logger.warn('Got something else -- reseting session and retrying.')
+#       self.reset_session()
+#       raise utils.PleaseRetryException()
+
+#     return response
+
+#   def _count_by_content(self, content):
+#     soup = utils.soup_by_content(content)
+#     info = soup.find('div', {'id': 'infopesquisa'})
+#     if not info:
+#       assert info is not None
+#     div_count = info.find_all('div', {'class': 'divCell'})[0]
+#     match = re.match(r'(\d+\.?\d+)', div_count.get_text())
+#     if match:
+#       return int(match.group(0).replace('.', ''))
+#     else:
+#       return 0
 
 #class TJMG(utils.BSCrawler):
-class TJMG(base.BaseCrawler):
+class TJMG:
 
     #self.browser = self.options['browser']
     # def __init__(self,**kwargs):
-        
-        
-    #     #logger=logger, 
+    def __init__(self,**kwargs):
+        self.output = kwargs['output']
+        self.logger = kwargs['logger']
+        self.query = kwargs['query']
+        self.browser = kwargs['browser']
+        self.requester = kwargs['requester']
+        self.filters = kwargs['filters']
     #     #output=output, 
     #     #browser=driver,
     #     #requester=requests.Session(), 
@@ -94,15 +152,15 @@ class TJMG(base.BaseCrawler):
     #     self.requester = kwargs['requester']
 
     def run(self):
-        browser = self.options.get('browser')
+        browser = self.browser
         url = f'{BASE_URL}/formEspelhoAcordao.do'
         self.logger.info(f'GET {url}')
         browser.get(url)
         session_id = browser.get_cookie('JSESSIONID')
         cookie_id = browser.get_cookie('juridico')
         headers = {'cookie': f'JSESSIONID={session_id}; juridico={cookie_id}'}
-        end_date = datetime.strptime(self.options.getparams['start_date'], DATE_FORMAT)
-        date = datetime.strptime(self.params['end_date'], DATE_FORMAT)
+        end_date = datetime.strptime(self.filters.get('start_date'), DATE_FORMAT)
+        date = datetime.strptime(self.filters.get('end_date'), DATE_FORMAT)
         delta = timedelta(days=1)
         while date >= end_date:
             try:
@@ -252,8 +310,8 @@ class TJMG(base.BaseCrawler):
 @celery.task(queue='crawlers', rate_limit='2/h', default_retry_delay=30 * 60,
              autoretry_for=(Exception,))
 def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
-    start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
+    # start_date, end_date =\
+    #     pendulum.parse(start_date), pendulum.parse(end_date)
 
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger = logger_factory('tjmg')
@@ -261,20 +319,20 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 
     #headless = bool(args.headless)
     #firefox = browsers.FirefoxBrowser(headless=1)#headless)
-    driver = webdriver.Chrome()
-    driver.implicitly_wait(20)
-    params = default_filters()
+    browser = webdriver.Chrome()
+    browser.implicitly_wait(20)
+    query = default_filters()
     filters = {'start_date':start_date,'end_date':end_date}
 
     crawler = TJMG(
-        params=params,
+        query=query,
         output=output,
         logger=logger, 
-        options = dict(browser=driver,
+        browser=browser,
         requester=requests.Session(), 
         filters=filters
         )
-    )
+    
 
     crawler.run()
 
