@@ -11,6 +11,14 @@ import requests
 from random import random
 from time import sleep
 
+
+DEFAULT_HEADERS = {
+  'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                        ' AppleWebKit/537.36 (KHTML, like Gecko)'
+                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
+}
+
+
 logger = logger_factory('tst')
 
 
@@ -18,10 +26,6 @@ class TSTClient:
 
     def __init__(self):
         self.url ='https://jurisprudencia-backend.tst.jus.br/rest/pesquisa-textual'
-        self.user_agent = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-                        ' AppleWebKit/537.36 (KHTML, like Gecko)'
-                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
-
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
@@ -68,7 +72,7 @@ class TSTClient:
             #sleep(0.5*random())
             return requests.post(search_url,
                 json=post_data,
-                headers={'User-Agent': self.user_agent}).json()
+                headers=DEFAULT_HEADERS).json()
 
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
