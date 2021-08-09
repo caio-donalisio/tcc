@@ -142,3 +142,4 @@ cython_debug/
 logs/*
 data/*
 .service-account.json
+crawlers/tst/exemplo_sem_dtaPublicacao.txt

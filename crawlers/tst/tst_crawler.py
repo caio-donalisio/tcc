@@ -18,7 +18,7 @@ class TSTClient:
 
     def __init__(self):
         self.url ='https://jurisprudencia-backend.tst.jus.br/rest/pesquisa-textual'
-        
+        self.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67'
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
@@ -58,12 +58,14 @@ class TSTClient:
             "tiposDecisoes": [],
             "tipos": ["ACORDAO"],
             "orgao": "TST",
-            "publicacaoInicial": filters.get('start_date'),
-            "publicacaoFinal": filters.get('end_date')
+            "julgamentoInicial": filters.get('start_date'),
+            "julgamentoFinal": filters.get('end_date')
             }
             
             #sleep(0.5*random())
-            return requests.post(search_url,json=post_data).json()
+            return requests.post(search_url,
+                json=post_data,
+                headers={'User-Agent': self.user_agent}).json()
 
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
@@ -109,47 +111,57 @@ class TSTChunk(base.Chunk):
         result = self.client.fetch(self.filters,self.page)
         
         base_pdf_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
-        base_html_report_url = 'http://jurisprudencia-backend.tst.jus.br/rest/documentos'
+        base_html_report_url = 'https://jurisprudencia-backend.tst.jus.br/rest/documentos'
 
         for record in result['registros']:
             
-            session_at = pendulum.parse(record['registro']['dtaPublicacao'])
+            session_at = pendulum.parse(record['registro']['dtaJulgamento'])
 
             record_id = record['registro']['id']                
             base_path   = f'{session_at.year}/{session_at.month:02d}'
             
             dest_record = f"{base_path}/doc_{record_id}.json"
 
-            params = {
-                'anoProcInt':record['registro']['anoProcInt'],
-                'numProcInt':record['registro']['numProcInt'],
-                'dtaPublicacaoStr':session_at.format('DD/MM/YYYY') + '%2007:00:00',
-                'nia':record['registro']['numInterno'],
-                'origem':'documento'
-                }
-                
-            rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
-            rtf_report_url = base_pdf_report_url + rtf_params
-            dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
-
-            pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
-            pdf_report_url = base_pdf_report_url + pdf_params
-            dest_pdf_report = f'{base_path}/doc_{record_id}.pdf'
-
             html_report_url = f'{base_html_report_url}/{record_id}'
             dest_html_report = f'{base_path}/doc_{record_id}.html'
+
+            files_to_download = []
+
+            if 'dtaPublicacao' in record['registro'].keys():
+
+                publication_at =  pendulum.parse(record['registro']['dtaPublicacao'])
+                
+                params = {
+                    'anoProcInt':record['registro']['anoProcInt'],
+                    'numProcInt':record['registro']['numProcInt'],
+                    'dtaPublicacaoStr':publication_at.format('DD/MM/YYYY') + '%2007:00:00',
+                    'nia':record['registro']['numInterno'],
+                    'origem':'documento'
+                    }
+                    
+                rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
+                rtf_report_url = base_pdf_report_url + rtf_params
+                dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
+                files_to_download.append(base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report))
+
+                pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
+                pdf_report_url = base_pdf_report_url + pdf_params
+                dest_pdf_report = f'{base_path}/doc_{record_id}'
+                files_to_download.append(base.ContentFromURL(src=pdf_report_url,dest=dest_pdf_report))
+
+
+            files_to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
+                content_type='application/json'))
+
+            files_to_download.append(base.ContentFromURL(src=html_report_url,dest=dest_html_report,
+                content_type='text/html'))
+
+            sleep(random()+1.13)
             
-            yield [
-            base.Content(content=json.dumps(record),dest=dest_record,
-                content_type='application/json'),
-            base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report,
-                 content_type='application/rtf'),
-            base.ContentFromURL(src=pdf_report_url,dest=dest_pdf_report,
-                 content_type='application/pdf'),
-            # base.ContentFromURL(src=html_report_url,dest=dest_html_report,
-            #      content_type='text/html')
-            ]
+            yield files_to_download
             
+
+
 @celery.task(queue='crawlers.tst', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
 def tst_task(**kwargs):
