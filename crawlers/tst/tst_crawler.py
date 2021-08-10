@@ -10,6 +10,8 @@ from app import cli, celery
 import requests
 from random import random
 from time import sleep
+from mimetypes import guess_extension
+
 
 
 DEFAULT_HEADERS = {
@@ -104,6 +106,48 @@ class TSTCollector(base.ICollector):
 
             )
 
+class TSTHandler(base.ContentHandler):
+    
+    @utils.retryable(max_retries=9)
+    def handle(self, event):
+        if isinstance(event, base.ContentFromURL):
+            self.download(event)
+        else:
+            super().handle(event)
+
+    @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)
+    def download(self, event):
+        if self.output.exists(event.dest):
+            return
+
+        try:
+            response = requests.get(event.src,
+                allow_redirects=True,
+                verify=False)
+
+            if response.status_code == 404:
+                return
+
+            if event.content_type:
+                dest = event.dest
+                content_type = event.content_type
+
+            else:
+                content_type = response.headers['Content-type'].split(';')[0].strip()
+                dest = f'{event.dest}{guess_extension(content_type)}'
+                if 'rtf' in content_type:
+                    return
+            if response.status_code == 200:
+                self.output.save_from_contents(
+                    filepath=dest,
+                    contents=response.content,
+                    content_type=content_type)
+
+        except requests.exceptions.ChunkedEncodingError:
+            logger.warn(
+            f"Got a ChunkedEncodingError when fetching {event.src} -- will retry.")
+            return 
+
 
 class TSTChunk(base.Chunk):
 
@@ -189,7 +233,8 @@ def tst_task(**kwargs):
             }
                         
         collector = TSTCollector(client=TSTClient(), filters=query_params)
-        handler   = base.ContentHandler(output=output) 
+        #handler = base.ContentHandler(output=output)
+        handler   = TSTHandler(output=output) 
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
