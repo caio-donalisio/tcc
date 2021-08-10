@@ -44,13 +44,13 @@ class TJSPDownloader:
             sleep_time = (interval - since) + jitter
             time.sleep(sleep_time)
 
-        last_run = time.time()
         response = self._get_response(item)
         if pbar:
           pbar.update(1)
 
         # up async
         if response:
+          last_run = time.time()
           futures.append(executor.submit(self._handle_upload, item, response))
 
       for future in concurrent.futures.as_completed(futures):
