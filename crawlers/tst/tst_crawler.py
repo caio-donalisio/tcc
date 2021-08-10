@@ -137,6 +137,7 @@ class TSTHandler(base.ContentHandler):
                 dest = f'{event.dest}{guess_extension(content_type)}'
                 if 'rtf' in content_type:
                     return
+                    
             if response.status_code == 200:
                 self.output.save_from_contents(
                     filepath=dest,
