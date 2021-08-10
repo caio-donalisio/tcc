@@ -59,22 +59,23 @@ class TJRJ(base.BaseCrawler, base.ICollector):
       'grpEssj': ''
     }
 
-  @utils.retryable(max_retries=6)
+  @utils.retryable(max_retries=99)
   def count(self):
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
     logger.debug(f'POST (count) {url}')
+    payload = {**self.payload, **{'numPagina': 0}}
     response = self.requester.post(url,
-      json={**self.payload, **{'numPagina': 0}}, headers=self.headers)
+      json=payload, headers=self.headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 on {url} payload {self.payload} got {response.status_code}.")
+      logger.info(f"@count -- Ops, expecting 200 on {url} payload {payload} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
       result = response.json()['d']
       return result['TotalDocs']
 
-    logger.info(f"POST {url} (payload={self.payload}) returned invalid data.")
+    logger.info(f"POST {url} (payload={payload}) returned invalid data.")
     raise utils.PleaseRetryException()
 
   def chunks(self):
@@ -115,7 +116,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     self.browser.click(search_button)
     session_id = None
 
-    WebDriverWait(self.browser.driver, 60) \
+    WebDriverWait(self.browser.driver, 120) \
       .until(EC.presence_of_element_located((By.ID, 'seletorPaginasTopo')))
 
     cookies = self.browser.driver.get_cookies()
@@ -129,14 +130,14 @@ class TJRJ(base.BaseCrawler, base.ICollector):
 
 class TJRJHandler(base.ContentHandler):
 
-  @utils.retryable(max_retries=9)
+  @utils.retryable(max_retries=99)
   def handle(self, event):
     if isinstance(event, base.ContentFromURL):
       self.download(event)
     else:
       super().handle(event)
 
-  @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)   # type: ignore
+  @utils.retryable(max_retries=99, sleeptime=5., ignore_if_exceeds=True)   # type: ignore
   def download(self, content_from_url):
     if self.output.exists(content_from_url.dest):
       return
@@ -219,7 +220,7 @@ class TJRJChunk(base.Chunk):
       ]
       time.sleep(random.uniform(.05, .20))
 
-  @utils.retryable(max_retries=6)
+  @utils.retryable(max_retries=99)
   def _fetch_data(self, act, headers, act_id, updated_at, fetch_all_pdfs=False):
     data_url = f'{EJUD_URL}/ConsultaEjud.asmx/DadosProcesso_1'
     data_payload = {
@@ -265,7 +266,7 @@ class TJRJChunk(base.Chunk):
       *extra_contents
     ]
 
-  @utils.retryable(max_retries=6)
+  @utils.retryable(max_retries=99)
   def _get_acts(self, page, payload, headers):
     payload['numPagina'] = page
     url = f'{EJURIS_URL}/ProcessarConsJuris.aspx/ExecutarConsultarJurisprudencia'
@@ -273,7 +274,7 @@ class TJRJChunk(base.Chunk):
     response = self.requester.post(url, json=payload, headers=headers)
 
     if response.status_code != 200:
-      logger.info(f"Ops, expecting 200 on {url} got {response.status_code}.")
+      logger.info(f"@_get_acts -- Ops, expecting 200 on {url} payload {payload} got {response.status_code}.")
       raise utils.PleaseRetryException()
 
     if response.json().get('d'):
