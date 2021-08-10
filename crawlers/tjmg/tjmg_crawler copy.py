@@ -13,11 +13,6 @@ import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
 import speech_recognition as sr
 from datetime import datetime, timedelta
-import utils
-from logconfig import logger_factory, setup_cloud_logger
-
-
-logger = loger_factory('tjmg')
 
 # CLI ARGUMENTS
 args_parser = tjmg_utils.default_argument_parser()
