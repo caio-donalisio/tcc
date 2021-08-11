@@ -70,8 +70,13 @@ class FirefoxBrowser:
     if option_text:
         select.select_by_visible_text(option_text)
 
-  def fill_in(self, field_id, value):
-    start_input = self.driver.find_element_by_id(field_id)
+  def fill_in(self, selector, value):
+    html_property = selector[1:]
+    if selector[0] == '#':
+        start_input = self.driver.find_element_by_id(html_property)
+    else:
+        start_input = self.driver.find_element_by_class_name(html_property)
+    #start_input = self.driver.find_element_by_id(field_id)
     start_input.clear()
     start_input.send_keys(value)
 
@@ -86,6 +91,16 @@ class FirefoxBrowser:
         return True
     except NoSuchElementException:
         return False
+
+  def get_cookie(self, cookie_name):
+    value = None
+    cookies = self.driver.get_cookies()
+    for cookie in cookies:
+        if cookie.get('name') == cookie_name:
+            value = cookie['value']
+    if cookie is None:
+        raise Exception(f'Cookie not found: {cookie_name}')
+    return value
 
   def _get_options(self, headers, headless):
     options = Options()

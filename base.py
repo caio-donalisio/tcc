@@ -313,7 +313,8 @@ class ChunkRunner:
 
       dirty   = False
       last_snapshot_taken = 0
-      expects = self.collector.count()
+      expects = 746
+      #expects = self.collector.count()
       records = 0
 
       with tqdm(total=expects, file=tqdm_out) as pbar:
