@@ -5,11 +5,7 @@
 from bs4 import BeautifulSoup
 import utils
 import requests
-#from . import tjmg_utils
-from crawlers.tjmg import tjmg_utils
-import json
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 import time
 import os
@@ -26,17 +22,13 @@ from celery_singleton import Singleton
 import browsers
 import math
 import pendulum
-import re
+
 
 logger = logger_factory('tjmg')
 
-# CLI ARGUMENTS
-args_parser = tjmg_utils.default_argument_parser()
-
 # CONSTANTS
-#
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
-DATE_FORMAT = tjmg_utils.default_date_format()
+DATE_FORMAT = "%d/%m/%Y"
 QUERY = 'a$ ou b$'
 
 
@@ -83,11 +75,8 @@ def format_date(date):
     else:
         return str(date.strftime(DATE_FORMAT))
 
-# SCRIPT
-#
 
-
-class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
+class TJMG(base.BaseCrawler,base.ICollector):
 
     def __init__(self, params,query,output,logger,handler,browser,**kwargs):
         self.params = params
@@ -98,31 +87,6 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
         self.browser = browser
         self.requester = requests.Session()
 
-    
-
-#     def run(self):
-#         browser = self.browser
-#         url = f'{BASE_URL}/formEspelhoAcordao.do'
-#         self.logger.info(f'GET {url}')
-#         browser.get(url)
-#         session_id = browser.get_cookie('JSESSIONID')
-#         cookie_id = browser.get_cookie('juridico')
-#         headers = {'cookie': f'JSESSIONID={session_id}; juridico={cookie_id}'}
-#         end_date = datetime.strptime(self.params.get('start_date'), DATE_FORMAT)
-#         date = datetime.strptime(self.params.get('end_date'), DATE_FORMAT)
-# #        end_date = datetime.strptime(args.start_date, DATE_FORMAT)
-# #        date = datetime.strptime(args.end_date, DATE_FORMAT)
-#         delta = timedelta(days=1)
-#         while date >= end_date:
-#             try:
-#                 self.fetch_pages_by_date(date, headers, session_id)
-#                 date -= delta
-#             except Exception as e:
-#                 self.logger.fatal(f'{type(e).__name__}: "{e}"')
-#                 self.browser.quit()
-#                 raise e
-
-#         self.browser.quit()
 
     def setup(self):
         try:
@@ -135,22 +99,14 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
             'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}'
             }
 
-        #finally:
         except Exception as e:
-            browser.quit()
+            browser.quit() 
             raise e
-
         
     @utils.retryable(max_retries=99)
     def count(self,page=1):
-#        browser = self.browser
-        #self.setup()
         url = f'{BASE_URL}/formEspelhoAcordao.do'
         self.logger.info(f'GET {url}')
-#        browser.get(url)
-        #session_id = browser.get_cookie('JSESSIONID')
-        #cookie_id = browser.get_cookie('juridico')
-        #headers = {'cookie': f'JSESSIONID={session_id}; juridico={cookie_id}'}
         date = datetime.strptime(self.params.get('start_date'), DATE_FORMAT)
         query = default_filters()# self.query.copy()
         query['paginaNumero'] = page
@@ -158,7 +114,6 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
             self.session_id, query=query, date=format_date(date))
         self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=self.headers)
-        next_page = None
         if response.status_code == 200:
             soup = BeautifulSoup(response.text,features='html.parser')
             results = soup.find('p',class_='info').contents[0]
@@ -166,7 +121,6 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
             return number
             
         elif response.status_code == 401:
-            return 200
             self.solve_captcha(date, self.headers, self.session_id)
             return self.count()
         else:
@@ -174,8 +128,7 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
                 f'Unexpected status code {response.status_code} fetching {url}.')
          
     def chunks(self):
-        self.total_records = 200
-        #self.total_records = self.count()
+        self.total_records = self.count()
         self.total_pages = math.ceil(self.total_records/10)
 
         for page in range(1, self.total_pages + 1):
@@ -209,7 +162,7 @@ class TJMG(base.BaseCrawler,base.ICollector):#(tjmg_utils.BSCrawler):
             #     else:
             #         break
 
-    @tjmg_utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
     def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, date=format_date(date))
@@ -266,16 +219,10 @@ class TJMGChunk(base.Chunk):
         self.requester = requester
         self.output = output
         
-    @utils.retryable(max_retries=99)
     def rows(self):
-
-        delimiter_pattern = re.compile(r'[\.\-]')
-        process_number_pattern = re.compile(r'(\S+)')
-        process_fields = ['numero','digito','ano','orgao','tribunal','origem']
 
         acts,next_page = self.fetch_page(self.date,self.page,self.headers,self.session_id)
         for act in acts:
-            #content = self.fetch_act(self.date,act,self.headers,self.session_id)
             query=default_filters()
             query['paginaNumero'] = act
             query['numeroRegistro'] = act
@@ -295,35 +242,13 @@ class TJMGChunk(base.Chunk):
             session_date = date_label.find_next_sibling('div').text
             session_date = pendulum.from_format(session_date,'DD/MM/YYYY')
 
-            # process_number, = soup.find_all('a',
-            #     attrs={'title' : 'Abrir Andamento Processual' })[-1].contents
-            # process_number = process_number_pattern.search(process_number).group()
-            # process_number = re.split(delimiter_pattern,process_number)
-            
-            # process_code = {k:v for k,v in zip(process_fields,process_number)}
-            
-            # num = str(int(process_code['numero'])//10)
-            # ano = process_code['ano'][2:]
-            # origem = process_code['origem'][-3:]
-
-            # pdf_url = (
-            #     f'https://www5.tjmg.jus.br/jurisprudencia/'
-            #     f'relatorioEspelhoAcordao.do?inteiroTeor=true&ano={ano}'
-            #     f'&ttriCodigo=1&codigoOrigem={origem}&numero={num}'
-            #     f'&sequencial=1&sequencialAcordao=0'
-            #     )
-            
             onclick_attr = soup.find('input',{"name":"inteiroTeorPDF"})['onclick']
             pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
-
             pdf_url = f'{BASE_URL}/{pdf_url}'
-            pdf_dest = f'{session_date.year}/{session_date.month}/{act}.pdf'
-            html_dest = f'{session_date.year}/{session_date.month}/{act}.html'
-            
 
-            #filepath = tjmg_utils.get_filepath(publication_date, act, 'html')
-            #date = pendulum.from_format(self.date,DATE_FORMAT)
-            #filepath = 
+            pdf_dest = f'{session_date.year}/{session_date.month:02d}/{act}.pdf'
+            html_dest = f'{session_date.year}/{session_date.month:02d}/{act}.html'
+            
             yield[
                 base.Content(content=browser.page_source(),
                     dest=html_dest,content_type='text/html'),
@@ -356,7 +281,7 @@ class TJMGChunk(base.Chunk):
         response = self.requester.get(url, headers=headers)
         next_page = None
         if response.status_code == 200:
-            soup = tjmg_utils.soup_by_content(response.text)
+            soup = utils.soup_by_content(response.text)
             act_indexes = []
             links = soup.find_all('a', class_='linkListaEspelhoAcordaos')
             for link in links:
@@ -374,53 +299,8 @@ class TJMGChunk(base.Chunk):
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
 
-    def fetch_act(self, date, act_index, headers, session_id):
-        query=default_filters()
-        #query = self.query.copy()
-        query['paginaNumero'] = act_index
-        query['numeroRegistro'] = act_index
-        query['linhasPorPagina'] = 1
-        url = self._get_search_url(
-            session_id, query=query, date=format_date(date))
-        self.logger.info(f'GET {url}')
-        browser = self.browser
-        
-     
-        #browser.get(url)
-        #print(browser.page_source())
-        
-        #hover = ActionChains(browser.driver).move_to_element(element_to_hover_over)
-        #hover.perform()
-        
-        
-        #response = self.requester.get(url, headers=headers)
-        #if response.status_code == 200:
-        browser.get(url)
-        while not browser.is_text_present('Inteiro Teor'):
-            self.solve_captcha(date,headers,session_id)
-        browser.click(self._find(id='imgBotao1'))
-#        element_to_hover_over = browser.get(url, wait_for=(By.XPATH, "//*[contains(text(),'Inteiro Teor')]"))
-        #
-        #imgBotao1
-        #hover = ActionChains(browser.driver).move_to_element(element_to_hover_over)
-        #hover.perform()
 
-        soup = BeautifulSoup(browser.page_source())
-        #soup = tjmg_utils.soup_by_content(response.text)
-        date_label = soup.find('div', text='Data da publicação da súmula')
-        publication_date = date_label.find_next_sibling('div').text
-        filepath = tjmg_utils.get_filepath(publication_date, act_index, 'html')
-        return browser.page_source()
-        #self.output.save_from_contents(
-        #    filepath=filepath, contents=browser.page_source())
-        #elif response.status_code == 401:
-        #     self.solve_captcha(date, headers, session_id)
-        #     return self.fetch_act(date, act_index, headers, session_id)
-        # else:
-        #     raise Exception(
-        #         f'Unexpected status code {response.status_code} fetching {url}.')
-
-    @tjmg_utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
     def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, date=format_date(date))
@@ -468,35 +348,6 @@ class TJMGChunk(base.Chunk):
 
         return recognizer.recognize_google(audio, language='pt-BR')
 
-
-# if __name__ == "__main__":
-#     args = args_parser.parse_args()
-#     daterange = tjmg_utils.get_daterange(args)
-
-#     log_filename = f'logs/TJMG-{daterange}.log'
-#     logger = tjmg_utils.setup_logger(name=daterange, log_file=log_filename)
-
-#     output = None
-
-#     if args.bucket:
-#         output = tjmg_utils.GSOutput(bucket_name=args.bucket)
-#         logger.info(f'Output gs://{args.bucket}.')
-#     else:
-#         output_folder = f'./out/TJMG/{daterange}'
-#         output = tjmg_utils.LSOutput(output_folder=output_folder)  # type: ignore
-#         logger.info(f'Output file:///{output_folder}.')
-
-#     headless = bool(args.headless)
-#     firefox = tjmg_utils.FirefoxBrowser(headless=True)
-#     query = default_filters()
-
-#     crawler = TJMG(
-#         logger=logger, output=output, browser=firefox,
-#         requester=requests.Session(), query=query,
-#     )
-
-#     crawler.run()
-#     logger.info(f'{args} execution ended. Files saved successfully.')
 
 @celery.task(queue='crawlers.tjmg', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,),
