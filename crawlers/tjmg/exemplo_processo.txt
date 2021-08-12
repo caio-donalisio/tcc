@@ -1,0 +1,5 @@
+DADOS:
+https://www5.tjmg.jus.br/jurisprudencia/pesquisaPalavrasEspelhoAcordao.do?&numeroRegistro=4&totalLinhas=3561&paginaNumero=4&linhasPorPagina=1&palavras=e&pesquisarPor=ementa&orderByData=2&dataJulgamentoInicial=15/10/2017&dataJulgamentoFinal=20/10/2017&referenciaLegislativa=Clique%20na%20lupa%20para%20pesquisar%20as%20refer%C3%AAncias%20cadastradas...&pesquisaPalavras=Pesquisar&excluirRepetitivos=true&
+
+PDF:
+https://www5.tjmg.jus.br/jurisprudencia/relatorioEspelhoAcordao.do?inteiroTeor=true&ano=13&ttriCodigo=1&codigoOrigem=24&numero=49890&sequencial=1&sequencialAcordao=0
