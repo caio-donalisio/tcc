@@ -136,14 +136,14 @@ class TJBAChunk(base.Chunk):
 
       base_path   = f'{published_at.year}/{published_at.month:02d}'
       dest_record = f"{base_path}/doc_{doc_id}_{doc_hash}.json"
-      dest_report = f"{base_path}/doc_{doc_id}_{doc_hash}_report.html"
+      dest_report = f"{base_path}/doc_{doc_id}_{doc_hash}_report"
       report_url  =\
         f'https://jurisprudenciaws.tjba.jus.br/inteiroTeor/{doc_hash}'
 
       yield [
         base.Content(content=json.dumps(record), dest=dest_record,
           content_type='application/json'),
-        base.ContentFromURL(src=report_url, dest=dest_report, content_type='text/html')
+        base.ContentFromURL(src=report_url, dest=dest_report)
       ]
 
 

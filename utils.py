@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 import logging
@@ -17,7 +18,10 @@ from bs4 import BeautifulSoup
 from google.cloud import storage
 from functools import wraps
 import wrapt
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit
+from random import choices
+from string import ascii_letters
+import speech_recognition as sr
 
 from selenium.common.exceptions import TimeoutException
 
@@ -122,6 +126,7 @@ def now():
 def write_file(filename, content):
     path = os.path.dirname(filename)
     Path(path).mkdir(parents=True, exist_ok=True)
+    mode = 'w'
     if isinstance(content, bytes):
         mode = 'wb'
     elif isinstance(content, str):
@@ -157,6 +162,7 @@ def retryable(*, max_retries=3, sleeptime=5,
               retryable_exceptions=(
                   requests.exceptions.ConnectionError,
                   requests.exceptions.ReadTimeout,
+                  requests.exceptions.ChunkedEncodingError,
                   http.client.HTTPException,
                   TimeoutException,
                   PleaseRetryException)):
@@ -363,3 +369,32 @@ def cooldown(interval):
     decorator = CoolDownDecorator(func=func, interval=interval)
     return wraps(func)(decorator)
   return decorated
+
+
+def get_param_from_url(url, param):
+    try:
+        query = urlsplit(url).query
+        value = dict(parse_qsl(query))[param]
+        return value
+    except Exception as e:
+        print("url", url, param)
+        raise e
+
+def find_between(string, start, end):
+    pattern = f"{start}(.*?){end}"
+    return re.search(pattern, string).group(1)
+
+def recognize_audio_by_content(content):
+        filename = f'captcha_{"".join(choices(ascii_letters,k=10))}.wav'
+        recognizer = sr.Recognizer()
+
+        with open(filename, 'wb') as f:
+            f.write(content)
+
+        with sr.AudioFile(filename) as source:
+            audio = recognizer.record(source)
+            os.remove(filename)
+
+        return recognizer.recognize_google(audio, language='pt-BR')
+
+        

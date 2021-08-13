@@ -50,7 +50,8 @@ class TJSPDownloader:
           pbar.update(1)
 
         # up async
-        futures.append(executor.submit(self._handle_upload, item, response))
+        if response:
+          futures.append(executor.submit(self._handle_upload, item, response))
 
       for future in concurrent.futures.as_completed(futures):
         future.result()
@@ -60,6 +61,10 @@ class TJSPDownloader:
     logger.debug(f'GET {content_from_url.src}')
     for cookie in self._client.request_cookies_browser:
       self._client.session.cookies.set(cookie['name'], cookie['value'])
+
+    if self._output.exists(content_from_url.dest):
+      return None
+
     response = self._client.session.get(content_from_url.src,
       headers=self._client.header_generator.generate(),
       allow_redirects=True,
