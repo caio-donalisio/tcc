@@ -104,12 +104,10 @@ class TJMG(base.BaseCrawler,base.ICollector):
             raise e
         
     @utils.retryable(max_retries=99)
-    def count(self,page=1):
+    def count(self):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
-        self.logger.info(f'GET {url}')
         date = datetime.strptime(self.params.get('start_date'), DATE_FORMAT)
-        query = default_filters()# self.query.copy()
-        query['paginaNumero'] = page
+        query = default_filters()
         url = self._get_search_url(
             self.session_id, query=query, date=format_date(date))
         self.logger.info(f'GET {url}')
@@ -140,7 +138,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
             yield TJMGChunk(
                 keys=keys,
-                prefix = 'date_',
+                prefix = self.params.get('start_date'),
                 page=page,
                 headers = self.headers,
                 logger = self.logger,
@@ -150,17 +148,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
                 output=self.output
             )
 
-            # page = 1
-            # while True:
-            #     act_indexes, next_page = self.fetch_page(
-            #         date, page, headers, session_id)
-            #     for act_index in act_indexes:
-            #         self.fetch_act(date, act_index, headers, session_id)
-
-            #     if next_page is not None:
-            #         page = int(next_page)
-            #     else:
-            #         break
+            #self.setup()
 
     @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
     def solve_captcha(self, date, headers, session_id):
@@ -172,7 +160,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
             response = self.requester.get(
                 f'{BASE_URL}/captchaAudio.svl', headers=headers)
-            text = self._recognize_audio_by_content(response.content)
+            text = utils.recognize_audio_by_content(response.content)
             browser.fill_in('#captcha_text', value=text)
             time.sleep(0.5)
             if browser.is_text_present('não corresponde', tag='div'):
@@ -181,6 +169,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
                 self.browser.wait_for_element(
                     locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
         return headers
+
 
     def _get_search_url(self, session_id, date, query=None):
         query = query or default_filters()# self.query.copy()
@@ -205,11 +194,11 @@ class TJMG(base.BaseCrawler,base.ICollector):
          return
 
 
+
 class TJMGChunk(base.Chunk):
 
     def __init__(self, keys, prefix,page, headers, logger,browser,session_id,requester,output):
         super(TJMGChunk, self).__init__(keys, prefix)
-        #self.keys_ = keys
         self.page = page
         self.headers = headers
         self.logger = logger
@@ -255,30 +244,37 @@ class TJMGChunk(base.Chunk):
                 base.ContentFromURL(src=pdf_url,dest=pdf_dest,
                     content_type='application/pdf')
             ]
-            #acts = self.fetch_pages_by_date(self.date,self.headers,self.session_id)
-            
 
-
-    def fetch_pages_by_date(self, date, headers, session_id):
-        page = 1
-        while True:
-            act_indexes, next_page = self.fetch_page(
-                date, page, headers, session_id)
-            for act_index in act_indexes:
-                self.fetch_act(date, act_index, headers, session_id)
-
-            if next_page is not None:
-                page = int(next_page)
+    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    def solve_captcha(self, date, headers, session_id):
+        browser = self.browser
+        url = self._get_search_url(session_id, date=format_date(date))
+        self.logger.info(f'GET {url}')
+        browser.get(url)
+        while not browser.is_text_present('Resultado da busca'):
+            browser.wait_for_element(locator=(By.ID, 'captcha_text'))
+            response = self.requester.get(
+                f'{BASE_URL}/captchaAudio.svl', headers=headers)
+            text = utils.recognize_audio_by_content(response.content)
+            browser.fill_in('#captcha_text', value=text)
+            time.sleep(0.5)
+            if browser.is_text_present('não corresponde', tag='div'):
+                browser.click(self._find(id='gerar'))
             else:
-                break
+                self.browser.wait_for_element(
+                    locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
+        return headers
 
+    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
     def fetch_page(self, date, page, headers, session_id):
         query = default_filters()# self.query.copy()
         query['paginaNumero'] = page
         url = self._get_search_url(
             session_id, query=query, date=format_date(date))
         self.logger.info(f'GET {url}')
-        response = self.requester.get(url, headers=headers)
+        self.requester.verify = False
+        response = requests.get(url,allow_redirects=False,verify=False)#,headers=headers,verify=False)
+        #response = self.requester.get(url, headers=headers)
         next_page = None
         if response.status_code == 200:
             soup = utils.soup_by_content(response.text)
@@ -300,34 +296,11 @@ class TJMGChunk(base.Chunk):
                 f'Unexpected status code {response.status_code} fetching {url}.')
 
 
-    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
-    def solve_captcha(self, date, headers, session_id):
-        browser = self.browser
-        url = self._get_search_url(session_id, date=format_date(date))
-        self.logger.info(f'GET {url}')
-        browser.get(url)
-        while not browser.is_text_present('Resultado da busca'):
-            browser.wait_for_element(locator=(By.ID, 'captcha_text'))
-            response = self.requester.get(
-                f'{BASE_URL}/captchaAudio.svl', headers=headers)
-            text = self._recognize_audio_by_content(response.content)
-            browser.fill_in('#captcha_text', value=text)
-            time.sleep(0.5)
-            if browser.is_text_present('não corresponde', tag='div'):
-                browser.click(self._find(id='gerar'))
-            else:
-                self.browser.wait_for_element(
-                    locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
-        return headers
-
     def _find(self, matcher=None, **kwargs):
         return self._current_soup().find(matcher, **kwargs)
 
     def _current_soup(self):
-        return self.soup_by_content(self.browser.page_source())
-
-    def soup_by_content(self,content):
-        return BeautifulSoup(content, features='html.parser')
+        return utils.soup_by_content(self.browser.page_source())
 
     def _get_search_url(self, session_id, date, query=None):
         query = query or default_filters()# self.query.copy()
@@ -335,18 +308,7 @@ class TJMGChunk(base.Chunk):
         endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
         return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
-    def _recognize_audio_by_content(self, content):
-        filename = f'captcha_{"".join(choices(ascii_letters,k=10))}.wav'
-        recognizer = sr.Recognizer()
-
-        with open(filename, 'wb') as f:
-            f.write(content)
-
-        with sr.AudioFile(filename) as source:
-            audio = recognizer.record(source)
-            os.remove(filename)
-
-        return recognizer.recognize_google(audio, language='pt-BR')
+    
 
 
 @celery.task(queue='crawlers.tjmg', default_retry_delay=5 * 60,
