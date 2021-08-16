@@ -32,7 +32,8 @@ logger = logger_factory('tjmg')
 
 # CONSTANTS
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
-DATE_FORMAT = "%d/%m/%Y"
+TJMG_DATE_FORMAT = "DD/MM/YYYY"
+STANDARD_DATE_FORMAT = "YYYY-MM-DD"
 QUERY = 'a$ ou b$'
 DEFAULT_USER_AGENT = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
@@ -77,19 +78,13 @@ def default_filters():
 
 
 def format_date(date):
-    if isinstance(date,str):
-        return date
-    else:
-        return str(date.strftime(DATE_FORMAT))
+    return pendulum.from_format(date,STANDARD_DATE_FORMAT).format(TJMG_DATE_FORMAT)
 
 
 class TJMG(base.BaseCrawler,base.ICollector):
 
     def __init__(self, params,query,output,logger,handler,browser,**kwargs):
-        super(TJMG, self).__init__(params, output, logger)#, **options)
-        #self.params = params
-        #self.output = output
-        #self.logger = logger
+        super(TJMG, self).__init__(params, output, logger)
         self.query = query
         self.handler = handler
         self.browser = browser
@@ -105,6 +100,21 @@ class TJMG(base.BaseCrawler,base.ICollector):
             self.cookie_id = browser.get_cookie('juridico')
             self.headers = {
             'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Host': 'www5.tjmg.jus.br',
+            'Pragma': 'no-cache',
+            #Referer: https://www5.tjmg.jus.br/jurisprudencia/pesquisaPalavrasEspelhoAcordao.do?numeroRegistro=1&totalLinhas=1&palavras=e&pesquisarPor=ementa&orderByData=2&codigoOrgaoJulgador=&codigoCompostoRelator=&classe=&codigoAssunto=&dataPublicacaoInicial=&dataPublicacaoFinal=&dataJulgamentoInicial=15%2F10%2F2018&dataJulgamentoFinal=16%2F10%2F2018&siglaLegislativa=&referenciaLegislativa=Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...&numeroRefLegislativa=&anoRefLegislativa=&legislacao=&norma=&descNorma=&complemento_1=&listaPesquisa=&descricaoTextosLegais=&observacoes=&linhasPorPagina=10&pesquisaPalavras=Pesquisar
+            'sec-ch-ua': '"Chromium";v="92", " Not A;Brand";v="99", "Microsoft Edge";v="92"',
+            'sec-ch-ua-mobile': '?0',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
             **DEFAULT_USER_AGENT
             }
 
@@ -115,7 +125,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
     @utils.retryable(max_retries=99)
     def count(self):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
-        date = datetime.strptime(self.params.get('start_date'), DATE_FORMAT)
+        date = self.params.get('start_date')
         query = default_filters()
         url = self._get_search_url(
             self.session_id, query=query, date=format_date(date))
@@ -141,7 +151,6 @@ class TJMG(base.BaseCrawler,base.ICollector):
         for page in range(1, self.total_pages + 1):
             keys = {
                 'date':self.params.get('start_date'),
-                #'end_date':self.params.get('end_date'),
                 'page':page
             }
 
@@ -242,7 +251,7 @@ class TJMGChunk(base.Chunk):
             soup = BeautifulSoup(browser.page_source(),features="html5lib")
             date_label = soup.find('div', text='Data de Julgamento')
             session_date = date_label.find_next_sibling('div').text
-            session_date = pendulum.from_format(session_date,'DD/MM/YYYY')
+            session_date = pendulum.from_format(session_date,TJMG_DATE_FORMAT)
 
             onclick_attr = soup.find('input',{"name":"inteiroTeorPDF"})['onclick']
             pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
@@ -328,17 +337,17 @@ class TJMGChunk(base.Chunk):
 @celery.task(queue='crawlers.tjmg', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,),
              base=Singleton)
-def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
+def tjmg_task(**kwargs):
   from logutils import logging_context
 
   with logging_context(crawler='tjmg'):
-    output = utils.get_output_strategy_by_path(path=output_uri)
+    output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
     logger.info(f'Output: {output}.')
     setup_cloud_logger(logger)
 
-    options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
+    #options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
     params = {
-      'start_date': start_date, 'end_date': end_date
+      'start_date': kwargs.get('start_date'), 'end_date': kwargs.get('end_date')
     }
 
     query = default_filters()
@@ -351,8 +360,7 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
                 output=output,
                 logger=logger,
                 handler = handler,
-                browser=browsers.FirefoxBrowser(page_load_strategy='eager'),
-                **options
+                browser=browsers.FirefoxBrowser(),
                 )
 
     snapshot = base.Snapshot(keys=params)
@@ -363,15 +371,24 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 
 
 @cli.command(name='tjmg')
-@click.option('--start-date', prompt=True,   help='Format dd/mm/YYYY.')
-@click.option('--end-date'  , prompt=True,   help='Format dd/mm/YYYY.')
+@click.option('--start-date', prompt=True,   help='Format YYYY-mm-dd')
+@click.option('--end-date'  , prompt=True,   help='Format YYYY-mm-dd')
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-#@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
-#@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+@click.option('--split-tasks',
+  default='days', help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
-def tjmg_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
-  if enqueue:
-    print("task_id", tjmg_task.delay(*args))
+def tjmg_command(**kwargs):
+  if kwargs.get('enqueue'):
+    if kwargs.get('split_tasks'):
+      start_date = pendulum.parse(kwargs.get('start_date'))
+      end_date = pendulum.parse(kwargs.get('end_date'))
+      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
+        task_id = tjmg_task.delay(
+          start_date=start.to_date_string(),
+          end_date=end.to_date_string(),
+          output_uri=kwargs.get('output_uri'))
+        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
+    else:
+      tjmg_task.delay(**kwargs)
   else:
-    tjmg_task(*args)
+    tjmg_task(**kwargs)
