@@ -143,3 +143,5 @@ logs/*
 data/*
 .service-account.json
 chromedriver.exe
+geckodriver.exe
+*.wav

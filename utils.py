@@ -393,7 +393,7 @@ def recognize_audio_by_content(content):
 
         with sr.AudioFile(filename) as source:
             audio = recognizer.record(source)
-            os.remove(filename)
+            #os.remove(filename)
 
         return recognizer.recognize_google(audio, language='pt-BR')
 

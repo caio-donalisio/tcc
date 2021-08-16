@@ -7,6 +7,9 @@ import utils
 import requests
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.firefox.options import Options
+
+
 from selenium import webdriver
 import time
 import os
@@ -23,7 +26,7 @@ from celery_singleton import Singleton
 import browsers
 import math
 import pendulum
-
+from time import sleep
 
 logger = logger_factory('tjmg')
 
@@ -31,6 +34,9 @@ logger = logger_factory('tjmg')
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
 DATE_FORMAT = "%d/%m/%Y"
 QUERY = 'a$ ou b$'
+DEFAULT_USER_AGENT = {
+  'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
+}
 
 
 # FUNCTIONS
@@ -80,10 +86,11 @@ def format_date(date):
 class TJMG(base.BaseCrawler,base.ICollector):
 
     def __init__(self, params,query,output,logger,handler,browser,**kwargs):
-        self.params = params
+        super(TJMG, self).__init__(params, output, logger)#, **options)
+        #self.params = params
+        #self.output = output
+        #self.logger = logger
         self.query = query
-        self.output = output
-        self.logger = logger
         self.handler = handler
         self.browser = browser
         self.requester = requests.Session()
@@ -97,11 +104,12 @@ class TJMG(base.BaseCrawler,base.ICollector):
             self.session_id  = browser.get_cookie('JSESSIONID')
             self.cookie_id = browser.get_cookie('juridico')
             self.headers = {
-            'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}'
+            'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}',
+            **DEFAULT_USER_AGENT
             }
 
         except Exception as e:
-            browser.quit() 
+            browser.quit()
             raise e
         
     @utils.retryable(max_retries=99)
@@ -151,7 +159,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
             #self.setup()
 
-    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    @utils.retryable(max_retries=33, sleeptime=20)
     def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, date=format_date(date))
@@ -210,7 +218,6 @@ class TJMGChunk(base.Chunk):
         self.output = output
         
     def rows(self):
-
         acts,next_page = self.fetch_page(self.date,self.page,self.headers,self.session_id)
         for act in acts:
             query=default_filters()
@@ -222,8 +229,13 @@ class TJMGChunk(base.Chunk):
             self.logger.info(f'GET {url}')
             browser = self.browser
             browser.get(url)
-            while not browser.is_text_present('Inteiro Teor'):
+            captcha = False
+            while browser.is_text_present('Digite os números abaixo'):
                 self.solve_captcha(self.date,self.headers,self.session_id)
+                captcha = True
+            if captcha:
+                    browser.get(url)
+            browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
             browser.click(self._find(id='imgBotao1'))
             
             
@@ -246,7 +258,7 @@ class TJMGChunk(base.Chunk):
                     content_type='application/pdf')
             ]
 
-    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    @utils.retryable(max_retries=33, sleeptime=20)
     def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, date=format_date(date))
@@ -266,16 +278,17 @@ class TJMGChunk(base.Chunk):
                     locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
         return headers
 
-    @utils.retryable(max_retries=3, sleeptime=20, retryable_exceptions=(TimeoutException))
+    @utils.retryable(max_retries=33, sleeptime=20)#, retryable_exceptions=(TimeoutException))
     def fetch_page(self, date, page, headers, session_id):
         query = default_filters()# self.query.copy()
         query['paginaNumero'] = page
         url = self._get_search_url(
             session_id, query=query, date=format_date(date))
         self.logger.info(f'GET {url}')
-        self.requester.verify = False
-        response = requests.get(url,allow_redirects=False,verify=False)#,headers=headers,verify=False)
-        #response = self.requester.get(url, headers=headers)
+        #self.requester.verify = False
+        sleep(6)
+        #response = requests.get(url,allow_redirects=False,verify=False)#,headers=headers,verify=False)
+        response = self.requester.get(url, headers=headers)
         next_page = None
         if response.status_code == 200:
             soup = utils.soup_by_content(response.text)
@@ -330,14 +343,15 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 
     query = default_filters()
     handler = base.ContentHandler(output=output) # TJRJHandler(output=output)
-
+    #options_browser = Options()
+    #options_browser.page_load_strategy = 'eager'
     collector = TJMG(
                 params=params,
                 query = query,
                 output=output,
                 logger=logger,
                 handler = handler,
-                browser=browsers.FirefoxBrowser(),
+                browser=browsers.FirefoxBrowser(page_load_strategy='eager'),
                 **options
                 )
 
@@ -352,8 +366,8 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 @click.option('--start-date', prompt=True,   help='Format dd/mm/YYYY.')
 @click.option('--end-date'  , prompt=True,   help='Format dd/mm/YYYY.')
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
-@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+#@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
+#@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 def tjmg_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
   args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
