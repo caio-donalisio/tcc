@@ -28,8 +28,8 @@ logger = logger_factory('tjmg')
 
 # CONSTANTS
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
-STANDARD_DATE_FORMAT = 'YYYY-MM-DD'
-TJMG_DATE_FORMAT = 'DD/MM/YYYY'
+TJMG_DATE_FORMAT = "DD/MM/YYYY"
+STANDARD_DATE_FORMAT = "YYYY-MM-DD"
 QUERY = 'a$ ou b$'
 DEFAULT_USER_AGENT = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
@@ -74,12 +74,12 @@ def default_filters():
 
 
 def format_date(date):
-    return date.format(TJMG_DATE_FORMAT)
+    return pendulum.from_format(date,STANDARD_DATE_FORMAT).format(TJMG_DATE_FORMAT)
 
 
 class TJMG(base.BaseCrawler,base.ICollector):
 
-    def __init__(self, params,query,output,logger,handler,browser):
+    def __init__(self, params,query,output,logger,handler,browser,**kwargs):
         super(TJMG, self).__init__(params, output, logger)
         self.query = query
         self.handler = handler
@@ -106,8 +106,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
     @utils.retryable(max_retries=99)
     def count(self):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
-        start_date = pendulum.from_format(self.params.get('start_date'),STANDARD_DATE_FORMAT)
-        end_date = pendulum.from_format(self.params.get('end_date'),STANDARD_DATE_FORMAT)
+        date = self.params.get('start_date')
         query = default_filters()
         url = self._get_search_url(
             self.session_id, query=query, start_date=format_date(start_date),end_date=format_date(end_date))
@@ -132,8 +131,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
         for page in range(1, self.total_pages + 1):
             keys = {
-                'start-date':self.params.get('start_date'),
-                'end_date':self.params.get('end_date'),
+                'date':self.params.get('start_date'),
                 'page':page
             }
 
@@ -326,16 +324,17 @@ class TJMGChunk(base.Chunk):
 @celery.task(queue='crawlers.tjmg', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,),
              base=Singleton)
-def tjmg_task(start_date, end_date, output_uri):#, pdf_async, skip_pdf):
+def tjmg_task(**kwargs):
   from logutils import logging_context
 
   with logging_context(crawler='tjmg'):
-    output = utils.get_output_strategy_by_path(path=output_uri)
+    output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
     logger.info(f'Output: {output}.')
     setup_cloud_logger(logger)
 
+    #options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
     params = {
-      'start_date': start_date, 'end_date': end_date
+      'start_date': kwargs.get('start_date'), 'end_date': kwargs.get('end_date')
     }
 
     query = default_filters()
@@ -359,15 +358,24 @@ def tjmg_task(start_date, end_date, output_uri):#, pdf_async, skip_pdf):
 
 
 @cli.command(name='tjmg')
-@click.option('--start-date', prompt=True,   help='Format dd/mm/YYYY.')
-@click.option('--end-date'  , prompt=True,   help='Format dd/mm/YYYY.')
+@click.option('--start-date', prompt=True,   help='Format YYYY-mm-dd')
+@click.option('--end-date'  , prompt=True,   help='Format YYYY-mm-dd')
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-#@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
-#@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+@click.option('--split-tasks',
+  default='days', help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
-def tjmg_command(start_date, end_date, output_uri, enqueue):
-  args = (start_date, end_date, output_uri)#, pdf_async, skip_pdf)
-  if enqueue:
-    print("task_id", tjmg_task.delay(*args))
+def tjmg_command(**kwargs):
+  if kwargs.get('enqueue'):
+    if kwargs.get('split_tasks'):
+      start_date = pendulum.parse(kwargs.get('start_date'))
+      end_date = pendulum.parse(kwargs.get('end_date'))
+      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
+        task_id = tjmg_task.delay(
+          start_date=start.to_date_string(),
+          end_date=end.to_date_string(),
+          output_uri=kwargs.get('output_uri'))
+        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
+    else:
+      tjmg_task.delay(**kwargs)
   else:
-    tjmg_task(*args)
+    tjmg_task(**kwargs)
