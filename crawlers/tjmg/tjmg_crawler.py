@@ -100,21 +100,6 @@ class TJMG(base.BaseCrawler,base.ICollector):
             self.cookie_id = browser.get_cookie('juridico')
             self.headers = {
             'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Host': 'www5.tjmg.jus.br',
-            'Pragma': 'no-cache',
-            #Referer: https://www5.tjmg.jus.br/jurisprudencia/pesquisaPalavrasEspelhoAcordao.do?numeroRegistro=1&totalLinhas=1&palavras=e&pesquisarPor=ementa&orderByData=2&codigoOrgaoJulgador=&codigoCompostoRelator=&classe=&codigoAssunto=&dataPublicacaoInicial=&dataPublicacaoFinal=&dataJulgamentoInicial=15%2F10%2F2018&dataJulgamentoFinal=16%2F10%2F2018&siglaLegislativa=&referenciaLegislativa=Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...&numeroRefLegislativa=&anoRefLegislativa=&legislacao=&norma=&descNorma=&complemento_1=&listaPesquisa=&descricaoTextosLegais=&observacoes=&linhasPorPagina=10&pesquisaPalavras=Pesquisar
-            'sec-ch-ua': '"Chromium";v="92", " Not A;Brand";v="99", "Microsoft Edge";v="92"',
-            'sec-ch-ua-mobile': '?0',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
-            'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1',
             **DEFAULT_USER_AGENT
             }
 
