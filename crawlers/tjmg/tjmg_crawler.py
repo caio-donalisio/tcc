@@ -22,7 +22,7 @@ from celery_singleton import Singleton
 import browsers
 import math
 import pendulum
-
+import random
 
 logger = logger_factory('tjmg')
 
@@ -46,29 +46,29 @@ def get_param_from_url(url, param):
 
 def default_filters():
     return {'palavras': QUERY,
-            # 'dataPublicacaoInicial': '',
-            # 'dataPublicacaoFinal': '',
+            'dataPublicacaoInicial': '',
+            'dataPublicacaoFinal': '',
             'numeroRegistro': '1',
             'pesquisarPor': 'ementa',
             'orderByData': '2',
-            # 'codigoOrgaoJulgador': '',
-            # 'codigoCompostoRelator': '',
-            # 'classe': '',
-            # 'codigoAssunto': '',
+            'codigoOrgaoJulgador': '',
+            'codigoCompostoRelator': '',
+            'classe': '',
+            'codigoAssunto': '',
             'dataJulgamentoInicial': '',
             'dataJulgamentoFinal': '',
-             #'excluirRepetitivos':'true',
-            # 'siglaLegislativa': '',
+            #'excluirRepetitivos':'true',
+            'siglaLegislativa': '',
             'referenciaLegislativa': 'Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...',
-            # 'numeroRefLegislativa': '',
-            # 'anoRefLegislativa': '',
-            # 'legislacao': '',
-            # 'norma': '',
-            # 'descNorma': '',
-            # 'complemento_1': '',
-            # 'listaPesquisa': '',
-            # 'descricaoTextosLegais': '',
-            # 'observacoes': '',
+            'numeroRefLegislativa': '',
+            'anoRefLegislativa': '',
+            'legislacao': '',
+            'norma': '',
+            'descNorma': '',
+            'complemento_1': '',
+            'listaPesquisa': '',
+            'descricaoTextosLegais': '',
+            'observacoes': '',
             'linhasPorPagina': '10',
             'pesquisaPalavras': 'Pesquisar'}
 
@@ -206,28 +206,32 @@ class TJMGChunk(base.Chunk):
         self.logger = logger
         self.browser = browser
         self.session_id = session_id
-        self.date = pendulum.from_format(keys.get('date'),STANDARD_DATE_FORMAT)
+        self.start_date = pendulum.from_format(keys.get('start_date'),STANDARD_DATE_FORMAT)
+        self.date = pendulum.from_format(keys.get('end_date'),STANDARD_DATE_FORMAT)
         self.requester = requester
         self.output = output
         
     def rows(self):
-        acts,next_page = self.fetch_page(self.date,self.page,self.headers,self.session_id)
+        acts,next_page = self.fetch_page(self.start_date,self.end_date,self.page,self.headers,self.session_id)
         for act in acts:
             query=default_filters()
             query['paginaNumero'] = act
             query['numeroRegistro'] = act
             query['linhasPorPagina'] = 1
             url = self._get_search_url(
-                self.session_id, query=query, date=self.date)
+                self.session_id, query=query, start_date=self.start_date,end_date=self.end_date)
             self.logger.info(f'GET {url}')
             browser = self.browser
             browser.get(url)
+            time.sleep(random.random())
             captcha = False
             while browser.is_text_present('Digite os números abaixo'):
                 self.solve_captcha(self.date,self.headers,self.session_id)
                 captcha = True
             if captcha:
                     browser.get(url)
+            time.sleep(random.random())
+
             browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
             browser.click(self._find(id='imgBotao1'))
             
