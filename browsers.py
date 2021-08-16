@@ -25,7 +25,7 @@ def get_soup_xpath(element):
 
 
 class FirefoxBrowser:
-  def __init__(self, headers=None, headless=False,page_load_strategy='normal'):
+  def __init__(self, headers=None, headless=True,page_load_strategy='normal'):
     options = self._get_options(headers, headless,page_load_strategy)
     self.driver = webdriver.Firefox(options=options)
 

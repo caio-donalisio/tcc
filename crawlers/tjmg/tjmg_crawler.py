@@ -6,16 +6,12 @@ from bs4 import BeautifulSoup
 import utils
 import requests
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.firefox.options import Options
 
 
-from selenium import webdriver
 import time
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
 import speech_recognition as sr
-from datetime import datetime, timedelta
 from logconfig import logger_factory, setup_cloud_logger
 from string import ascii_letters
 from random import choices
@@ -26,13 +22,14 @@ from celery_singleton import Singleton
 import browsers
 import math
 import pendulum
-from time import sleep
+
 
 logger = logger_factory('tjmg')
 
 # CONSTANTS
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
-DATE_FORMAT = "%d/%m/%Y"
+STANDARD_DATE_FORMAT = 'YYYY-MM-DD'
+TJMG_DATE_FORMAT = 'DD/MM/YYYY'
 QUERY = 'a$ ou b$'
 DEFAULT_USER_AGENT = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
@@ -49,47 +46,41 @@ def get_param_from_url(url, param):
 
 def default_filters():
     return {'palavras': QUERY,
-            'dataPublicacaoInicial': '',
-            'dataPublicacaoFinal': '',
+            # 'dataPublicacaoInicial': '',
+            # 'dataPublicacaoFinal': '',
             'numeroRegistro': '1',
             'pesquisarPor': 'ementa',
             'orderByData': '2',
-            'codigoOrgaoJulgador': '',
-            'codigoCompostoRelator': '',
-            'classe': '',
-            'codigoAssunto': '',
+            # 'codigoOrgaoJulgador': '',
+            # 'codigoCompostoRelator': '',
+            # 'classe': '',
+            # 'codigoAssunto': '',
             'dataJulgamentoInicial': '',
             'dataJulgamentoFinal': '',
              #'excluirRepetitivos':'true',
-            'siglaLegislativa': '',
+            # 'siglaLegislativa': '',
             'referenciaLegislativa': 'Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...',
-            'numeroRefLegislativa': '',
-            'anoRefLegislativa': '',
-            'legislacao': '',
-            'norma': '',
-            'descNorma': '',
-            'complemento_1': '',
-            'listaPesquisa': '',
-            'descricaoTextosLegais': '',
-            'observacoes': '',
+            # 'numeroRefLegislativa': '',
+            # 'anoRefLegislativa': '',
+            # 'legislacao': '',
+            # 'norma': '',
+            # 'descNorma': '',
+            # 'complemento_1': '',
+            # 'listaPesquisa': '',
+            # 'descricaoTextosLegais': '',
+            # 'observacoes': '',
             'linhasPorPagina': '10',
             'pesquisaPalavras': 'Pesquisar'}
 
 
 def format_date(date):
-    if isinstance(date,str):
-        return date
-    else:
-        return str(date.strftime(DATE_FORMAT))
+    return date.format(TJMG_DATE_FORMAT)
 
 
 class TJMG(base.BaseCrawler,base.ICollector):
 
-    def __init__(self, params,query,output,logger,handler,browser,**kwargs):
-        super(TJMG, self).__init__(params, output, logger)#, **options)
-        #self.params = params
-        #self.output = output
-        #self.logger = logger
+    def __init__(self, params,query,output,logger,handler,browser):
+        super(TJMG, self).__init__(params, output, logger)
         self.query = query
         self.handler = handler
         self.browser = browser
@@ -115,10 +106,11 @@ class TJMG(base.BaseCrawler,base.ICollector):
     @utils.retryable(max_retries=99)
     def count(self):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
-        date = datetime.strptime(self.params.get('start_date'), DATE_FORMAT)
+        start_date = pendulum.from_format(self.params.get('start_date'),STANDARD_DATE_FORMAT)
+        end_date = pendulum.from_format(self.params.get('end_date'),STANDARD_DATE_FORMAT)
         query = default_filters()
         url = self._get_search_url(
-            self.session_id, query=query, date=format_date(date))
+            self.session_id, query=query, start_date=format_date(start_date),end_date=format_date(end_date))
         self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=self.headers)
         if response.status_code == 200:
@@ -128,7 +120,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
             return number
             
         elif response.status_code == 401:
-            self.solve_captcha(date, self.headers, self.session_id)
+            self.solve_captcha(start_date,end_date, self.headers, self.session_id)
             return self.count()
         else:
             raise Exception(
@@ -140,8 +132,8 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
         for page in range(1, self.total_pages + 1):
             keys = {
-                'date':self.params.get('start_date'),
-                #'end_date':self.params.get('end_date'),
+                'start-date':self.params.get('start_date'),
+                'end_date':self.params.get('end_date'),
                 'page':page
             }
 
@@ -160,9 +152,9 @@ class TJMG(base.BaseCrawler,base.ICollector):
             #self.setup()
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def solve_captcha(self, date, headers, session_id):
+    def solve_captcha(self, start_date,end_date, headers, session_id):
         browser = self.browser
-        url = self._get_search_url(session_id, date=format_date(date))
+        url = self._get_search_url(session_id, start_date=format_date(start_date),end_date=format_date(end_date))
         self.logger.info(f'GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca'):
@@ -180,9 +172,10 @@ class TJMG(base.BaseCrawler,base.ICollector):
         return headers
 
 
-    def _get_search_url(self, session_id, date, query=None):
+    def _get_search_url(self, session_id, start_date,end_date, query=None):
         query = query or default_filters()# self.query.copy()
-        query['dataPublicacaoInicial'] = query['dataPublicacaoFinal'] = date
+        query['dataJulgamentoInicial'] = start_date.format(TJMG_DATE_FORMAT)
+        query['dataJulgamentoFinal'] = end_date.format(TJMG_DATE_FORMAT)
         endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
         return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
@@ -213,7 +206,7 @@ class TJMGChunk(base.Chunk):
         self.logger = logger
         self.browser = browser
         self.session_id = session_id
-        self.date = keys.get('date')
+        self.date = pendulum.from_format(keys.get('date'),STANDARD_DATE_FORMAT)
         self.requester = requester
         self.output = output
         
@@ -225,7 +218,7 @@ class TJMGChunk(base.Chunk):
             query['numeroRegistro'] = act
             query['linhasPorPagina'] = 1
             url = self._get_search_url(
-                self.session_id, query=query, date=format_date(self.date))
+                self.session_id, query=query, date=self.date)
             self.logger.info(f'GET {url}')
             browser = self.browser
             browser.get(url)
@@ -242,7 +235,7 @@ class TJMGChunk(base.Chunk):
             soup = BeautifulSoup(browser.page_source(),features="html5lib")
             date_label = soup.find('div', text='Data de Julgamento')
             session_date = date_label.find_next_sibling('div').text
-            session_date = pendulum.from_format(session_date,'DD/MM/YYYY')
+            session_date = pendulum.from_format(session_date,TJMG_DATE_FORMAT)
 
             onclick_attr = soup.find('input',{"name":"inteiroTeorPDF"})['onclick']
             pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
@@ -259,9 +252,9 @@ class TJMGChunk(base.Chunk):
             ]
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def solve_captcha(self, date, headers, session_id):
+    def solve_captcha(self, start_date,end_date, headers, session_id):
         browser = self.browser
-        url = self._get_search_url(session_id, date=format_date(date))
+        url = self._get_search_url(session_id, start_date=format_date(start_date),end_date=format_date(end_date))
         self.logger.info(f'GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca'):
@@ -279,14 +272,14 @@ class TJMGChunk(base.Chunk):
         return headers
 
     @utils.retryable(max_retries=33, sleeptime=20)#, retryable_exceptions=(TimeoutException))
-    def fetch_page(self, date, page, headers, session_id):
+    def fetch_page(self, start_date,end_date, page, headers, session_id):
         query = default_filters()# self.query.copy()
         query['paginaNumero'] = page
         url = self._get_search_url(
-            session_id, query=query, date=format_date(date))
+            session_id, query=query, start_date=start_date,end_date=end_date)
         self.logger.info(f'GET {url}')
         #self.requester.verify = False
-        sleep(6)
+        time.sleep(6)
         #response = requests.get(url,allow_redirects=False,verify=False)#,headers=headers,verify=False)
         response = self.requester.get(url, headers=headers)
         next_page = None
@@ -303,8 +296,8 @@ class TJMGChunk(base.Chunk):
                     next_page_link['href'], param='paginaNumero')
             return (act_indexes, next_page)
         elif response.status_code == 401:
-            self.solve_captcha(date, headers, session_id)
-            return self.fetch_page(date, page, headers, session_id)
+            self.solve_captcha(start_date,end_date, headers, session_id)
+            return self.fetch_page(start_date,end_date, page, headers, session_id)
         else:
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
@@ -316,9 +309,10 @@ class TJMGChunk(base.Chunk):
     def _current_soup(self):
         return utils.soup_by_content(self.browser.page_source())
 
-    def _get_search_url(self, session_id, date, query=None):
+    def _get_search_url(self, session_id, start_date,end_date, query=None):
         query = query or default_filters()# self.query.copy()
-        query['dataPublicacaoInicial'] = query['dataPublicacaoFinal'] = date
+        query['dataJulgamentoInicial'] = start_date.format(TJMG_DATE_FORMAT)
+        query['dataJulgamentoFinal'] = end_date.format(TJMG_DATE_FORMAT)
         endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
         return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
@@ -328,7 +322,7 @@ class TJMGChunk(base.Chunk):
 @celery.task(queue='crawlers.tjmg', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,),
              base=Singleton)
-def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
+def tjmg_task(start_date, end_date, output_uri):#, pdf_async, skip_pdf):
   from logutils import logging_context
 
   with logging_context(crawler='tjmg'):
@@ -336,7 +330,6 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
     logger.info(f'Output: {output}.')
     setup_cloud_logger(logger)
 
-    options = dict(pdf_async=pdf_async, skip_pdf=skip_pdf)
     params = {
       'start_date': start_date, 'end_date': end_date
     }
@@ -351,8 +344,7 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
                 output=output,
                 logger=logger,
                 handler = handler,
-                browser=browsers.FirefoxBrowser(page_load_strategy='eager'),
-                **options
+                browser=browsers.FirefoxBrowser(),
                 )
 
     snapshot = base.Snapshot(keys=params)
@@ -369,8 +361,8 @@ def tjmg_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 #@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 #@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
-def tjmg_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
+def tjmg_command(start_date, end_date, output_uri, enqueue):
+  args = (start_date, end_date, output_uri)#, pdf_async, skip_pdf)
   if enqueue:
     print("task_id", tjmg_task.delay(*args))
   else:
