@@ -77,6 +77,58 @@ def format_date(date):
     return pendulum.from_format(date,STANDARD_DATE_FORMAT).format(TJMG_DATE_FORMAT)
 
 
+# class CaptchaSolver:
+#     def init(self,browser,requester,logger,start_date,end_date,headers,session_id):
+#         self.browser = browser
+#         self.requester=requester
+#         self.logger=logger
+#         self.start_date=start_date
+#         self.end_date=end_date
+#         self.headers=headers
+#         self.session_id=session_id
+
+#     @utils.retryable(max_retries=33, sleeptime=20)
+#     def solve_captcha(self, start_date,end_date, headers, session_id):
+#         browser = self.browser
+#         url = self._get_search_url(session_id, start_date=format_date(start_date),end_date=format_date(end_date))
+#         self.logger.info(f'GET {url}')
+#         browser.get(url)
+#         while not browser.is_text_present('Resultado da busca'):
+#             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
+#             response = self.requester.get(
+#                 f'{BASE_URL}/captchaAudio.svl', headers=headers)
+#             text = utils.recognize_audio_by_content(response.content)
+#             browser.fill_in('#captcha_text', value=text)
+#             time.sleep(0.5)
+#             if browser.is_text_present('não corresponde', tag='div'):
+#                 browser.click(self._find(id='gerar'))
+#             else:
+#                 self.browser.wait_for_element(
+#                     locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
+#         return headers
+
+
+#     def _get_search_url(self, session_id, start_date,end_date, query=None):
+#         query = query or default_filters()# self.query.copy()
+#         query['dataJulgamentoInicial'] = start_date.format(TJMG_DATE_FORMAT)
+#         query['dataJulgamentoFinal'] = end_date.format(TJMG_DATE_FORMAT)
+#         endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
+#         return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
+
+#     def _recognize_audio_by_content(self, content):
+#         filename = f'captcha_{"".join(choices(ascii_letters,k=10))}.wav'
+#         recognizer = sr.Recognizer()
+
+#         with open(filename, 'wb') as f:
+#             f.write(content)
+
+#         with sr.AudioFile(filename) as source:
+#             audio = recognizer.record(source)
+#             os.remove(filename)
+
+#         return recognizer.recognize_google(audio, language='pt-BR')
+
+
 class TJMG(base.BaseCrawler,base.ICollector):
 
     def __init__(self, params,query,output,logger,handler,browser,**kwargs):
@@ -109,7 +161,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
         date = self.params.get('start_date')
         query = default_filters()
         url = self._get_search_url(
-            self.session_id, query=query, start_date=format_date(start_date),end_date=format_date(end_date))
+            self.session_id, query=query, start_date=format_date(date),end_date=format_date(date))
         self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=self.headers)
         if response.status_code == 200:
@@ -152,7 +204,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
     @utils.retryable(max_retries=33, sleeptime=20)
     def solve_captcha(self, start_date,end_date, headers, session_id):
         browser = self.browser
-        url = self._get_search_url(session_id, start_date=format_date(start_date),end_date=format_date(end_date))
+        url = self._get_search_url(session_id, start_date=format_date(date),end_date=format_date(date))
         self.logger.info(f'GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca'):
@@ -256,7 +308,7 @@ class TJMGChunk(base.Chunk):
     @utils.retryable(max_retries=33, sleeptime=20)
     def solve_captcha(self, start_date,end_date, headers, session_id):
         browser = self.browser
-        url = self._get_search_url(session_id, start_date=format_date(start_date),end_date=format_date(end_date))
+        url = self._get_search_url(session_id, start_date=format_date(date),end_date=format_date(date))
         self.logger.info(f'GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca'):
