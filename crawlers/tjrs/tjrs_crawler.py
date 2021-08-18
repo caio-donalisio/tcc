@@ -46,9 +46,13 @@ class TJRSClient:
                 filters_aux = {k:v[0] for k,v in filters_aux.items()}
                 filters_aux = {k:force_int(v) for k,v in filters_aux.items()}
                 filters_aux['pagina_atual']  = page
+                
+                #filters_aux['start']  = (page - 1) + page * 10
+
                 filters['parametros'] = filters_aux
 
-            filters['parametros'] = urllib.parse.urlencode(filters['parametros'])
+            filters['parametros'] = urllib.parse.urlencode(filters['parametros'],quote_via=urllib.parse.quote)
+            #filters['pages'] = 'wt=json&start=140&rows=10&sort=data_julgamento%20desc&'
 
             return requests.post(self.url,
                                 data=filters,
@@ -97,7 +101,7 @@ class TJRSChunk(base.Chunk):
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
-        for record in result['response']['docs']:
+        for n,record in enumerate(result['response']['docs']):
 
             session_at = pendulum.parse(record['data_julgamento'])
             base_path   = f'{session_at.year}/{session_at.month:02d}'
@@ -106,10 +110,11 @@ class TJRSChunk(base.Chunk):
             ano = record['ano_julgamento']
             numero = record['numero_processo']
 
-            dest_record = f"{base_path}/doc_{codigo}_{numero}.json"
-            
+            import os
+            dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+
             report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-            dest_report = f"{base_path}/doc_{codigo}_{numero}.doc"
+            dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
 
             yield [
             base.Content(content=json.dumps(record),dest=dest_record,
@@ -160,12 +165,15 @@ def tjrs_task(**kwargs):
             'data_publicacao_de':'',
             'data_publicacao_ate':'',
             'filtroacordao':'acordao',
-            'facet':'on',
-            'facet.sort':'index',
-            'facet.limit':'index',
+            # 'facet':'on',
+            # 'facet.sort':'index',
+            # 'facet.limit':'index',
             'wt':'json',
-            'ordem':'desc',
-            'start':0}
+            'ordem':'asc,cod_documento%20asc',
+            #'sort':'cod_documento asc,numero_processo asc',
+            #'rows':'20',
+            'start':0
+            }
             }
 
         collector = TJRSCollector(client=TJRSClient(), filters=filters)
