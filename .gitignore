@@ -142,3 +142,4 @@ cython_debug/
 logs/*
 data/*
 .service-account.json
+geckodriver.exe
