@@ -40,20 +40,19 @@ class TJRSClient:
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
-        items_per_page = 10
         try:
             if isinstance(filters['parametros'],str):
                 filters_aux = urllib.parse.parse_qs(filters['parametros'])
                 filters_aux = {k:v[0] for k,v in filters_aux.items()}
                 filters_aux = {k:force_int(v) for k,v in filters_aux.items()}
                 filters_aux['pagina_atual']  = page
-                #filters_aux['start']  = (page - 1) * items_per_page
                 filters['parametros'] = filters_aux
 
             filters['parametros'] = urllib.parse.urlencode(filters['parametros'])
 
             return requests.post(self.url,
                                 data=filters,
+                                headers=DEFAULT_HEADERS
                                 ).json()
 
         except Exception as e:
@@ -107,11 +106,10 @@ class TJRSChunk(base.Chunk):
             ano = record['ano_julgamento']
             numero = record['numero_processo']
 
-            dest_record = f"{base_path}/doc_{codigo}.json"
-            
+            dest_record = f"{base_path}/doc_{codigo}_{numero}.json"
             
             report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-            dest_report = f"{base_path}/doc_{codigo}.doc"
+            dest_report = f"{base_path}/doc_{codigo}_{numero}.doc"
 
             yield [
             base.Content(content=json.dumps(record),dest=dest_record,
@@ -135,11 +133,6 @@ def tjrs_task(**kwargs):
         start_date = pendulum.parse(kwargs.get('start_date')).format(SOURCE_DATE_FORMAT)
         end_date = pendulum.parse(kwargs.get('end_date')).format(SOURCE_DATE_FORMAT)
 
-        #date_format = 'YYYY-MM-DD HH:mm:ss'
-
-        #start_date = pendulum.from_format(start_date,date_format).to_iso8601_string()
-        #end_date = pendulum.from_format(end_date,date_format).to_iso8601_string()
-
         filters = {
         'action': 'consultas_solr_ajax',
         'metodo': 'buscar_resultados',
@@ -161,13 +154,12 @@ def tjrs_task(**kwargs):
             'filtroJurisprudencia':'',
             'filtroComarcaOrigem':'',
             'filtroAssunto':'',
-            # 'data_julgamento_de':'15/08/2019',
-            # 'data_julgamento_ate':'17/08/2019',
             'data_julgamento_de':f'{start_date}',
             'data_julgamento_ate':f'{end_date}',
             'filtroNumeroProcesso':'',
             'data_publicacao_de':'',
             'data_publicacao_ate':'',
+            'filtroacordao':'acordao',
             'facet':'on',
             'facet.sort':'index',
             'facet.limit':'index',
@@ -175,14 +167,6 @@ def tjrs_task(**kwargs):
             'ordem':'desc',
             'start':0}
             }
-
-        
-
-#        query_params = {
-#            'sort':'cod_documento asc',
-##            'rows':10,
-#            'wt':'json',
-#   dest            }
 
         collector = TJRSCollector(client=TJRSClient(), filters=filters)
         handler   = base.ContentHandler(output=output)
