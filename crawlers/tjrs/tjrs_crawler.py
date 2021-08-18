@@ -114,7 +114,7 @@ class TJRSChunk(base.Chunk):
 
             yield [
             base.Content(content=json.dumps(record),dest=dest_record,
-                content_type='text/html'),
+                content_type='application/json'),
             base.ContentFromURL(src=report_url,dest=dest_report,
                 content_type='application/doc')
             ]
