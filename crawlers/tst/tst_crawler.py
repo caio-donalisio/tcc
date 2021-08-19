@@ -70,7 +70,7 @@ class TSTClient:
             "julgamentoInicial": filters.get('start_date'),
             "julgamentoFinal": filters.get('end_date')
             }
-            
+
             #sleep(0.5*random())
             return requests.post(search_url,
                 json=post_data,
@@ -107,7 +107,7 @@ class TSTCollector(base.ICollector):
             )
 
 class TSTHandler(base.ContentHandler):
-    
+
     @utils.retryable(max_retries=9)
     def handle(self, event):
         if isinstance(event, base.ContentFromURL):
@@ -137,7 +137,7 @@ class TSTHandler(base.ContentHandler):
                 dest = f'{event.dest}{guess_extension(content_type)}'
                 if 'rtf' in content_type:
                     return
-                    
+
             if response.status_code == 200:
                 self.output.save_from_contents(
                     filepath=dest,
@@ -147,7 +147,7 @@ class TSTHandler(base.ContentHandler):
         except requests.exceptions.ChunkedEncodingError:
             logger.warn(
             f"Got a ChunkedEncodingError when fetching {event.src} -- will retry.")
-            return 
+            return
 
 
 class TSTChunk(base.Chunk):
@@ -157,21 +157,21 @@ class TSTChunk(base.Chunk):
         self.filters  = filters
         self.page = page
         self.client = client
-        
+
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
-        
+
         base_pdf_report_url = 'http://aplicacao5.tst.jus.br/consultaDocumento/acordao.do?'
         base_html_report_url = 'https://jurisprudencia-backend.tst.jus.br/rest/documentos'
 
         for record in result['registros']:
-            
+
             session_at = pendulum.parse(record['registro']['dtaJulgamento'])
 
-            record_id = record['registro']['id']                
+            record_id = record['registro']['id']
             base_path   = f'{session_at.year}/{session_at.month:02d}'
-            
+
             dest_record = f"{base_path}/doc_{record_id}.json"
 
             html_report_url = f'{base_html_report_url}/{record_id}'
@@ -182,7 +182,7 @@ class TSTChunk(base.Chunk):
             if 'dtaPublicacao' in record['registro'].keys():
 
                 publication_at =  pendulum.parse(record['registro']['dtaPublicacao'])
-                
+
                 params = {
                     'anoProcInt':record['registro']['anoProcInt'],
                     'numProcInt':record['registro']['numProcInt'],
@@ -190,7 +190,7 @@ class TSTChunk(base.Chunk):
                     'nia':record['registro']['numInterno'],
                     'origem':'documento'
                     }
-                    
+
                 rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
                 rtf_report_url = base_pdf_report_url + rtf_params
                 dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
@@ -210,9 +210,9 @@ class TSTChunk(base.Chunk):
                 content_type='text/html'))
 
             sleep(random()+1.13)
-            
+
             yield files_to_download
-            
+
 
 
 @celery.task(queue='crawlers.tst', default_retry_delay=5 * 60,
@@ -232,17 +232,17 @@ def tst_task(**kwargs):
             'start_date':kwargs.get('start_date'),
             'end_date':kwargs.get('end_date')
             }
-                        
+
         collector = TSTCollector(client=TSTClient(), filters=query_params)
         #handler = base.ContentHandler(output=output)
-        handler   = TSTHandler(output=output) 
+        handler   = TSTHandler(output=output)
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
-            collector=collector, 
-            output=output, 
-            handler=handler, 
-            logger=logger, 
+            collector=collector,
+            output=output,
+            handler=handler,
+            logger=logger,
             max_workers=8) \
             .run(snapshot=snapshot)
 
@@ -260,9 +260,9 @@ def tst_command(**kwargs):
       end_date = pendulum.parse(kwargs.get('end_date'))
       for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
         task_id = tst_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          kwargs.get('output_uri'))
+          start_date=start.to_date_string(),
+          end_date=end.to_date_string(),
+          output_uri=kwargs.get('output_uri'))
         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
     else:
       tst_task.delay(**kwargs)
