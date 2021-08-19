@@ -9,7 +9,9 @@ import click
 from app import cli, celery
 import requests
 import urllib
-
+from browsers import FirefoxBrowser
+from selenium.webdriver.common.by import By
+import time
 
 logger = logger_factory('tjrs')
 
@@ -23,8 +25,9 @@ SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
-                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
-}
+                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67'),
+    'Cookie':'cookielawinfo-checkbox-analytics=no; cookielawinfo-checkbox-functional=no; cookielawinfo-checkbox-necessary=yes; cookielawinfo-checkbox-performance=no; cookielawinfo-checkbox-advertisement=no; cookielawinfo-checkbox-others=no; _ga=GA1.3.1484575181.1629204768; _gid=GA1.3.1734249402.1629204768; __utmz=245208256.1629215859.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=245208256.1484575181.1629204768.1629215859.1629223977.2; PHPSESSID=pkaju47lkv1hj9dirlgqom44eq; PHPINTER-PROD=.phpinter-prod-02; WORDPRESS=.wordpress-dmz-3'
+                        }
 
 
 class TJRSClient:
@@ -37,6 +40,33 @@ class TJRSClient:
     def count(self,filters):
         result = self.fetch(filters,page=1)
         return result['response']['numFound']
+
+    # def setup(self):
+    #     try:
+    #         url = f'https://www.tjrs.jus.br/novo/buscas-solr/?aba=jurisprudencia&q=&conteudo_busca=ementa_completa'
+    #         browser = self.browser
+    #         browser.get(url)
+    #         self.session_id  = browser.get_cookie('JSESSIONID')
+    #         self.cookie_id = browser.get_cookie('juridico')
+    #         self.headers = {
+    #         'cookie': f'JSESSIONID={self.session_id};juridico={self.cookie_id}',
+    #         **DEFAULT_USER_AGENT
+    #         }
+
+        # except Exception as e:
+        #     browser.quit()
+        #     raise e
+    
+    def get_cookie(self, cookie_name):
+        value = None
+        cookies = self.driver.get_cookies()
+        for cookie in cookies:
+            if cookie.get('name') == cookie_name:
+                value = cookie['value']
+        if cookie is None:
+            raise Exception(f'Cookie not found: {cookie_name}')
+        return value
+
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
@@ -93,11 +123,17 @@ class TJRSChunk(base.Chunk):
         self.filters  = filters
         self.page = page
         self.client = client
+        self.browser = FirefoxBrowser(headers=DEFAULT_HEADERS)#,headless=False)
 
 
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
         for n,record in enumerate(result['response']['docs']):
+            
+            to_download = []
+
+            browser = self.browser
+            browser.driver.implicitly_wait(10)
 
             session_at = pendulum.parse(record['data_julgamento'])
             base_path   = f'{session_at.year}/{session_at.month:02d}'
@@ -106,18 +142,37 @@ class TJRSChunk(base.Chunk):
             ano = record['ano_julgamento']
             numero = record['numero_processo']
 
-            import os
+            
             dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-            report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-            dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+            to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
+                content_type='application/json'),)
 
-            yield [
-            base.Content(content=json.dumps(record),dest=dest_record,
-                content_type='application/json'),
-            base.ContentFromURL(src=report_url,dest=dest_report,
-                content_type='application/doc')
-            ]
+            browser.get('https://www.tjrs.jus.br/buscas/jurisprudencia/?conteudo_busca=ementa_completa&q_palavra_chave=&aba=jurisprudencia&q=&conteudo_busca=ementa_completa')
+
+            browser.fill_in(field_id='filtroNumeroProcesso',value=numero)
+            browser.fill_in(field_id='data_julgamento_de',value=session_at.format(SOURCE_DATE_FORMAT))
+            browser.fill_in(field_id='data_julgamento_ate',value=session_at.format(SOURCE_DATE_FORMAT))
+            browser.driver.find_element_by_class_name('button-buscar-adicional').click()
+            
+            if browser.driver.find_element_by_css_selector("[title='exibir doc']"):
+                report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
+                dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+                to_download.append(base.ContentFromURL(src=report_url,dest=dest_report,
+                    content_type='application/doc'))
+
+            if record['documento_tiff']:
+                pass
+
+            if browser.driver.find_element_by_css_selector("[title='exibir html']"):
+                browser.driver.find_element_by_class_name('exibir_html').click()
+                html_content = browser.page_source()
+                browser.back()
+                html_dest = f"{base_path}/doc_{numero}_{codigo}.html"
+                to_download.append(base.Content(content=html_content,dest=html_dest,
+                    content_type='text/html'))
+            
+            yield to_download
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
