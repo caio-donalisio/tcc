@@ -22,8 +22,7 @@ SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
-                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67'),
-    'Cookie':'cookielawinfo-checkbox-analytics=no; cookielawinfo-checkbox-functional=no; cookielawinfo-checkbox-necessary=yes; cookielawinfo-checkbox-performance=no; cookielawinfo-checkbox-advertisement=no; cookielawinfo-checkbox-others=no; _ga=GA1.3.1484575181.1629204768; _gid=GA1.3.1734249402.1629204768; __utmz=245208256.1629215859.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=245208256.1484575181.1629204768.1629215859.1629223977.2; PHPSESSID=pkaju47lkv1hj9dirlgqom44eq; PHPINTER-PROD=.phpinter-prod-02; WORDPRESS=.wordpress-dmz-3'
+                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
                         }
 
 
