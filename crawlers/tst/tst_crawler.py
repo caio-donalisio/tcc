@@ -30,12 +30,12 @@ class TSTClient:
     def __init__(self):
         self.url ='https://jurisprudencia-backend.tst.jus.br/rest/pesquisa-textual'
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=9)
     def count(self,filters):
         result = self.fetch(filters,page=1)
         return result['totalRegistros']
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=9)
     def fetch(self, filters, page=1):
         try:
 
@@ -137,7 +137,7 @@ class TSTHandler(base.ContentHandler):
         else:
             super().handle(event)
 
-    @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)
+    @utils.retryable(max_retries=9, sleeptime=5., ignore_if_exceeds=True)
     def download(self, event):
         if self.output.exists(event.dest):
             return
