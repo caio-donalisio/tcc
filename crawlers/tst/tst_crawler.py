@@ -19,6 +19,7 @@ DEFAULT_HEADERS = {
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
 }
+DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 
 
 logger = logger_factory('tst')
@@ -95,16 +96,14 @@ class TSTCollector(base.ICollector):
         pages = math.ceil(total/self.filters.get('rows'))
 
         for page in range(1, pages + 1):
+            
             yield TSTChunk(
-                keys={
-                    **self.filters  , **{'page': page}
-                },
+                keys={**self.filters  , **{'page': page}},
                 prefix='',
                 filters=self.filters,
                 page=page,
                 client=self.client
-
-            )
+                )
 
 class TSTHandler(base.ContentHandler):
 
@@ -233,18 +232,39 @@ def tst_task(**kwargs):
             'end_date':kwargs.get('end_date')
             }
 
-        collector = TSTCollector(client=TSTClient(), filters=query_params)
-        #handler = base.ContentHandler(output=output)
-        handler   = TSTHandler(output=output)
-        snapshot = base.Snapshot(keys=query_params)
+        total = TSTCollector(client=TSTClient(), filters=query_params).count()
 
-        base.get_default_runner(
-            collector=collector,
-            output=output,
-            handler=handler,
-            logger=logger,
-            max_workers=8) \
-            .run(snapshot=snapshot)
+        if total >= 10_000:
+            query_params = [
+                {
+                'rows':20,
+                'start_date':start.format(DEFAULT_DATE_FORMAT),
+                'end_date':end.format(DEFAULT_DATE_FORMAT)
+                } for start,end in utils.timely(
+                    start_date=pendulum.parse(query_params.get('start_date')),
+                    end_date=pendulum.parse(query_params.get('end_date')),
+                    unit='days',
+                    step=2
+                    ) if start and end
+                ]
+                
+        else:
+            query_params = [query_params]
+
+
+        for params in query_params:
+            collector = TSTCollector(client=TSTClient(), filters=params)
+            #handler = base.ContentHandler(output=output)
+            handler   = TSTHandler(output=output)
+            snapshot = base.Snapshot(keys=params)
+
+            base.get_default_runner(
+                collector=collector,
+                output=output,
+                handler=handler,
+                logger=logger,
+                max_workers=8) \
+                .run(snapshot=snapshot)
 
 @cli.command(name='tst')
 @click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
