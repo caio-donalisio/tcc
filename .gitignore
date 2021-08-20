@@ -142,4 +142,4 @@ cython_debug/
 logs/*
 data/*
 .service-account.json
-geckodriver.exe
+crawlers/tst/exemplo_sem_dtaPublicacao.txt
