@@ -108,7 +108,7 @@ class TSTCollector(base.ICollector):
                     start_date=pendulum.parse(self.filters.get('start_date')),
                     end_date=pendulum.parse(self.filters.get('end_date')),
                     unit='days',
-                    step=1
+                    step=2
                     ) if start and end
             )
         else:
