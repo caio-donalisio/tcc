@@ -171,7 +171,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
             return number
             
         elif response.status_code == 401:
-            self.solve_captcha(start_date,end_date, self.headers, self.session_id)
+            self.solve_captcha(date, self.headers, self.session_id)
             return self.count()
         else:
             raise Exception(
@@ -202,7 +202,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
             #self.setup()
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def solve_captcha(self, start_date,end_date, headers, session_id):
+    def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, start_date=format_date(date),end_date=format_date(date))
         self.logger.info(f'GET {url}')
@@ -306,7 +306,7 @@ class TJMGChunk(base.Chunk):
             ]
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def solve_captcha(self, start_date,end_date, headers, session_id):
+    def solve_captcha(self, date, headers, session_id):
         browser = self.browser
         url = self._get_search_url(session_id, start_date=format_date(date),end_date=format_date(date))
         self.logger.info(f'GET {url}')
@@ -399,7 +399,7 @@ def tjmg_task(**kwargs):
                 output=output,
                 logger=logger,
                 handler = handler,
-                browser=browsers.FirefoxBrowser(),
+                browser=browsers.FirefoxBrowser(headless=False),
                 )
 
     snapshot = base.Snapshot(keys=params)
