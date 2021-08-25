@@ -19,6 +19,7 @@ DEFAULT_HEADERS = {
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
 }
+DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 
 
 logger = logger_factory('tst')
@@ -29,12 +30,12 @@ class TSTClient:
     def __init__(self):
         self.url ='https://jurisprudencia-backend.tst.jus.br/rest/pesquisa-textual'
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=9)
     def count(self,filters):
         result = self.fetch(filters,page=1)
         return result['totalRegistros']
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=9)
     def fetch(self, filters, page=1):
         try:
 
@@ -87,24 +88,45 @@ class TSTCollector(base.ICollector):
         self.client = client
         self.filters = filters
 
-    def count(self):
-        return self.client.count(self.filters)
+    def count(self,filter_=None):
+        if filter_: 
+            return self.client.count(filter_)
+        else:
+            return self.client.count(self.filters)
 
     def chunks(self):
         total = self.count()
         pages = math.ceil(total/self.filters.get('rows'))
 
-        for page in range(1, pages + 1):
-            yield TSTChunk(
-                keys={
-                    **self.filters  , **{'page': page}
-                },
-                prefix='',
-                filters=self.filters,
-                page=page,
-                client=self.client
-
+        if total >= 10_000:
+            self.filters = (
+                {
+                'rows':20,
+                'start_date':start.format(DEFAULT_DATE_FORMAT),
+                'end_date':end.format(DEFAULT_DATE_FORMAT)
+                } for start,end in utils.timely(
+                    start_date=pendulum.parse(self.filters.get('start_date')),
+                    end_date=pendulum.parse(self.filters.get('end_date')),
+                    unit='days',
+                    step=2
+                    ) if start and end
             )
+        else:
+            self.filters = [self.filters]
+        
+        for filter_ in self.filters:
+            total = self.count(filter_)
+            pages = math.ceil(total/filter_.get('rows'))
+
+            for page in range(1, pages + 1):
+                yield TSTChunk(
+                    keys={**filter_ , **{'page': page}},
+                    prefix='',
+                    filters=filter_,
+                    page=page,
+                    client=self.client
+                )
+
 
 class TSTHandler(base.ContentHandler):
 
@@ -115,7 +137,7 @@ class TSTHandler(base.ContentHandler):
         else:
             super().handle(event)
 
-    @utils.retryable(max_retries=3, sleeptime=5., ignore_if_exceeds=True)
+    @utils.retryable(max_retries=9, sleeptime=5., ignore_if_exceeds=True)
     def download(self, event):
         if self.output.exists(event.dest):
             return

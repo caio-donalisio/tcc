@@ -143,3 +143,4 @@ logs/*
 data/*
 .service-account.json
 crawlers/tst/exemplo_sem_dtaPublicacao.txt
+geckodriver.exe
