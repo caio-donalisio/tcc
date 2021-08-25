@@ -145,3 +145,5 @@ data/*
 chromedriver.exe
 geckodriver.exe
 *.wav
+operadriver.exe
+crawlers/tjmg/chromedriver.exe
