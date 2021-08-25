@@ -21,6 +21,8 @@ from crawlers.carf.carf_crawler import (
   carf_command)
 from crawlers.titsp.titsp_crawler import (
   titsp_command)
+from crawlers.tjrs.tjrs_crawler import (
+  tjrs_command)
 from crawlers.tjsp2.tjsp_pdf import tjsp_pdf_command
 from crawlers.tst.tst_crawler import (
   tst_command)

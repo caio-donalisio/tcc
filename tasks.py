@@ -18,6 +18,7 @@ from crawlers.stj.stj_crawler import stj_task
 from crawlers.carf.carf_crawler import carf_task
 from crawlers.tst.tst_crawler import tst_task
 from crawlers.titsp.titsp_crawler import titsp_task
+from crawlers.tjrs.tjrs_crawler import tjrs_task
 
 
 @celery.task(queue='downloader', trail=True, rate_limit='120/m')
