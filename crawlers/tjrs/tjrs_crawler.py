@@ -26,6 +26,42 @@ DEFAULT_HEADERS = {
                         }
 
 
+def merged_with_default_filters(start_date, end_date):
+    return {
+        'action': 'consultas_solr_ajax',
+        'metodo': 'buscar_resultados',
+        'parametros':{
+            'aba':'jurisprudencia',
+            'realizando_pesquisa':1,
+            'pagina_atual':1,
+            'q_palavra_chave':'',
+            'conteudo_busca':'ementa_completa',
+            'filtroComAExpressao':'',
+            'filtroComQualquerPalavra':'',
+            'filtroSemAsPalavras':'',
+            'filtroTribunal':-1,
+            'filtroRelator':-1,
+            'filtroOrgaoJulgador':-1,
+            'filtroTipoProcesso':-1,
+            'filtroClasseCnj':-1,
+            'assuntoCnj':-1,
+            'filtroReferenciaLegislativa':'',
+            'filtroJurisprudencia':'',
+            'filtroComarcaOrigem':'',
+            'filtroAssunto':'',
+            'data_julgamento_de':f'{start_date}',
+            'data_julgamento_ate':f'{end_date}',
+            'filtroNumeroProcesso':'',
+            'data_publicacao_de':'',
+            'data_publicacao_ate':'',
+            'filtroacordao':'acordao',
+            'wt':'json',
+            'ordem':'asc,cod_documento%20asc,numero_processo%20asc',
+            'start':0
+        }
+    }
+
+
 class TJRSClient:
 
     def __init__(self):
@@ -33,7 +69,7 @@ class TJRSClient:
 
 
     @utils.retryable(max_retries=3)
-    def count(self,filters):
+    def count(self, filters):
         result = self.fetch(filters,page=1)
         return result['response']['numFound']
 
@@ -73,11 +109,11 @@ class TJRSClient:
 class TJRSCollector(base.ICollector):
 
     def __init__(self, client, filters):
-        self.client = client
+        self.client  = client
         self.filters = filters
 
     def count(self):
-        return self.client.count(self.filters)
+        return self.client.count(merged_with_default_filters(**self.filters))
 
     def chunks(self):
         total = self.count()
@@ -92,7 +128,6 @@ class TJRSCollector(base.ICollector):
                 filters=self.filters,
                 page=page,
                 client=self.client
-
             )
 
 
@@ -100,15 +135,15 @@ class TJRSChunk(base.Chunk):
 
     def __init__(self, keys, prefix, filters, page,client):
         super(TJRSChunk, self).__init__(keys, prefix)
-        self.filters  = filters
+        self.filters = filters
         self.page = page
         self.client = client
 
 
     def rows(self):
-        result = self.client.fetch(self.filters,self.page)
+        result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
         for n,record in enumerate(result['response']['docs']):
-            
+
             session_at = pendulum.parse(record['data_julgamento'])
             base_path   = f'{session_at.year}/{session_at.month:02d}'
 
@@ -122,10 +157,10 @@ class TJRSChunk(base.Chunk):
             dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
 
             yield [
-            base.Content(content=json.dumps(record),dest=dest_record,
-                content_type='application/json'),
-            base.ContentFromURL(src=report_url,dest=dest_report,
-                content_type='application/doc')
+                base.Content(content=json.dumps(record),dest=dest_record,
+                    content_type='application/json'),
+                base.ContentFromURL(src=report_url,dest=dest_report,
+                    content_type='application/doc')
             ]
 
 
@@ -145,37 +180,9 @@ def tjrs_task(**kwargs):
         end_date = pendulum.parse(kwargs.get('end_date')).format(SOURCE_DATE_FORMAT)
 
         filters = {
-        'action': 'consultas_solr_ajax',
-        'metodo': 'buscar_resultados',
-        'parametros':{'aba':'jurisprudencia',
-            'realizando_pesquisa':1,
-            'pagina_atual':1,
-            'q_palavra_chave':'',
-            'conteudo_busca':'ementa_completa',
-            'filtroComAExpressao':'',
-            'filtroComQualquerPalavra':'',
-            'filtroSemAsPalavras':'',
-            'filtroTribunal':-1,
-            'filtroRelator':-1,
-            'filtroOrgaoJulgador':-1,
-            'filtroTipoProcesso':-1,
-            'filtroClasseCnj':-1,
-            'assuntoCnj':-1,
-            'filtroReferenciaLegislativa':'',
-            'filtroJurisprudencia':'',
-            'filtroComarcaOrigem':'',
-            'filtroAssunto':'',
-            'data_julgamento_de':f'{start_date}',
-            'data_julgamento_ate':f'{end_date}',
-            'filtroNumeroProcesso':'',
-            'data_publicacao_de':'',
-            'data_publicacao_ate':'',
-            'filtroacordao':'acordao',
-            'wt':'json',
-            'ordem':'asc,cod_documento%20asc,numero_processo%20asc',
-            'start':0
-            }
-            }
+            'start_date' :start_date,
+            'end_date': end_date,
+        }
 
         collector = TJRSCollector(client=TJRSClient(), filters=filters)
         handler   = base.ContentHandler(output=output)
@@ -188,6 +195,7 @@ def tjrs_task(**kwargs):
             logger=logger,
             max_workers=8) \
             .run(snapshot=snapshot)
+
 
 @cli.command(name='tjrs')
 @click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
