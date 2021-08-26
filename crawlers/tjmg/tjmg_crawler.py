@@ -81,8 +81,8 @@ def format_date(date):
 
 def _get_search_url(session_id, start_date,end_date, query=None):
     query = query or default_filters()# self.query.copy()
-    query['dataJulgamentoInicial'] = start_date.format(TJMG_DATE_FORMAT)
-    query['dataJulgamentoFinal'] = end_date.format(TJMG_DATE_FORMAT)
+    query['dataJulgamentoInicial'] = format_date(start_date)
+    query['dataJulgamentoFinal'] = format_date(end_date)#.format(TJMG_DATE_FORMAT)
     endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
     return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
@@ -91,7 +91,7 @@ def _get_search_url(session_id, start_date,end_date, query=None):
 
 class TJMG(base.BaseCrawler,base.ICollector):
 
-    def __init__(self, params,query,output,logger,handler,browser,**kwargs):
+    def __init__(self, params,query,output,logger,handler,browser):
         super(TJMG, self).__init__(params, output, logger)
         self.query = query
         self.handler = handler
@@ -119,63 +119,40 @@ class TJMG(base.BaseCrawler,base.ICollector):
     @utils.retryable(max_retries=99)
     def count(self,init_date=None):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
-        date = init_date or self.params.get('start_date')
+        start_date = init_date or self.params.get('start_date')
+        end_date = init_date or self.params.get('start_date')
         query = default_filters()
         url = _get_search_url(
-            self.session_id, query=query, start_date=pendulum.parse(date),end_date=pendulum.parse(date))
+            self.session_id, query=query, start_date=start_date,end_date=end_date)
         self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=self.headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text,features='html.parser')
-            results = soup.find('p',class_='info').contents[0]
-            number = int(''.join(char for char in results if char.isdigit()))
-            return number
+            if soup.find('p',class_='aviso'):
+                return 0
+            #print(soup.find('p',class_='aviso').contents[0])
+            else:
+                results = soup.find('p',class_='info').contents[0]
+                number = int(''.join(char for char in results if char.isdigit()))
+                return number
             
         elif response.status_code == 401:
-            CaptchaSolver(date,
+            CaptchaSolver(date=start_date,
                 logger=self.logger,
                 browser=self.browser,
                 requester=self.requester,
                 headers=self.headers,
                 session_id=self.session_id).solve_captcha()
-            return self.count()
+            
+            if init_date:
+                return self.count(init_date)
+            else:
+                return self.count()
         else:
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
 
-    # def chunks(self):
-    #     total = self.count()
-    #     pages = math.ceil(total/self.filters.get('rows'))
-
-    #     if total >= 10_000:
-    #         self.filters = (
-    #             {
-    #             'rows':20,
-    #             'start_date':start.format(DEFAULT_DATE_FORMAT),
-    #             'end_date':end.format(DEFAULT_DATE_FORMAT)
-    #             } for start,end in utils.timely(
-    #                 start_date=pendulum.parse(self.filters.get('start_date')),
-    #                 end_date=pendulum.parse(self.filters.get('end_date')),
-    #                 unit='days',
-    #                 step=2
-    #                 ) if start and end
-    #         )
-    #     else:
-    #         self.filters = [self.filters]
-        
-    #     for filter_ in self.filters:
-    #         total = self.count(filter_)
-    #         pages = math.ceil(total/filter_.get('rows'))
-
-    #         for page in range(1, pages + 1):
-    #             yield TSTChunk(
-    #                 keys={**filter_ , **{'page': page}},
-    #                 prefix='',
-    #                 filters=filter_,
-    #                 page=page,
-    #                 client=self.client
-    #             )
-
+    
 
     def chunks(self):
         
@@ -183,9 +160,9 @@ class TJMG(base.BaseCrawler,base.ICollector):
         self.total_records = self.count()
         self.total_pages = math.ceil(self.total_records/10)
 
-        dates = [format_date(start) for start,end in utils.timely(
-                   start_date=pendulum.parse(self.params.get('start_date')),
-                    end_date=pendulum.parse(self.params.get('end_date')),
+        dates = [start for start,end in utils.timely(
+                   start_date=self.params.get('start_date'),
+                    end_date=self.params.get('end_date'),
                     unit='days',
                     step=1
                     )]
@@ -198,7 +175,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
             for page in range(1, self.total_pages + 1):
                 keys = {
-                    'date':date,
+                    'date':date.format(STANDARD_DATE_FORMAT),
                     'page':page
                 }
 
@@ -225,12 +202,13 @@ class CaptchaSolver(TJMG):
         self.session_id=session_id
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def solve_captcha(self):#, start_date,end_date, headers, session_id):
+    def solve_captcha(self):
         browser = self.browser
         url = _get_search_url(self.session_id, start_date=self.date,end_date=self.date)
         self.logger.info(f'GET {url}')
         browser.get(url)
-        while not browser.is_text_present('Resultado da busca'):
+        while not browser.is_text_present('Resultado da busca') \
+            and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
             response = self.requester.get(
                 f'{BASE_URL}/captchaAudio.svl', headers=self.headers)
@@ -239,7 +217,6 @@ class CaptchaSolver(TJMG):
             for char in text:
                 captcha_box.send_keys(char)
                 time.sleep(random.random())
-            #browser.fill_in('#captcha_text', value=text)
             time.sleep(random.random())
             if browser.is_text_present('não corresponde', tag='div'):
                 browser.click(self._find(id='gerar'))
@@ -271,10 +248,10 @@ class TJMGChunk(base.Chunk):
         self.browser = browser
         self.session_id = session_id
         self.date = pendulum.parse(keys.get('date'))
-        # self.date = pendulum.from_format(keys.get('date'),STANDARD_DATE_FORMAT)
         self.requester = requester
         self.output = output
-        
+
+    @utils.retryable(max_retries=33, sleeptime=20)    
     def rows(self):
         acts,_ = self.fetch_page(self.date,self.date,self.page,self.headers,self.session_id)
         for act in acts:
@@ -287,7 +264,6 @@ class TJMGChunk(base.Chunk):
             self.logger.info(f'GET {url}')
             browser = self.browser
             browser.get(url)
-            time.sleep(random.random())
             captcha = False
             while browser.is_text_present('Digite os números abaixo'):
                 CaptchaSolver(
@@ -297,11 +273,9 @@ class TJMGChunk(base.Chunk):
                     requester=self.requester,
                     headers=self.headers,
                     session_id=self.session_id).solve_captcha()
-                # self.solve_captcha(self.date,self.headers,self.session_id)
                 captcha = True
             if captcha:
                     browser.get(url)
-            time.sleep(random.random())
 
             browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
             browser.click(self._find(id='imgBotao1'))
@@ -316,8 +290,8 @@ class TJMGChunk(base.Chunk):
             pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
             pdf_url = f'{BASE_URL}/{pdf_url}'
 
-            pdf_dest = f'{session_date.year}/{session_date.month:02d}/{act}.pdf'
-            html_dest = f'{session_date.year}/{session_date.month:02d}/{act}.html'
+            pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{act}.pdf'
+            html_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{act}.html'
             
             yield[
                 base.Content(content=browser.page_source(),
@@ -332,7 +306,7 @@ class TJMGChunk(base.Chunk):
         query = default_filters()
         query['paginaNumero'] = page
         url = _get_search_url(
-            session_id, query=query, start_date=format_date(start_date),end_date=format_date(end_date))
+            session_id, query=query, start_date=start_date,end_date=end_date)
         self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=headers)
         next_page = None
@@ -380,7 +354,8 @@ def tjmg_task(**kwargs):
     setup_cloud_logger(logger)
 
     params = {
-      'start_date': kwargs.get('start_date'), 'end_date': kwargs.get('end_date')
+      'start_date': pendulum.parse(kwargs.get('start_date')), 
+      'end_date': pendulum.parse(kwargs.get('end_date'))
     }
 
     query = default_filters()
