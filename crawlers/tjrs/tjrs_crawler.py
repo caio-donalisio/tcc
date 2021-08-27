@@ -57,7 +57,7 @@ def merged_with_default_filters(start_date, end_date):
             'data_publicacao_ate':'',
             'filtroacordao':'acordao',
             'wt':'json',
-            'ordem':'asc,cod_documento%20asc,numero_processo%20asc',
+            'ordem':'asc,cod_documento%20asc,numero_processo%20asc,cod_ementa%20asc',
             'start':0
         }
     }
