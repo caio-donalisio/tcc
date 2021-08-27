@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import utils
 import requests
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
 
 
 import time
@@ -58,6 +59,7 @@ def default_filters():
             'dataJulgamentoInicial': '',
             'dataJulgamentoFinal': '',
             #'excluirRepetitivos':'true',
+            #'&':'&'.join([f'listaClasse:{n}' for n in range(1,1000)]  )          #'&listaClasse':600,
             'siglaLegislativa': '',
             'referenciaLegislativa': 'Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...',
             'numeroRefLegislativa': '',
@@ -130,24 +132,24 @@ class TJMG(base.BaseCrawler,base.ICollector):
             soup = BeautifulSoup(response.text,features='html.parser')
             if soup.find('p',class_='aviso'):
                 return 0
-            #print(soup.find('p',class_='aviso').contents[0])
             else:
                 results = soup.find('p',class_='info').contents[0]
                 number = int(''.join(char for char in results if char.isdigit()))
                 return number
             
         elif response.status_code == 401:
-            CaptchaSolver(date=start_date,
+            if CaptchaSolver(date=start_date,
                 logger=self.logger,
                 browser=self.browser,
                 requester=self.requester,
                 headers=self.headers,
-                session_id=self.session_id).solve_captcha()
-            
-            if init_date:
-                return self.count(init_date)
+                session_id=self.session_id).solve_captcha():
+                if init_date:
+                    return self.count(init_date)
+                else:
+                    return self.count()
             else:
-                return self.count()
+                pass
         else:
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
@@ -212,18 +214,25 @@ class CaptchaSolver(TJMG):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
             response = self.requester.get(
                 f'{BASE_URL}/captchaAudio.svl', headers=self.headers)
-            text = utils.recognize_audio_by_content(response.content)
+            text = self._recognize_audio_by_content(response.content)
             captcha_box = browser.driver.find_element_by_id('captcha_text')
             for char in text:
                 captcha_box.send_keys(char)
                 time.sleep(random.random())
-            time.sleep(random.random())
+            time.sleep(1+random.random())
             if browser.is_text_present('não corresponde', tag='div'):
                 browser.click(self._find(id='gerar'))
             else:
-                self.browser.wait_for_element(
-                    locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
+                try:
+                    browser.wait_for_element(
+                            locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
+                except TimeoutException:
+                #except Exception as e:
+                    
+                    return browser.is_text_present('Acórdãos de Repetitivos:', tag='td')
+                    
 
+    @utils.retryable(max_retries=10, sleeptime=10)
     def _recognize_audio_by_content(self, content):
         filename = f'captcha_{"".join(choices(ascii_letters,k=10))}.wav'
         recognizer = sr.Recognizer()

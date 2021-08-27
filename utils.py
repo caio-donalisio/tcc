@@ -384,17 +384,5 @@ def find_between(string, start, end):
     pattern = f"{start}(.*?){end}"
     return re.search(pattern, string).group(1)
 
-def recognize_audio_by_content(content):
-        filename = f'captcha_{"".join(choices(ascii_letters,k=10))}.wav'
-        recognizer = sr.Recognizer()
-
-        with open(filename, 'wb') as f:
-            f.write(content)
-
-        with sr.AudioFile(filename) as source:
-            audio = recognizer.record(source)
-            #os.remove(filename)
-
-        return recognizer.recognize_google(audio, language='pt-BR')
 
         
