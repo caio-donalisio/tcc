@@ -9,6 +9,7 @@ import click
 from app import cli, celery
 import requests
 import urllib
+import base64
 
 logger = logger_factory('tjrs')
 
@@ -147,22 +148,37 @@ class TJRSChunk(base.Chunk):
             session_at = pendulum.parse(record['data_julgamento'])
             base_path   = f'{session_at.year}/{session_at.month:02d}'
 
-            codigo = record['cod_documento']
-            ano = record['ano_criacao']
-            numero = record['numero_processo']
+            if 'cod_documento' in record:
+                codigo = record['cod_documento']
+                ano = record['ano_criacao']
+                numero = record['numero_processo']
 
-            dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-            report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-            dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+                report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
+                dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+            
+                yield [
+                    base.Content(content=json.dumps(record),dest=dest_record,
+                        content_type='application/json'),
+                        base.ContentFromURL(src=report_url,dest=dest_report,
+                        content_type='application/doc')
+                ]
 
-            yield [
-                base.Content(content=json.dumps(record),dest=dest_record,
-                    content_type='application/json'),
-                base.ContentFromURL(src=report_url,dest=dest_report,
-                    content_type='application/doc')
-            ]
+            else:
+                numero = record['numero_processo']
+                codigo = record['cod_ementa']
+                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
+                record['documento_text_aspas'] = str(base64.b64decode(record['documento_text_aspas']))
+                record['documento_text'] = str(base64.b64decode(record['documento_text']))
+
+                yield [
+                    base.Content(content=json.dumps(record),dest=dest_record,
+                        content_type='application/json')
+                ]
+
+                
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
