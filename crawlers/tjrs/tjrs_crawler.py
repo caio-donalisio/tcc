@@ -13,19 +13,12 @@ import base64
 
 logger = logger_factory('tjrs')
 
-def force_int(text):
-    try:
-        return int(text)
-    except ValueError:
-        return text
-
 SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
                         }
-
 
 def merged_with_default_filters(start_date, end_date):
     return {
@@ -68,7 +61,6 @@ class TJRSClient:
     def __init__(self):
         self.url = 'https://www.tjrs.jus.br/buscas/jurisprudencia/ajax.php?'
 
-
     @utils.retryable(max_retries=3)
     def count(self, filters):
         result = self.fetch(filters,page=1)
@@ -83,7 +75,6 @@ class TJRSClient:
         if cookie is None:
             raise Exception(f'Cookie not found: {cookie_name}')
         return value
-
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
@@ -134,7 +125,6 @@ class TJRSChunk(base.Chunk):
         self.page = page
         self.client = client
 
-
     def rows(self):
         result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
         for n,record in enumerate(result['response']['docs']):
@@ -165,7 +155,6 @@ class TJRSChunk(base.Chunk):
 
                 dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-
                 record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
                 record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
 
@@ -173,8 +162,6 @@ class TJRSChunk(base.Chunk):
                     base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json')
                 ]
-
-                
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
