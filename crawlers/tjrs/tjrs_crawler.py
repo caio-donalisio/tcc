@@ -88,13 +88,7 @@ class TJRSClient:
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
         try:
-            if isinstance(filters['parametros'],str):
-                filters_aux = urllib.parse.parse_qs(filters['parametros'])
-                filters_aux = {k:v[0] for k,v in filters_aux.items()}
-                filters_aux = {k:force_int(v) for k,v in filters_aux.items()}
-                filters_aux['pagina_atual']  = page
-                filters['parametros'] = filters_aux
-
+            filters['parametros']['pagina_atual'] = page
             filters['parametros'] = urllib.parse.urlencode(filters['parametros'],quote_via=urllib.parse.quote)
 
             return requests.post(self.url,
@@ -168,10 +162,12 @@ class TJRSChunk(base.Chunk):
             else:
                 numero = record['numero_processo']
                 codigo = record['cod_ementa']
+
                 dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-                record['documento_text_aspas'] = str(base64.b64decode(record['documento_text_aspas']))
-                record['documento_text'] = str(base64.b64decode(record['documento_text']))
+
+                record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
+                record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
 
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
