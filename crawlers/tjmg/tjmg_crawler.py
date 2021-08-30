@@ -31,18 +31,25 @@ logger = logger_factory('tjmg')
 BASE_URL = 'https://www5.tjmg.jus.br/jurisprudencia'
 TJMG_DATE_FORMAT = "DD/MM/YYYY"
 STANDARD_DATE_FORMAT = "YYYY-MM-DD"
-QUERY = 'NAO e'#a$ ou b$'
+QUERY = 'NAO e'
 DEFAULT_USER_AGENT = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
 }
-
-
-# FUNCTIONS
-#
+EXTRA_PARAMS = [
+    {'listaClasse':600},
+    {'listaClasse':602},
+    {'excluirRepetitivos':'true'}
+    ]
 def get_param_from_url(url, param):
     query = urlsplit(url).query
     value = dict(parse_qsl(query))[param]
     return value
+
+
+def get_repetitivos(browser):
+    soup = BeautifulSoup(browser.page_source())
+    links = [element['href'] for element in soup.tbody.tbody.find_all('a')]
+    return links
 
 
 def default_filters():
@@ -58,8 +65,6 @@ def default_filters():
             'codigoAssunto': '',
             'dataJulgamentoInicial': '',
             'dataJulgamentoFinal': '',
-            #'excluirRepetitivos':'true',
-            #'&':'&'.join([f'listaClasse:{n}' for n in range(1,1000)]  )          #'&listaClasse':600,
             'siglaLegislativa': '',
             'referenciaLegislativa': 'Clique+na+lupa+para+pesquisar+as+refer%EAncias+cadastradas...',
             'numeroRefLegislativa': '',
@@ -82,13 +87,11 @@ def format_date(date):
         return pendulum.from_format(date,STANDARD_DATE_FORMAT).format(TJMG_DATE_FORMAT)
 
 def _get_search_url(session_id, start_date,end_date, query=None):
-    query = query or default_filters()# self.query.copy()
+    query = query or default_filters()
     query['dataJulgamentoInicial'] = format_date(start_date)
-    query['dataJulgamentoFinal'] = format_date(end_date)#.format(TJMG_DATE_FORMAT)
+    query['dataJulgamentoFinal'] = format_date(end_date)
     endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
     return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
-
-
 
 
 class TJMG(base.BaseCrawler,base.ICollector):
@@ -119,11 +122,11 @@ class TJMG(base.BaseCrawler,base.ICollector):
             raise e
         
     @utils.retryable(max_retries=99)
-    def count(self,init_date=None):
+    def count(self,init_date=None,query=None):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
         start_date = init_date or self.params.get('start_date')
         end_date = init_date or self.params.get('start_date')
-        query = default_filters()
+        query = query or default_filters()
         url = _get_search_url(
             self.session_id, query=query, start_date=start_date,end_date=end_date)
         self.logger.info(f'GET {url}')
@@ -138,18 +141,17 @@ class TJMG(base.BaseCrawler,base.ICollector):
                 return number
             
         elif response.status_code == 401:
-            if CaptchaSolver(date=start_date,
+            CaptchaSolver(date=start_date,
                 logger=self.logger,
                 browser=self.browser,
                 requester=self.requester,
                 headers=self.headers,
-                session_id=self.session_id).solve_captcha():
-                if init_date:
-                    return self.count(init_date)
-                else:
-                    return self.count()
+                session_id=self.session_id,
+                query=query).solve_captcha()
+            if init_date:
+                return self.count(init_date)
             else:
-                pass
+                return self.count()
         else:
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
@@ -157,8 +159,6 @@ class TJMG(base.BaseCrawler,base.ICollector):
     
 
     def chunks(self):
-        
-        
         self.total_records = self.count()
         self.total_pages = math.ceil(self.total_records/10)
 
@@ -169,44 +169,55 @@ class TJMG(base.BaseCrawler,base.ICollector):
                     step=1
                     )]
 
+        queries = [{**default_filters(),**extra} for extra in EXTRA_PARAMS]
 
         for date in dates:
 
-            self.total_records = self.count(date)
-            self.total_pages = math.ceil(self.total_records/10)
+            for query in queries:
 
-            for page in range(1, self.total_pages + 1):
-                keys = {
-                    'date':date.format(STANDARD_DATE_FORMAT),
-                    'page':page
-                }
+                self.total_records = self.count(date,query)
+                self.total_pages = math.ceil(self.total_records/10)
 
-                yield TJMGChunk(
-                    keys=keys,
-                    prefix = '',
-                    page=page,
-                    headers = self.headers,
-                    logger = self.logger,
-                    browser=self.browser,
-                    session_id = self.session_id,
-                    requester = self.requester,
-                    output=self.output
-                )
+                for page in range(1, self.total_pages + 1):
+
+                    keys = {
+                        'date':date.format(STANDARD_DATE_FORMAT),
+                        'page':page
+                    }
+                    if query.get('listaClasse'):
+                        keys.update({'listaClasse':query.get('listaClasse')})
+                    elif query.get('excluirRepetitivos'):
+                        keys.update({'excluirRepetitivos':query.get('excluirRepetitivos')})
+
+                    yield TJMGChunk(
+                        keys=keys,
+                        prefix = '',
+                        page=page,
+                        headers = self.headers,
+                        logger = self.logger,
+                        browser=self.browser,
+                        session_id = self.session_id,
+                        requester = self.requester,
+                        output=self.output,
+                        query=query
+                    )
 
 
 class CaptchaSolver(TJMG):
-    def __init__(self, date,logger,browser,requester,headers,session_id):
+    def __init__(self, date,logger,browser,requester,headers,session_id,query):
         self.logger = logger
         self.browser = browser
         self.date = date
         self.requester = requester
         self.headers=headers
         self.session_id=session_id
+        self.query=query
 
     @utils.retryable(max_retries=33, sleeptime=20)
     def solve_captcha(self):
         browser = self.browser
-        url = _get_search_url(self.session_id, start_date=self.date,end_date=self.date)
+        self.query['excluirRepetitivos'] = True
+        url = _get_search_url(self.session_id, start_date=self.date,end_date=self.date,query=self.query)
         self.logger.info(f'GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca') \
@@ -227,9 +238,9 @@ class CaptchaSolver(TJMG):
                     browser.wait_for_element(
                             locator=(By.CLASS_NAME, 'caixa_processo'), timeout=20)
                 except TimeoutException:
-                #except Exception as e:
-                    
-                    return browser.is_text_present('Acórdãos de Repetitivos:', tag='td')
+                    if browser.is_text_present('Acórdãos de Repetitivos:', tag='td'):
+                        pass
+                return
                     
 
     @utils.retryable(max_retries=10, sleeptime=10)
@@ -249,7 +260,7 @@ class CaptchaSolver(TJMG):
 
 class TJMGChunk(base.Chunk):
 
-    def __init__(self, keys, prefix,page, headers, logger,browser,session_id,requester,output):
+    def __init__(self, keys, prefix,page, headers, logger,browser,session_id,requester,output,query):
         super(TJMGChunk, self).__init__(keys, prefix)
         self.page = page
         self.headers = headers
@@ -259,12 +270,15 @@ class TJMGChunk(base.Chunk):
         self.date = pendulum.parse(keys.get('date'))
         self.requester = requester
         self.output = output
+        self.query = query
 
     @utils.retryable(max_retries=33, sleeptime=20)    
     def rows(self):
-        acts,_ = self.fetch_page(self.date,self.date,self.page,self.headers,self.session_id)
+        extra_query = {k:v for k,v in self.query.items() if k in ['ListaClasse','excluirRepetitivos']}
+        acts,_ = self.fetch_page(self.date,self.date,self.page,self.headers,self.session_id,extra_query)
         for act in acts:
-            query=default_filters()
+            to_download = []
+            query=self.query#default_filters()
             query['paginaNumero'] = act
             query['numeroRegistro'] = act
             query['linhasPorPagina'] = 1
@@ -281,39 +295,43 @@ class TJMGChunk(base.Chunk):
                     browser=self.browser,
                     requester=self.requester,
                     headers=self.headers,
-                    session_id=self.session_id).solve_captcha()
+                    session_id=self.session_id,
+                    query=self.query).solve_captcha()
                 captcha = True
             if captcha:
                     browser.get(url)
-
-            browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
-            browser.click(self._find(id='imgBotao1'))
-            
+            if browser.is_text_present('Inteiro Teor'):
+                browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
+                browser.click(self._find(id='imgBotao1'))
             
             soup = BeautifulSoup(browser.page_source(),features="html5lib")
             date_label = soup.find('div', text='Data de Julgamento')
+            proc_string = '_'.join([element.text for element in soup.find_all('a', {'title' : 'Abrir Andamento Processual'})])
+            proc_string = ''.join(char for char in proc_string if char.isdigit() or char=='_')
             session_date = date_label.find_next_sibling('div').text
             session_date = pendulum.from_format(session_date,TJMG_DATE_FORMAT)
-
-            onclick_attr = soup.find('input',{"name":"inteiroTeorPDF"})['onclick']
-            pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
-            pdf_url = f'{BASE_URL}/{pdf_url}'
-
-            pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{act}.pdf'
-            html_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{act}.html'
+            if browser.is_text_present('Inteiro Teor'):
+                onclick_attr = soup.find('input',{"name":"inteiroTeorPDF"})['onclick']
+                pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
+                pdf_url = f'{BASE_URL}/{pdf_url}'
+                pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.pdf'
+                to_download.append(base.ContentFromURL(src=pdf_url,dest=pdf_dest,
+                    content_type='application/pdf'))
             
-            yield[
-                base.Content(content=browser.page_source(),
-                    dest=html_dest,content_type='text/html'),
-                base.ContentFromURL(src=pdf_url,dest=pdf_dest,
-                    content_type='application/pdf')
-            ]
+            html_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.html'
+            to_download.append(base.Content(content=browser.page_source(),
+                    dest=html_dest,content_type='text/html'))
+
+            yield to_download
 
 
     @utils.retryable(max_retries=33, sleeptime=20)
-    def fetch_page(self, start_date,end_date, page, headers, session_id):
+    def fetch_page(self, start_date,end_date, page, headers, session_id,extra_query):
         query = default_filters()
         query['paginaNumero'] = page
+        query.pop('listaClasse',None)
+        query.pop('excluirRepetitivos',None)
+        query.update(extra_query)
         url = _get_search_url(
             session_id, query=query, start_date=start_date,end_date=end_date)
         self.logger.info(f'GET {url}')
@@ -337,8 +355,9 @@ class TJMGChunk(base.Chunk):
                 browser=self.browser,
                 requester=self.requester,
                 headers=self.headers,
-                session_id=self.session_id).solve_captcha()
-            return self.fetch_page(start_date,end_date, page, headers, session_id)
+                session_id=self.session_id,
+                query=query).solve_captcha()
+            return self.fetch_page(start_date,end_date, page, headers, session_id,extra_query=extra_query)
         else:
             raise Exception(
                 f'Unexpected status code {response.status_code} fetching {url}.')
