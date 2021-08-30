@@ -9,14 +9,9 @@ import click
 from app import cli, celery
 import requests
 import urllib
+import base64
 
 logger = logger_factory('tjrs')
-
-def force_int(text):
-    try:
-        return int(text)
-    except ValueError:
-        return text
 
 SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
@@ -24,7 +19,6 @@ DEFAULT_HEADERS = {
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
                         }
-
 
 def merged_with_default_filters(start_date, end_date):
     return {
@@ -56,7 +50,7 @@ def merged_with_default_filters(start_date, end_date):
             'data_publicacao_ate':'',
             'filtroacordao':'acordao',
             'wt':'json',
-            'ordem':'asc,cod_documento%20asc,numero_processo%20asc',
+            'ordem':'asc,cod_documento%20asc,numero_processo%20asc,cod_ementa%20asc',
             'start':0
         }
     }
@@ -66,7 +60,6 @@ class TJRSClient:
 
     def __init__(self):
         self.url = 'https://www.tjrs.jus.br/buscas/jurisprudencia/ajax.php?'
-
 
     @utils.retryable(max_retries=3)
     def count(self, filters):
@@ -83,17 +76,10 @@ class TJRSClient:
             raise Exception(f'Cookie not found: {cookie_name}')
         return value
 
-
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
         try:
-            if isinstance(filters['parametros'],str):
-                filters_aux = urllib.parse.parse_qs(filters['parametros'])
-                filters_aux = {k:v[0] for k,v in filters_aux.items()}
-                filters_aux = {k:force_int(v) for k,v in filters_aux.items()}
-                filters_aux['pagina_atual']  = page
-                filters['parametros'] = filters_aux
-
+            filters['parametros']['pagina_atual'] = page
             filters['parametros'] = urllib.parse.urlencode(filters['parametros'],quote_via=urllib.parse.quote)
 
             return requests.post(self.url,
@@ -139,7 +125,6 @@ class TJRSChunk(base.Chunk):
         self.page = page
         self.client = client
 
-
     def rows(self):
         result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
         for n,record in enumerate(result['response']['docs']):
@@ -147,22 +132,36 @@ class TJRSChunk(base.Chunk):
             session_at = pendulum.parse(record['data_julgamento'])
             base_path   = f'{session_at.year}/{session_at.month:02d}'
 
-            codigo = record['cod_documento']
-            ano = record['ano_criacao']
-            numero = record['numero_processo']
+            if 'cod_documento' in record:
+                codigo = record['cod_documento']
+                ano = record['ano_criacao']
+                numero = record['numero_processo']
 
-            dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-            report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-            dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+                report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
+                dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+            
+                yield [
+                    base.Content(content=json.dumps(record),dest=dest_record,
+                        content_type='application/json'),
+                        base.ContentFromURL(src=report_url,dest=dest_report,
+                        content_type='application/doc')
+                ]
 
-            yield [
-                base.Content(content=json.dumps(record),dest=dest_record,
-                    content_type='application/json'),
-                base.ContentFromURL(src=report_url,dest=dest_report,
-                    content_type='application/doc')
-            ]
+            else:
+                numero = record['numero_processo']
+                codigo = record['cod_ementa']
 
+                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+
+                record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
+                record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
+
+                yield [
+                    base.Content(content=json.dumps(record),dest=dest_record,
+                        content_type='application/json')
+                ]
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
