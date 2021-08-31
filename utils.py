@@ -19,10 +19,6 @@ from google.cloud import storage
 from functools import wraps
 import wrapt
 from urllib.parse import parse_qsl, urlencode, urlsplit
-from random import choices
-from string import ascii_letters
-import speech_recognition as sr
-
 from selenium.common.exceptions import TimeoutException
 
 from storage import (get_bucket_ref, )
