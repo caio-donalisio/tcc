@@ -1,214 +1,292 @@
-#!/usr/bin/env python3
-# -*- coding: latin-1 -*-
-
-import sys
-import requests
-from bs4 import BeautifulSoup
-import mimetypes
-import re
-import sqlite3
+import base
+import math
 import json
-import timeit
 import pendulum
-import traceback
-from collections import OrderedDict
-from google.cloud import storage
-import os
+import celery
+import utils
+from logconfig import logger_factory, setup_cloud_logger
+import click
+from app import cli, celery
+import requests
+from random import random
+from time import sleep
+from mimetypes import guess_extension
 
-storage_client = storage.Client()
 
-bucket_name = os.environ.get('BUCKET_NAME') or "inspira-trf3"
 
-start_date_arr = (os.environ.get('START_DATE') or "2020/01").split("/")
-end_date_arr = (os.environ.get('END_DATE') or "2020/12").split("/")
+DEFAULT_HEADERS = {
+  'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                        ' AppleWebKit/537.36 (KHTML, like Gecko)'
+                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
+}
+DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 
-start_date_arr = list(map(lambda x: int(x), start_date_arr))
-end_date_arr = list(map(lambda x: int(x), end_date_arr))
 
-start_date = pendulum.datetime(start_date_arr[0], start_date_arr[1], 1)
-end_date = pendulum.datetime(end_date_arr[0], end_date_arr[1], 1)
+logger = logger_factory('trf3')
 
-bucket = storage_client.bucket(bucket_name)
 
-def uploadGCS(content, blob_name):
-  global bucket
-  blob = bucket.blob(blob_name)
-  blob.upload_from_string(content)
-  print("uploaded")
+class TRF3Client:
 
-sys.path.append('../libs/')
+    def __init__(self):
+        self.url ='https://jurisprudencia-backend.trf3.jus.br/rest/pesquisa-textual'
 
-from json_to_sqlite import json_to_sqlite_single
+    @utils.retryable(max_retries=9)
+    def count(self,filters):
+        result = self.fetch(filters,page=1)
+        return result['totalRegistros']
 
-s = requests.Session()
-s.headers = OrderedDict([('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0'), ('Accept', '*/*'), ('Accept-Encoding', 'gzip, deflate'), ('Referer', 'http://web.trf3.jus.br/base-textual')])
+    @utils.retryable(max_retries=9)
+    def fetch(self, filters, page=1):
+        try:
 
-# s.proxies = {'http': 'http://127.0.0.1:8080'}
-errors = 0
-good = 0
-current_range = []
-start = timeit.default_timer()
+            search_url = '/'.join([
+                self.url,
+                str(1 + ( (page - 1) * filters.get('rows') )),
+                str(filters.get('rows')),
+            ])
 
-def initialize_session():
-  r = s.get('http://web.trf3.jus.br/base-textual')
-  return r.status_code == 200
+            post_data = {
+            "ou": None,
+            "e": None,
+            "termoExato": "",
+            "naoContem": None,
+            "ementa": None,
+            "dispositivo": None,
+            "numeracaoUnica": {
+                "numero": None,
+                "digito": None,
+                "ano": None,
+                "orgao": "5",
+                "tribunal": None,
+                "vara": None
+            },
+            "orgaosJudicantes": [],
+            "ministros": [],
+            "convocados": [],
+            "classesProcessuais": [],
+            "indicadores": [],
+            "tiposDecisoes": [],
+            "tipos": ["ACORDAO"],
+            "orgao": "TRF3",
+            "julgamentoInicial": filters.get('start_date'),
+            "julgamentoFinal": filters.get('end_date')
+            }
 
-def set_search(term, date_range):
-  data = {
-    'txtPesquisaLivre': term,
-    'chkMostrarLista': 'on',
-    'numero': '',
-    'magistrado': 0,
-    'data_inicial': date_range[0],
-    'data_final': date_range[1],
-    'data_tipo': 0,
-    'classe': 0,
-    'numclasse': '',
-    'orgao': 0,
-    'ementa': '',
-    'indexacao': '',
-    'legislacao': '',
-    'chkAcordaos': 'on',
-    'hdnMagistrado': '',
-    'hdnClasse': '',
-    'hdnOrgao': '',
-    'hdnLegislacao': '',
-    'hdnMostrarListaResumida': ''
-  }
-  r = s.post('http://web.trf3.jus.br/base-textual/Home/ResultadoTotais', data=data)
-  return r.status_code == 200
+            #sleep(0.5*random())
+            return requests.post(search_url,
+                json=post_data,
+                headers=DEFAULT_HEADERS).json()
 
-def get_page(page):
-  if page == 0:
-    page = '1?np=0'
+        except Exception as e:
+            logger.error(f"page fetch error params: {filters}")
+            raise e
+
+
+class TRF3Collector(base.ICollector):
+
+    def __init__(self, client, filters):
+        self.client = client
+        self.filters = filters
+
+    def count(self,filter_=None):
+        if filter_: 
+            return self.client.count(filter_)
+        else:
+            return self.client.count(self.filters)
+
+    def chunks(self):
+        total = self.count()
+        pages = math.ceil(total/self.filters.get('rows'))
+
+        if total >= 10_000:
+            self.filters = (
+                {
+                'rows':20,
+                'start_date':start.format(DEFAULT_DATE_FORMAT),
+                'end_date':end.format(DEFAULT_DATE_FORMAT)
+                } for start,end in utils.timely(
+                    start_date=pendulum.parse(self.filters.get('start_date')),
+                    end_date=pendulum.parse(self.filters.get('end_date')),
+                    unit='days',
+                    step=2
+                    ) if start and end
+            )
+        else:
+            self.filters = [self.filters]
+        
+        for filter_ in self.filters:
+            total = self.count(filter_)
+            pages = math.ceil(total/filter_.get('rows'))
+
+            for page in range(1, pages + 1):
+                yield TRF3Chunk(
+                    keys={**filter_ , **{'page': page}},
+                    prefix='',
+                    filters=filter_,
+                    page=page,
+                    client=self.client
+                )
+
+
+class TRF3Handler(base.ContentHandler):
+
+    @utils.retryable(max_retries=9)
+    def handle(self, event):
+        if isinstance(event, base.ContentFromURL):
+            self.download(event)
+        else:
+            super().handle(event)
+
+    @utils.retryable(max_retries=9, sleeptime=5., ignore_if_exceeds=True)
+    def download(self, event):
+        if self.output.exists(event.dest):
+            return
+
+        try:
+            response = requests.get(event.src,
+                allow_redirects=True,
+                verify=False)
+
+            if response.status_code == 404:
+                return
+
+            if event.content_type:
+                dest = event.dest
+                content_type = event.content_type
+
+            else:
+                content_type = response.headers['Content-type'].split(';')[0].strip()
+                dest = f'{event.dest}{guess_extension(content_type)}'
+                if 'rtf' in content_type:
+                    return
+
+            if response.status_code == 200:
+                self.output.save_from_contents(
+                    filepath=dest,
+                    contents=response.content,
+                    content_type=content_type)
+
+        except requests.exceptions.ChunkedEncodingError:
+            logger.warn(
+            f"Got a ChunkedEncodingError when fetching {event.src} -- will retry.")
+            return
+
+
+class TRF3Chunk(base.Chunk):
+
+    def __init__(self, keys, prefix, filters, page,client):
+        super(TRF3Chunk, self).__init__(keys, prefix)
+        self.filters  = filters
+        self.page = page
+        self.client = client
+
+
+    def rows(self):
+        result = self.client.fetch(self.filters,self.page)
+
+        base_pdf_report_url = 'http://aplicacao5.trf3.jus.br/consultaDocumento/acordao.do?'
+        base_html_report_url = 'https://jurisprudencia-backend.trf3.jus.br/rest/documentos'
+
+        for record in result['registros']:
+
+            session_at = pendulum.parse(record['registro']['dtaJulgamento'])
+
+            record_id = record['registro']['id']
+            base_path   = f'{session_at.year}/{session_at.month:02d}'
+
+            dest_record = f"{base_path}/doc_{record_id}.json"
+
+            html_report_url = f'{base_html_report_url}/{record_id}'
+            dest_html_report = f'{base_path}/doc_{record_id}.html'
+
+            files_to_download = []
+
+            if 'dtaPublicacao' in record['registro'].keys():
+
+                publication_at =  pendulum.parse(record['registro']['dtaPublicacao'])
+
+                params = {
+                    'anoProcInt':record['registro']['anoProcInt'],
+                    'numProcInt':record['registro']['numProcInt'],
+                    'dtaPublicacaoStr':publication_at.format('DD/MM/YYYY') + '%2007:00:00',
+                    'nia':record['registro']['numInterno'],
+                    'origem':'documento'
+                    }
+
+                rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
+                rtf_report_url = base_pdf_report_url + rtf_params
+                dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
+                files_to_download.append(base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report,
+                    content_type='application/rtf'))
+
+                pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
+                pdf_report_url = base_pdf_report_url + pdf_params
+                dest_pdf_report = f'{base_path}/doc_{record_id}'
+                files_to_download.append(base.ContentFromURL(src=pdf_report_url,dest=dest_pdf_report))
+
+
+            files_to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
+                content_type='application/json'))
+
+            files_to_download.append(base.ContentFromURL(src=html_report_url,dest=dest_html_report,
+                content_type='text/html'))
+
+            sleep(random()+1.13)
+
+            yield files_to_download
+
+
+
+@celery.task(queue='crawlers.trf3', default_retry_delay=5 * 60,
+            autoretry_for=(BaseException,))
+def trf3_task(**kwargs):
+    import utils
+    setup_cloud_logger(logger)
+
+    from logutils import logging_context
+
+    with logging_context(crawler='trf3'):
+        output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
+        logger.info(f'Output: {output}.')
+
+        query_params = {
+            'rows':20,
+            'start_date':kwargs.get('start_date'),
+            'end_date':kwargs.get('end_date')
+            }
+
+        collector = TRF3Collector(client=TRF3Client(), filters=query_params)
+        #handler = base.ContentHandler(output=output)
+        handler   = TRF3Handler(output=output)
+        snapshot = base.Snapshot(keys=query_params)
+
+        base.get_default_runner(
+            collector=collector,
+            output=output,
+            handler=handler,
+            logger=logger,
+            max_workers=8) \
+            .run(snapshot=snapshot)
+
+@cli.command(name='trf3')
+@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
+@click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
+@click.option('--split-tasks',
+  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def trf3_command(**kwargs):
+  if kwargs.get('enqueue'):
+    if kwargs.get('split_tasks'):
+      start_date = pendulum.parse(kwargs.get('start_date'))
+      end_date = pendulum.parse(kwargs.get('end_date'))
+      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
+        task_id = trf3_task.delay(
+          start_date=start.to_date_string(),
+          end_date=end.to_date_string(),
+          output_uri=kwargs.get('output_uri'))
+        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
+    else:
+      trf3_task.delay(**kwargs)
   else:
-    page = f'3?np={page-1}'
-  r = s.get(f'http://web.trf3.jus.br/base-textual/Home/ListaResumida/{page}')
-  soup = BeautifulSoup(r.text, features="html.parser")
-  rows = soup.find_all('tr')
-  print(list(map(lambda el: el.find('a')['href'], rows)))
-
-def get_acordao(id):
-  global current_range
-  try:
-    r = s.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={id}')
-    if 'Object reference not set to an instance of an object.' in r.text:
-      return 'finish'
-    if r.status_code != 200:
-      with open('errors.txt', 'a+') as f:
-        f.write(f'StatusCode: {r.status_code} / {id}')
-        return False
-    # print(r.text)
-    # print(r.text)
-    if 'Object reference not set to an instance of an object.' in r.text or 'expirou' in r.text:
-      print('session expired, resetting search')
-      initialize_session()
-      set_search('a ou de ou o', current_range)
-      r = s.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={id}')
-      # print(r.text)
-    soup = BeautifulSoup(r.text, features="html.parser")
-    processo_full = soup.find('p', {'class': 'docTexto'}).get_text().strip()
-    # tipo_processual = ' - '.join(processo_full.split(' - ')[:-1]).strip()
-    # numero_acordao = processo_full.split(' - ')[-1].split('   ')[0].strip()
-    numero_processo = processo_full.split(' - ')[-1].split('   ')[1].strip()
-    numero_processo = re.sub(r'_|\.|-', '', numero_processo) # Sanitize (take dots, underlines and dashes out)
-    # info = soup.find_all('div', {'class': 'docTexto'})
-    # relator = info[0].get_text().strip()
-    # orgao = info[1].get_text().strip()
-    # data_julgamento = info[2].get_text().strip()
-    # data_publicacao = re.search(r'\d*\/\d*\/\d*', info[3].get_text().strip()).group(0)
-    # ementa = info[4].get_text().strip()
-    # acordao = info[5].get_text().strip()
-    integra = soup.find('div', {'id': 'acoesdocumento'}).find('a')['href']
-    # FIX for googlecloud (www.trf3.jus.br) is not accessible
-    integra = f'http://web.trf3.jus.br/acordaos/Acordao/PesquisarDocumento?processo={integra.split("&processo=")[1]}'
-    doc_urls = get_docs(integra, id)
-
-    downloaded = download_docs(doc_urls, numero_processo) if doc_urls else []
-    return { 'num': numero_processo, 'data': r.text }
-    # downloaded = False
-
-    # print(','.join(downloaded))
-
-    # df = {'Tipo Processual': tipo_processual, 'NumProcesso': numero_processo, 'Relator(a)': relator, 'Orgao Julgador': orgao, 'Data da Publicacao': data_publicacao, 'Data do Julgamento': data_julgamento, 'Ementa': ementa, 'Acordao': acordao, 'PathToPdf': ','.join(downloaded)}
-
-    # return df
-  except:
-    global errors
-    print('error')
-    with open('errors.txt', 'a+') as f:
-      r = s.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={id}')
-      f.write(str(id) + f'\n=========\n{r.text}\n\n\n\n\n{traceback.format_exc()}\n============\n')
-    errors += 1
-
-def get_docs(url, id):
-  r = s.get(url)
-  # print(r.text)
-  if 'Ocorreu um erro' in r.text:
-    with open('errors.txt', 'a+') as f:
-      f.write(f'DocError: {url} / {id}')
-    return False
-  soup = BeautifulSoup(r.text, features="html.parser")
-  links = list(map(lambda el: 'http://web.trf3.jus.br' + el['href'], soup.find('form').find('ul').find_all('a')))
-  return links
-
-def download_docs(links, numero_processo):
-  files = []
-  for idx, link in enumerate(links):
-    r = s.get(link)
-    extension = mimetypes.guess_extension(r.headers['content-type'].split(';')[0]) # get extension from mime
-    suffix = f'_{idx+1}'
-    dateinfo = current_range[0].split('/')
-    filename = f'{dateinfo[2]}/{dateinfo[1]}/{numero_processo}{suffix}{extension}'
-    # filepath = f'downloads/{filename}'
-    uploadGCS(r.content, filename)
-    print(f'{filename} saved to gcs.')
-    files.append(filename)
-    return files
-
-period = pendulum.period(start_date, end_date)
-
-dates = period.range("months")
-
-ranges = []
-
-for dt in dates:
-  ranges.append([dt.format('DD/MM/YYYY'), dt.add(months=1).format('DD/MM/YYYY')])
-
-print(initialize_session())
-
-checkpoint = '0:0'
-
-with open('checkpoint.txt', 'r') as f:
-  checkpoint = f.readline()
-
-dateid = int(checkpoint.split(':')[0])
-offset = int(checkpoint.split(':')[1])
-
-ranges = ranges[dateid:]
-
-for idx, date_range in enumerate(ranges):
-  current_range = date_range
-  print(f'using range: {"-".join(date_range)}')
-  print(set_search('a ou de ou o', date_range))
-  i = offset if offset else 1 # offset from the actual search
-  while True:
-    acordao = get_acordao(i)
-
-    if acordao == 'finish':
-      break
-
-    if acordao:
-      good += 1
-      dateinfo = current_range[0].split('/')
-      filename = f'{dateinfo[2]}/{dateinfo[1]}/{acordao["num"]}.html'
-      # filepath = f'raw_html/{acordao.num}.html'
-      uploadGCS(acordao["data"], filename)
-      print('raw html data saved')
-
-    stop = timeit.default_timer()
-    idstr = f'{idx}:{i}'
-    print(f'Current ID: {idstr} | Total errors: {errors} | Total processed: {good} | Time elapsed: {stop - start}')
-    with open('checkpoint.txt', 'w') as f:
-      f.write(idstr)
-    i += 1
+    trf3_task(**kwargs)
