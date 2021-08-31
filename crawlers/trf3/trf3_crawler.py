@@ -11,7 +11,7 @@ import requests
 from random import random
 from time import sleep
 from mimetypes import guess_extension
-
+from bs4 import BeautifulSoup
 
 
 DEFAULT_HEADERS = {
@@ -20,7 +20,7 @@ DEFAULT_HEADERS = {
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
 }
 DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
-
+TRF3_DATE_FORMAT = 'DD/MM/YYYY'
 
 logger = logger_factory('trf3')
 
@@ -28,58 +28,46 @@ logger = logger_factory('trf3')
 class TRF3Client:
 
     def __init__(self):
-        self.url ='https://jurisprudencia-backend.trf3.jus.br/rest/pesquisa-textual'
+        #self.url ='https://jurisprudencia-backend.trf3.jus.br/rest/pesquisa-textual'
+        self.url = 'http://web.trf3.jus.br/base-textual/Home/ResultadoTotais'
 
     @utils.retryable(max_retries=9)
     def count(self,filters):
         result = self.fetch(filters,page=1)
+        soup = BeautifulSoup(result)
+        text = soup.find('a',{'href':'/base-textual/Home/ListaResumida/1?np=0'}).text
+        print(text)
         return result['totalRegistros']
 
     @utils.retryable(max_retries=9)
     def fetch(self, filters, page=1):
-        try:
+        post_data = {
+        'txtPesquisaLivre': '',
+        'chkMostrarLista': 'on',
+        'numero': '',
+        'magistrado': 0,
+        'data_inicial': filters.get('start_date').format(TRF3_DATE_FORMAT),
+        'data_final': filters.get('end_date').format(TRF3_DATE_FORMAT),
+        'data_tipo': 1,
+        'classe': 0,
+        'numclasse': '',
+        'orgao': 0,
+        'ementa': '',
+        'indexacao': '',
+        'legislacao': '',
+        'chkAcordaos': 'on',
+        'hdnMagistrado': '',
+        'hdnClasse': '',
+        'hdnOrgao': '',
+        'hdnLegislacao': '',
+        'hdnMostrarListaResumida': ''
+    }
 
-            search_url = '/'.join([
-                self.url,
-                str(1 + ( (page - 1) * filters.get('rows') )),
-                str(filters.get('rows')),
-            ])
+        #sleep(0.5*random())
+        return requests.post(self.url,
+            json=post_data,
+            headers=DEFAULT_HEADERS)
 
-            post_data = {
-            "ou": None,
-            "e": None,
-            "termoExato": "",
-            "naoContem": None,
-            "ementa": None,
-            "dispositivo": None,
-            "numeracaoUnica": {
-                "numero": None,
-                "digito": None,
-                "ano": None,
-                "orgao": "5",
-                "tribunal": None,
-                "vara": None
-            },
-            "orgaosJudicantes": [],
-            "ministros": [],
-            "convocados": [],
-            "classesProcessuais": [],
-            "indicadores": [],
-            "tiposDecisoes": [],
-            "tipos": ["ACORDAO"],
-            "orgao": "TRF3",
-            "julgamentoInicial": filters.get('start_date'),
-            "julgamentoFinal": filters.get('end_date')
-            }
-
-            #sleep(0.5*random())
-            return requests.post(search_url,
-                json=post_data,
-                headers=DEFAULT_HEADERS).json()
-
-        except Exception as e:
-            logger.error(f"page fetch error params: {filters}")
-            raise e
 
 
 class TRF3Collector(base.ICollector):
@@ -88,89 +76,22 @@ class TRF3Collector(base.ICollector):
         self.client = client
         self.filters = filters
 
-    def count(self,filter_=None):
-        if filter_: 
-            return self.client.count(filter_)
-        else:
-            return self.client.count(self.filters)
+    def count(self):
+        return self.client.count(self.filters)
 
     def chunks(self):
         total = self.count()
-        pages = math.ceil(total/self.filters.get('rows'))
+        pages = math.ceil(total/10)
 
-        if total >= 10_000:
-            self.filters = (
-                {
-                'rows':20,
-                'start_date':start.format(DEFAULT_DATE_FORMAT),
-                'end_date':end.format(DEFAULT_DATE_FORMAT)
-                } for start,end in utils.timely(
-                    start_date=pendulum.parse(self.filters.get('start_date')),
-                    end_date=pendulum.parse(self.filters.get('end_date')),
-                    unit='days',
-                    step=2
-                    ) if start and end
+    
+        for page in range(1, pages + 1):
+            yield TRF3Chunk(
+                keys={**self.filters , **{'page': page}},
+                prefix='',
+                filters=self.filters,
+                page=page,
+                client=self.client
             )
-        else:
-            self.filters = [self.filters]
-        
-        for filter_ in self.filters:
-            total = self.count(filter_)
-            pages = math.ceil(total/filter_.get('rows'))
-
-            for page in range(1, pages + 1):
-                yield TRF3Chunk(
-                    keys={**filter_ , **{'page': page}},
-                    prefix='',
-                    filters=filter_,
-                    page=page,
-                    client=self.client
-                )
-
-
-class TRF3Handler(base.ContentHandler):
-
-    @utils.retryable(max_retries=9)
-    def handle(self, event):
-        if isinstance(event, base.ContentFromURL):
-            self.download(event)
-        else:
-            super().handle(event)
-
-    @utils.retryable(max_retries=9, sleeptime=5., ignore_if_exceeds=True)
-    def download(self, event):
-        if self.output.exists(event.dest):
-            return
-
-        try:
-            response = requests.get(event.src,
-                allow_redirects=True,
-                verify=False)
-
-            if response.status_code == 404:
-                return
-
-            if event.content_type:
-                dest = event.dest
-                content_type = event.content_type
-
-            else:
-                content_type = response.headers['Content-type'].split(';')[0].strip()
-                dest = f'{event.dest}{guess_extension(content_type)}'
-                if 'rtf' in content_type:
-                    return
-
-            if response.status_code == 200:
-                self.output.save_from_contents(
-                    filepath=dest,
-                    contents=response.content,
-                    content_type=content_type)
-
-        except requests.exceptions.ChunkedEncodingError:
-            logger.warn(
-            f"Got a ChunkedEncodingError when fetching {event.src} -- will retry.")
-            return
-
 
 class TRF3Chunk(base.Chunk):
 
@@ -180,60 +101,15 @@ class TRF3Chunk(base.Chunk):
         self.page = page
         self.client = client
 
-
     def rows(self):
         result = self.client.fetch(self.filters,self.page)
 
-        base_pdf_report_url = 'http://aplicacao5.trf3.jus.br/consultaDocumento/acordao.do?'
-        base_html_report_url = 'https://jurisprudencia-backend.trf3.jus.br/rest/documentos'
-
         for record in result['registros']:
-
-            session_at = pendulum.parse(record['registro']['dtaJulgamento'])
-
-            record_id = record['registro']['id']
-            base_path   = f'{session_at.year}/{session_at.month:02d}'
-
-            dest_record = f"{base_path}/doc_{record_id}.json"
-
-            html_report_url = f'{base_html_report_url}/{record_id}'
-            dest_html_report = f'{base_path}/doc_{record_id}.html'
-
-            files_to_download = []
-
-            if 'dtaPublicacao' in record['registro'].keys():
-
-                publication_at =  pendulum.parse(record['registro']['dtaPublicacao'])
-
-                params = {
-                    'anoProcInt':record['registro']['anoProcInt'],
-                    'numProcInt':record['registro']['numProcInt'],
-                    'dtaPublicacaoStr':publication_at.format('DD/MM/YYYY') + '%2007:00:00',
-                    'nia':record['registro']['numInterno'],
-                    'origem':'documento'
-                    }
-
-                rtf_params = '&'.join(f'{k}={v}' for k,v in params.items())
-                rtf_report_url = base_pdf_report_url + rtf_params
-                dest_rtf_report = f'{base_path}/doc_{record_id}.rtf'
-                files_to_download.append(base.ContentFromURL(src=rtf_report_url,dest=dest_rtf_report,
-                    content_type='application/rtf'))
-
-                pdf_params = '&'.join(f'{k}={v}' for k,v in params.items() if k not in ['origem'])
-                pdf_report_url = base_pdf_report_url + pdf_params
-                dest_pdf_report = f'{base_path}/doc_{record_id}'
-                files_to_download.append(base.ContentFromURL(src=pdf_report_url,dest=dest_pdf_report))
-
-
-            files_to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
-                content_type='application/json'))
-
-            files_to_download.append(base.ContentFromURL(src=html_report_url,dest=dest_html_report,
-                content_type='text/html'))
 
             sleep(random()+1.13)
 
-            yield files_to_download
+
+            yield base.Content('aaa','05/05/bla.html')
 
 
 
@@ -250,14 +126,12 @@ def trf3_task(**kwargs):
         logger.info(f'Output: {output}.')
 
         query_params = {
-            'rows':20,
-            'start_date':kwargs.get('start_date'),
-            'end_date':kwargs.get('end_date')
+            'start_date':pendulum.parse(kwargs.get('start_date')),
+            'end_date':pendulum.parse(kwargs.get('end_date'))
             }
 
         collector = TRF3Collector(client=TRF3Client(), filters=query_params)
-        #handler = base.ContentHandler(output=output)
-        handler   = TRF3Handler(output=output)
+        handler = base.ContentHandler(output=output)
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
