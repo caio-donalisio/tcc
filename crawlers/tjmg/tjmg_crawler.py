@@ -125,7 +125,7 @@ class TJMG(base.BaseCrawler,base.ICollector):
     def count(self,init_date=None,query=None):
         url = f'{BASE_URL}/formEspelhoAcordao.do'
         start_date = init_date or self.params.get('start_date')
-        end_date = init_date or self.params.get('start_date')
+        end_date = init_date or self.params.get('end_date')
         query = query or default_filters()
         url = _get_search_url(
             self.session_id, query=query, start_date=start_date,end_date=end_date)
@@ -133,8 +133,13 @@ class TJMG(base.BaseCrawler,base.ICollector):
         response = self.requester.get(url, headers=self.headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text,features='html.parser')
-            if soup.find('p',class_='aviso'):
-                return 0
+            content = soup.find('p',class_='aviso')
+            if content:
+                number = ''.join([char for char in content.text if char.isdigit()])
+                if number:
+                    return int(number)
+                else:
+                    return 0
             else:
                 results = soup.find('p',class_='info').contents[0]
                 number = int(''.join(char for char in results if char.isdigit()))
@@ -175,10 +180,10 @@ class TJMG(base.BaseCrawler,base.ICollector):
 
             for query in queries:
 
-                self.total_records = self.count(date,query)
-                self.total_pages = math.ceil(self.total_records/10)
+                query_total_records = self.count(date,query)
+                query_total_pages = math.ceil(query_total_records/10)
 
-                for page in range(1, self.total_pages + 1):
+                for page in range(1, query_total_pages + 1):
 
                     keys = {
                         'date':date.format(STANDARD_DATE_FORMAT),
@@ -218,7 +223,7 @@ class CaptchaSolver(TJMG):
         browser = self.browser
         self.query['excluirRepetitivos'] = True
         url = _get_search_url(self.session_id, start_date=self.date,end_date=self.date,query=self.query)
-        self.logger.info(f'GET {url}')
+        self.logger.info(f'(Captcha) GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca') \
             and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
@@ -253,7 +258,7 @@ class CaptchaSolver(TJMG):
 
         with sr.AudioFile(filename) as source:
             audio = recognizer.record(source)
-            #os.remove(filename)
+            os.remove(filename)
 
         return recognizer.recognize_google(audio, language='pt-BR')
 
@@ -284,7 +289,7 @@ class TJMGChunk(base.Chunk):
             query['linhasPorPagina'] = 1
             url = _get_search_url(
                 self.session_id, query=query, start_date=self.date,end_date=self.date)
-            self.logger.info(f'GET {url}')
+            #self.logger.info(f'GET {url}')
             browser = self.browser
             browser.get(url)
             captcha = False
@@ -334,7 +339,7 @@ class TJMGChunk(base.Chunk):
         query.update(extra_query)
         url = _get_search_url(
             session_id, query=query, start_date=start_date,end_date=end_date)
-        self.logger.info(f'GET {url}')
+        #self.logger.info(f'GET {url}')
         response = self.requester.get(url, headers=headers)
         next_page = None
         if response.status_code == 200:
@@ -394,7 +399,7 @@ def tjmg_task(**kwargs):
                 output=output,
                 logger=logger,
                 handler = handler,
-                browser=browsers.FirefoxBrowser(headless=False)
+                browser=browsers.FirefoxBrowser(headless=True)
                 )
 
     snapshot = base.Snapshot(keys=params)
