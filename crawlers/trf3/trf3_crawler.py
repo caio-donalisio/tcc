@@ -108,7 +108,6 @@ class TRF3Chunk(base.Chunk):
 
     @utils.retryable(max_retries=9)
     def rows(self):
-        BASE_INTEIRO_URL = 'http://web.trf3.jus.br'
 
         for proc_number in range(
             1 + ((self.page - 1) * FILES_PER_PAGE),
@@ -146,7 +145,7 @@ class TRF3Chunk(base.Chunk):
                 acordao_inteiro = requests.get(f'http://web.trf3.jus.br{url_acordao_inteiro}',headers=DEFAULT_HEADERS)
                 to_download.append(base.Content(content=acordao_inteiro.text,dest = dest_path_completo,content_type='text/html'))
             else:
-                logger.info(f'Link não disponível para inteiro de: {processo_text}')
+                logger.info(f'Link não disponível para inteiro teor de: {processo_text}')
 
             yield to_download
 
