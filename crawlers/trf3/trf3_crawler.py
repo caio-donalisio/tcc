@@ -8,11 +8,8 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
-from random import random
-from time import sleep
-from mimetypes import guess_extension
 from bs4 import BeautifulSoup
-
+import re
 
 DEFAULT_HEADERS = {
      'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
@@ -21,8 +18,10 @@ DEFAULT_HEADERS = {
      'Referer': 'http://web.trf3.jus.br/base-textual'
             }
 
-DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 TRF3_DATE_FORMAT = 'DD/MM/YYYY'
+DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
+FILES_PER_PAGE = 100
+
 
 logger = logger_factory('trf3')
 
@@ -30,10 +29,7 @@ logger = logger_factory('trf3')
 class TRF3Client:
 
     def __init__(self):
-
-        self.session = requests.Session()#.get('http://web.trf3.jus.br/base-textual',headers=DEFAULT_HEADERS)
-        #self.url ='https://jurisprudencia-backend.trf3.jus.br/rest/pesquisa-textual'
-        #self.url = 
+        self.session = requests.Session()
 
     def setup(self):
         self.session.get('http://web.trf3.jus.br/base-textual',headers=DEFAULT_HEADERS)
@@ -92,55 +88,64 @@ class TRF3Collector(base.ICollector):
 
     def chunks(self):
         total = self.count()
-    
-        for proc_number in range(1, total + 1):
+        pages = math.ceil(total/FILES_PER_PAGE)
+
+        for page in range(1, pages + 2):
             yield TRF3Chunk(
-                keys={**self.filters , **{'proc_number': proc_number}},
+                keys={**self.filters , **{'page': page}},
                 prefix='',
-                #filters=self.filters,
-                proc_number=proc_number,
-                #session = self.session,
+                page=page,
+                total=total,
                 client=self.client,
-                
             )
+
 
 class TRF3Chunk(base.Chunk):
 
-    def __init__(self, keys, prefix, proc_number,client):
+    def __init__(self, keys, prefix, page,total,client):
         super(TRF3Chunk, self).__init__(keys, prefix)
-        #self.filters  = filters
-        self.proc_number = proc_number
-        #self.session = session
+        self.page = page
+        self.total=total
         self.client = client
-        
 
+    @utils.retryable(max_retries=9)
     def rows(self):
-        
-        response = self.client.session.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={self.proc_number}',headers=DEFAULT_HEADERS)
-        soup = BeautifulSoup(response.text)
-        
-        data_julg_div = soup.find('div',text='Data do Julgamento ')
-        session_at = data_julg_div.next_sibling.next_sibling.text.strip()
-        session_at = pendulum.from_format(session_at,TRF3_DATE_FORMAT)
+        for proc_number in range(
+            1 + ((self.page - 1) * FILES_PER_PAGE),
+            1 + min(self.total,((self.page) * FILES_PER_PAGE))
+            ):
 
-        processo_div = soup.find('h4',text='Processo').next_sibling.next_sibling.text.strip()
-        processo_num = ''.join(char for char in processo_div if char.isdigit())
+            
+            response = self.client.session.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',headers=DEFAULT_HEADERS)
+            soup = BeautifulSoup(response.text,features='html5lib')
+            
+            pub_date_div = soup.find('div',text='Data da Publicação/Fonte ')
+            pub_date, = DATE_PATTERN.findall(pub_date_div.next_sibling.next_sibling.text)
+            
+            url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
+            page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
+            acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
 
-        dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}.html'
+            link_to_inteiro = acordao_soup.find('a',text=pub_date)
+            if not link_to_inteiro:
+                link_to_inteiro = acordao_soup.find('a',{'name':'Pje'})
+            url_acordao_completo = link_to_inteiro.get('href')
+            acordao_completo = requests.get('http://web.trf3.jus.br' + url_acordao_completo,headers=DEFAULT_HEADERS)
 
-        #result = self.client.fetch(self.filters,self.page)
+            data_julg_div = soup.find('div',text='Data do Julgamento ')
+            session_at = data_julg_div.next_sibling.next_sibling.text.strip()
+            session_at = pendulum.from_format(session_at,TRF3_DATE_FORMAT)
 
-        #for record in result['registros']:
+            processo_div = soup.find('h4',text='Processo').next_sibling.next_sibling.text.strip()
+            processo_num = ''.join(char for char in processo_div if char.isdigit())
 
-        #    sleep(random()+1.13)
+            dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{proc_number}_{processo_num}.html'
+            dest_path_completo = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{proc_number}_{processo_num}_INTEIRO.html'
 
-
-        yield [base.Content(
-            content=response.text,
-            dest=dest_path,
-            content_type='text/html')]
-
-
+            yield [
+                base.Content(content=response.text, dest=dest_path,content_type='text/html'),#content_type='text/html'),
+                base.Content(content=acordao_completo.text,dest = dest_path_completo,content_type='text/html')
+                    ]
 
 
 @celery.task(queue='crawlers.trf3', default_retry_delay=5 * 60,
