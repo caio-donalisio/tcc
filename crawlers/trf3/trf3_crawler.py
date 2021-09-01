@@ -21,6 +21,8 @@ TRF3_DATE_FORMAT = 'DD/MM/YYYY'
 DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
 FILES_PER_PAGE = 50
 
+logger = logger_factory('trf3')
+
 def get_post_data(filters):
     return {
         'txtPesquisaLivre': '',
@@ -44,10 +46,6 @@ def get_post_data(filters):
         'hdnMostrarListaResumida': ''
     }
 
-
-logger = logger_factory('trf3')
-
-
 class TRF3Client:
 
     def __init__(self):
@@ -59,7 +57,7 @@ class TRF3Client:
     @utils.retryable(max_retries=9)
     def count(self,filters):
         result = self.fetch(filters)
-        soup = BeautifulSoup(result.text)
+        soup = BeautifulSoup(result.text,features='html5lib')
         count = soup.find('a',{'href':'/base-textual/Home/ListaResumida/1?np=0'}).text
         if count:
             return int(''.join([char for char in count if char.isdigit()]))
@@ -116,21 +114,14 @@ class TRF3Chunk(base.Chunk):
             1 + ((self.page - 1) * FILES_PER_PAGE),
             1 + min(self.total,((self.page) * FILES_PER_PAGE))
             ):
+            to_download = []
+
             response = self.client.session.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',headers=DEFAULT_HEADERS)
             soup = BeautifulSoup(response.text,features='html5lib')
             
             pub_date_div = soup.find('div',text='Data da Publicação/Fonte ')
             pub_date, = DATE_PATTERN.findall(pub_date_div.next_sibling.next_sibling.text)
             
-            url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
-            page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
-            page_acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
-
-            link_to_inteiro = page_acordao_soup.find('a',text=pub_date) or \
-                              page_acordao_soup.find('a',{'name':'Pje'})
-            url_acordao_inteiro = link_to_inteiro.get('href')
-            acordao_inteiro = requests.get(f'http://web.trf3.jus.br{url_acordao_inteiro}',headers=DEFAULT_HEADERS)
-
             data_julg_div = soup.find('div',text='Data do Julgamento ')
             session_at = data_julg_div.next_sibling.next_sibling.text.strip()
             session_at = pendulum.from_format(session_at,TRF3_DATE_FORMAT)
@@ -141,10 +132,23 @@ class TRF3Chunk(base.Chunk):
             dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}.html'
             dest_path_completo = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_INTEIRO.html'
 
-            yield [
-                base.Content(content=response.text, dest=dest_path,content_type='text/html'),#content_type='text/html'),
-                base.Content(content=acordao_inteiro.text,dest = dest_path_completo,content_type='text/html')
-                    ]
+            to_download.append(base.Content(content=response.text, dest=dest_path,content_type='text/html'))
+
+            url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
+            page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
+            page_acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
+
+            link_to_inteiro = page_acordao_soup.find('a',text=pub_date) or \
+                              page_acordao_soup.find('a',{'name':'Pje'})
+            
+            if link_to_inteiro:
+                url_acordao_inteiro = link_to_inteiro.get('href')
+                acordao_inteiro = requests.get(f'http://web.trf3.jus.br{url_acordao_inteiro}',headers=DEFAULT_HEADERS)
+                to_download.append(base.Content(content=acordao_inteiro.text,dest = dest_path_completo,content_type='text/html'))
+            else:
+                logger.info(f'Link não disponível para inteiro de: {processo_text}')
+
+            yield to_download
 
 
 @celery.task(queue='crawlers.trf3', default_retry_delay=5 * 60,
