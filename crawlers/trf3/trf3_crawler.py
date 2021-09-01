@@ -1,6 +1,5 @@
 import base
 import math
-import json
 import pendulum
 import celery
 import utils
@@ -20,7 +19,30 @@ DEFAULT_HEADERS = {
 
 TRF3_DATE_FORMAT = 'DD/MM/YYYY'
 DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
-FILES_PER_PAGE = 100
+FILES_PER_PAGE = 50
+
+def get_post_data(filters):
+    return {
+        'txtPesquisaLivre': '',
+        'chkMostrarLista': 'on',
+        'numero': '',
+        'magistrado': 0,
+        'data_inicial': pendulum.parse(filters.get('start_date')).format(TRF3_DATE_FORMAT),
+        'data_final': pendulum.parse(filters.get('end_date')).format(TRF3_DATE_FORMAT),
+        'data_tipo': 1,
+        'classe': 0,
+        'numclasse': '',
+        'orgao': 0,
+        'ementa': '',
+        'indexacao': '',
+        'legislacao': '',
+        'chkAcordaos': 'on',
+        'hdnMagistrado': '',
+        'hdnClasse': '',
+        'hdnOrgao': '',
+        'hdnLegislacao': '',
+        'hdnMostrarListaResumida': ''
+    }
 
 
 logger = logger_factory('trf3')
@@ -47,30 +69,8 @@ class TRF3Client:
     @utils.retryable(max_retries=9)
     def fetch(self, filters):
         self.setup()
-        post_data = {
-        'txtPesquisaLivre': '',
-        'chkMostrarLista': 'on',
-        'numero': '',
-        'magistrado': 0,
-        'data_inicial': pendulum.parse(filters.get('start_date')).format(TRF3_DATE_FORMAT),
-        'data_final': pendulum.parse(filters.get('end_date')).format(TRF3_DATE_FORMAT),
-        'data_tipo': 1,
-        'classe': 0,
-        'numclasse': '',
-        'orgao': 0,
-        'ementa': '',
-        'indexacao': '',
-        'legislacao': '',
-        'chkAcordaos': 'on',
-        'hdnMagistrado': '',
-        'hdnClasse': '',
-        'hdnOrgao': '',
-        'hdnLegislacao': '',
-        'hdnMostrarListaResumida': ''
-    }
+        post_data = get_post_data(filters)
         url = 'http://web.trf3.jus.br/base-textual/Home/ResultadoTotais'
-
-        #sleep(0.5*random())
         return self.session.post(url,
             json=post_data,
             headers=DEFAULT_HEADERS)
@@ -110,12 +110,12 @@ class TRF3Chunk(base.Chunk):
 
     @utils.retryable(max_retries=9)
     def rows(self):
+        BASE_INTEIRO_URL = 'http://web.trf3.jus.br'
+
         for proc_number in range(
             1 + ((self.page - 1) * FILES_PER_PAGE),
             1 + min(self.total,((self.page) * FILES_PER_PAGE))
             ):
-
-            
             response = self.client.session.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',headers=DEFAULT_HEADERS)
             soup = BeautifulSoup(response.text,features='html5lib')
             
@@ -124,27 +124,26 @@ class TRF3Chunk(base.Chunk):
             
             url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
             page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
-            acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
+            page_acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
 
-            link_to_inteiro = acordao_soup.find('a',text=pub_date)
-            if not link_to_inteiro:
-                link_to_inteiro = acordao_soup.find('a',{'name':'Pje'})
-            url_acordao_completo = link_to_inteiro.get('href')
-            acordao_completo = requests.get('http://web.trf3.jus.br' + url_acordao_completo,headers=DEFAULT_HEADERS)
+            link_to_inteiro = page_acordao_soup.find('a',text=pub_date) or \
+                              page_acordao_soup.find('a',{'name':'Pje'})
+            url_acordao_inteiro = link_to_inteiro.get('href')
+            acordao_inteiro = requests.get(f'http://web.trf3.jus.br{url_acordao_inteiro}',headers=DEFAULT_HEADERS)
 
             data_julg_div = soup.find('div',text='Data do Julgamento ')
             session_at = data_julg_div.next_sibling.next_sibling.text.strip()
             session_at = pendulum.from_format(session_at,TRF3_DATE_FORMAT)
 
-            processo_div = soup.find('h4',text='Processo').next_sibling.next_sibling.text.strip()
-            processo_num = ''.join(char for char in processo_div if char.isdigit())
+            processo_text = soup.find('h4',text='Processo').next_sibling.next_sibling.text.strip()
+            processo_num = ''.join(char for char in processo_text if char.isdigit())
 
-            dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{proc_number}_{processo_num}.html'
-            dest_path_completo = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{proc_number}_{processo_num}_INTEIRO.html'
+            dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}.html'
+            dest_path_completo = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_INTEIRO.html'
 
             yield [
                 base.Content(content=response.text, dest=dest_path,content_type='text/html'),#content_type='text/html'),
-                base.Content(content=acordao_completo.text,dest = dest_path_completo,content_type='text/html')
+                base.Content(content=acordao_inteiro.text,dest = dest_path_completo,content_type='text/html')
                     ]
 
 
