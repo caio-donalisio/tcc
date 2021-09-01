@@ -51,10 +51,11 @@ class TRF3Client:
     def __init__(self):
         self.session = requests.Session()
 
+    @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
         self.session.get('http://web.trf3.jus.br/base-textual',headers=DEFAULT_HEADERS)
 
-    @utils.retryable(max_retries=9)
+    @utils.retryable(max_retries=9, sleeptime=20)
     def count(self,filters):
         result = self.fetch(filters)
         soup = BeautifulSoup(result.text,features='html5lib')
@@ -64,7 +65,7 @@ class TRF3Client:
         else:
             return 0
 
-    @utils.retryable(max_retries=9)
+    @utils.retryable(max_retries=9, sleeptime=20)
     def fetch(self, filters):
         self.setup()
         post_data = get_post_data(filters)
@@ -81,9 +82,11 @@ class TRF3Collector(base.ICollector):
         self.client = client
         self.filters = filters
 
+    @utils.retryable(max_retries=9, sleeptime=20)
     def count(self):
         return self.client.count(self.filters)
 
+    @utils.retryable(max_retries=9, sleeptime=20)
     def chunks(self):
         total = self.count()
         pages = math.ceil(total/FILES_PER_PAGE)
@@ -94,21 +97,23 @@ class TRF3Collector(base.ICollector):
                 prefix='',
                 page=page,
                 total=total,
+                filters=self.filters,
                 client=self.client,
             )
 
 
 class TRF3Chunk(base.Chunk):
 
-    def __init__(self, keys, prefix, page,total,client):
+    def __init__(self, keys, prefix, page,total,filters,client):
         super(TRF3Chunk, self).__init__(keys, prefix)
         self.page = page
         self.total=total
+        self.filters=filters
         self.client = client
 
-    @utils.retryable(max_retries=9)
+    @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
-
+        self.client.fetch(self.filters)
         for proc_number in range(
             1 + ((self.page - 1) * FILES_PER_PAGE),
             1 + min(self.total,((self.page) * FILES_PER_PAGE))
