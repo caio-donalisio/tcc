@@ -131,7 +131,7 @@ class TRF3Chunk(base.Chunk):
             dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}.html'
             dest_path_completo = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_INTEIRO.html'
 
-            to_download.append(base.Content(content=response.text, dest=dest_path,content_type='text/html'))
+            to_download.append(base.Content(content=BeautifulSoup(response.text,features='html5lib').encode('latin-1'), dest=dest_path,content_type='text/html'))
 
             url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
             page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
@@ -143,7 +143,7 @@ class TRF3Chunk(base.Chunk):
             if link_to_inteiro:
                 url_acordao_inteiro = link_to_inteiro.get('href')
                 acordao_inteiro = requests.get(f'http://web.trf3.jus.br{url_acordao_inteiro}',headers=DEFAULT_HEADERS)
-                to_download.append(base.Content(content=acordao_inteiro.text,dest = dest_path_completo,content_type='text/html'))
+                to_download.append(base.Content(content=BeautifulSoup(acordao_inteiro.text,features='html5lib').encode('latin-1'),dest = dest_path_completo,content_type='text/html'))
             else:
                 logger.info(f'Link não disponível para inteiro teor de: {processo_text}')
 
