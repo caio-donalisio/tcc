@@ -182,16 +182,20 @@ class TRF3Chunk(base.Chunk):
             if link_to_inteiro:
                 dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
                 url_acordao_inteiro = link_to_inteiro.get('href')
-                acordao_inteiro = requests.get(
-                    f'http://web.trf3.jus.br{url_acordao_inteiro}',
-                    headers=DEFAULT_HEADERS)
-                to_download.append(base.Content(
-                    content=BeautifulSoup(
-                        acordao_inteiro.text, features='html5lib').encode('latin-1'),
-                    dest=dest_path_inteiro,
-                    content_type='text/html'))
+                try:
+                    acordao_inteiro = requests.get(
+                        f'http://web.trf3.jus.br{url_acordao_inteiro}',
+                        headers=DEFAULT_HEADERS)
+                    to_download.append(base.Content(
+                        content=BeautifulSoup(
+                            acordao_inteiro.text, features='html5lib').encode('latin-1'),
+                        dest=dest_path_inteiro,
+                        content_type='text/html'))
+                except requests.ConnectionError:
+                    logger.error(
+                        f'Unable to connect to page of full document of: {processo_text}')
             else:
-                logger.info(
+                logger.error(
                     f'Link not available for full document of: {processo_text}')
 
             yield to_download
