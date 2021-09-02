@@ -23,6 +23,12 @@ FILES_PER_PAGE = 50
 
 logger = logger_factory('trf3')
 
+def nearest_date(items, pivot):
+    if items:
+        return min([pendulum.from_format(item.text,TRF3_DATE_FORMAT) for item in items], 
+                key=lambda x: abs(x - pendulum.from_format(pivot,TRF3_DATE_FORMAT)))
+    else:
+        return ''
 def get_post_data(filters):
     return {
         'txtPesquisaLivre': '',
@@ -144,9 +150,9 @@ class TRF3Chunk(base.Chunk):
             page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
             page_acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
 
-            link_to_inteiro = page_acordao_soup.find('a',text=pub_date) or \
-                              page_acordao_soup.find('a',{'name':'Pje'})
-            
+            link_date = nearest_date(page_acordao_soup.find_all('a',{'name':'Pje'}),pub_date) 
+            link_to_inteiro = page_acordao_soup.find('a',text=link_date.format(TRF3_DATE_FORMAT))
+
             if link_to_inteiro:
                 dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_INTEIRO.html'
                 url_acordao_inteiro = link_to_inteiro.get('href')
