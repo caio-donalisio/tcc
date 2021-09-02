@@ -9,6 +9,8 @@ from app import cli, celery
 import requests
 from bs4 import BeautifulSoup
 import re
+import hashlib
+from itertools import chain
 
 DEFAULT_HEADERS = {
      'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
@@ -29,6 +31,18 @@ def nearest_date(items, pivot):
                 key=lambda x: abs(x - pendulum.from_format(pivot,TRF3_DATE_FORMAT)))
     else:
         return ''
+
+def get_content_hash(soup):
+    content_string = ''.join(
+        tag.text
+        for tag in chain(
+            soup.find_all('p',   {'class': 'docTexto'}),
+            soup.find_all('div', {'class': 'docTexto'}),
+            soup.find_all('pre', {'class': 'txtQuebra'}),
+        )
+    )
+    return hashlib.sha1(content_string.encode('utf-8')).hexdigest()
+
 def get_post_data(filters):
     return {
         'txtPesquisaLivre': '',
@@ -122,49 +136,63 @@ class TRF3Chunk(base.Chunk):
         self.client.fetch(self.filters)
         for proc_number in range(
             1 + ((self.page - 1) * FILES_PER_PAGE),
-            1 + min(self.total,((self.page) * FILES_PER_PAGE))
-            ):
+            1 + min(self.total, ((self.page) * FILES_PER_PAGE))
+        ):
             to_download = []
 
-            response = self.client.session.get(f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',headers=DEFAULT_HEADERS)
-            soup = BeautifulSoup(response.text,features='html5lib')
-            
-            pub_date_div = soup.find('div',text='Data da Publicação/Fonte ')
-            pub_date, = DATE_PATTERN.findall(pub_date_div.next_sibling.next_sibling.text)
-            
-            data_julg_div = soup.find('div',text='Data do Julgamento ')
+            response = self.client.session.get(
+                f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
+            soup = BeautifulSoup(response.text, features='html5lib')
+
+            pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
+            pub_date, = DATE_PATTERN.findall(
+                pub_date_div.next_sibling.next_sibling.text)
+
+            data_julg_div = soup.find('div', text='Data do Julgamento ')
             session_at = data_julg_div.next_sibling.next_sibling.text.strip()
-            session_at = pendulum.from_format(session_at,TRF3_DATE_FORMAT)
+            session_at = pendulum.from_format(session_at, TRF3_DATE_FORMAT)
 
-            processo_text = soup.find('h4',text='Processo').next_sibling.next_sibling.text.strip()
-            processo_num = ''.join(char for char in processo_text if char.isdigit())
+            processo_text = soup.find(
+                'h4', text='Processo').next_sibling.next_sibling.text.strip()
+            processo_num = ''.join(
+                char for char in processo_text if char.isdigit())
 
-            dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}.html'
+            content_hash = get_content_hash(soup)
+
+            dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}.html'
 
             to_download.append(base.Content(
-                content=BeautifulSoup(response.text,features='html5lib').encode('latin-1'), 
+                content=BeautifulSoup(
+                    response.text, features='html5lib').encode('latin-1'),
                 dest=dest_path,
                 content_type='text/html'))
 
-            url_page_acordao = soup.find('a',{'title':'Exibir a íntegra do acórdão.'}).get('href')
-            page_acordao = requests.get(url_page_acordao,headers=DEFAULT_HEADERS)
-            page_acordao_soup = BeautifulSoup(page_acordao.text,features='html5lib')
+            url_page_acordao = soup.find(
+                'a', {'title': 'Exibir a íntegra do acórdão.'}).get('href')
+            page_acordao = requests.get(
+                url_page_acordao, headers=DEFAULT_HEADERS)
+            page_acordao_soup = BeautifulSoup(
+                page_acordao.text, features='html5lib')
 
-            link_date = nearest_date(page_acordao_soup.find_all('a',{'name':'Pje'}),pub_date) 
-            link_to_inteiro = page_acordao_soup.find('a',text=link_date.format(TRF3_DATE_FORMAT))
+            link_date = nearest_date(page_acordao_soup.find_all(
+                'a', {'name': 'Pje'}), pub_date)
+            link_to_inteiro = page_acordao_soup.find(
+                'a', text=link_date.format(TRF3_DATE_FORMAT))
 
             if link_to_inteiro:
-                dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_INTEIRO.html'
+                dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
                 url_acordao_inteiro = link_to_inteiro.get('href')
                 acordao_inteiro = requests.get(
                     f'http://web.trf3.jus.br{url_acordao_inteiro}',
                     headers=DEFAULT_HEADERS)
                 to_download.append(base.Content(
-                    content=BeautifulSoup(acordao_inteiro.text,features='html5lib').encode('latin-1'),
-                    dest = dest_path_inteiro,
+                    content=BeautifulSoup(
+                        acordao_inteiro.text, features='html5lib').encode('latin-1'),
+                    dest=dest_path_inteiro,
                     content_type='text/html'))
             else:
-                logger.info(f'Link not available for full document of: {processo_text}')
+                logger.info(
+                    f'Link not available for full document of: {processo_text}')
 
             yield to_download
 
