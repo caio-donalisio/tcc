@@ -164,7 +164,7 @@ class TRF3Chunk(base.Chunk):
                     dest = dest_path_inteiro,
                     content_type='text/html'))
             else:
-                logger.info(f'Link não disponível para inteiro teor de: {processo_text}')
+                logger.info(f'Link not available for full document of: {processo_text}')
 
             yield to_download
 
