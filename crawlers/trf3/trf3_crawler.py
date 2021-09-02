@@ -24,7 +24,7 @@ FILES_PER_PAGE = 50
 logger = logger_factory('trf3')
 
 def nearest_date(items, pivot):
-    if items:
+    if items and pivot:
         return min([pendulum.from_format(item.text,TRF3_DATE_FORMAT) for item in items], 
                 key=lambda x: abs(x - pendulum.from_format(pivot,TRF3_DATE_FORMAT)))
     else:
