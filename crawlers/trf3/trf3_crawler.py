@@ -182,23 +182,43 @@ class TRF3Chunk(base.Chunk):
             if link_to_inteiro:
                 dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
                 url_acordao_inteiro = link_to_inteiro.get('href')
-                try:
-                    acordao_inteiro = requests.get(
-                        f'http://web.trf3.jus.br{url_acordao_inteiro}',
-                        headers=DEFAULT_HEADERS)
-                    to_download.append(base.Content(
-                        content=BeautifulSoup(
-                            acordao_inteiro.text, features='html5lib').encode('latin-1'),
-                        dest=dest_path_inteiro,
-                        content_type='text/html'))
-                except requests.ConnectionError:
-                    logger.error(
-                        f'Unable to connect to page of full document of: {processo_text}')
+                to_download.append(base.ContentFromURL(
+                    src=f'http://web.trf3.jus.br{url_acordao_inteiro}',
+                    dest=dest_path_inteiro,
+                    content_type='text/html'
+                ))
             else:
                 logger.error(
                     f'Link not available for full document of: {processo_text}')
 
             yield to_download
+
+class TRF3Handler(base.ContentHandler):
+    def __init__(self, output,headers):
+        super(TRF3Handler, self).__init__(output)
+        self.headers  = headers
+        
+    def _handle_url_event(self, event):
+        
+        if self.output.exists(event.dest):
+            return
+
+        response = requests.get(event.src,
+        allow_redirects=True,
+        headers=self.headers,
+        verify=False)
+
+        if response.status_code == 404:
+            return
+
+        dest = event.dest
+        content_type = event.content_type
+
+        if response.status_code == 200:
+            self.output.save_from_contents(
+                filepath=dest,
+                contents=response.content,
+                content_type=content_type)
 
 
 @celery.task(queue='crawlers.trf3', default_retry_delay=5 * 60,
@@ -219,7 +239,7 @@ def trf3_task(**kwargs):
             }
 
         collector = TRF3Collector(client=TRF3Client(), filters=query_params)
-        handler = base.ContentHandler(output=output)
+        handler = TRF3Handler(output=output,headers=DEFAULT_HEADERS)
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
