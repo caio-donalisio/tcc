@@ -154,9 +154,11 @@ class TJRSChunk(base.Chunk):
                 codigo = record['cod_ementa']
 
                 dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
-
-                record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
-                record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
+                if 'documento_text_aspas' in record:
+                    record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
+                if 'documento_text' in record:
+                    record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
+                    logger.warn(f'File {dest_record} has no full document text')
 
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
