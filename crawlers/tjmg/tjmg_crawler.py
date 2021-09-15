@@ -135,7 +135,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
                     query=query,
                     start_date=start_date,
                     end_date=end_date)
-        self.logger.info(f'GET {url}')
+        self.logger.debug(f'GET {url}')
         response = self.requester.get(url, headers=self.headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, features='html.parser')
@@ -226,12 +226,12 @@ class CaptchaSolver(TJMG):
         browser = self.browser
         self.query['excluirRepetitivos'] = True
         url = _get_search_url(
-                self.session_id, 
+                self.session_id,
                 start_date=self.date,
                 end_date=self.date,
                 query=self.query
                 )
-        self.logger.info(f'(Captcha) GET {url}')
+        self.logger.debug(f'(Captcha) GET {url}')
         browser.get(url)
         while not browser.is_text_present('Resultado da busca') \
                 and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
@@ -287,8 +287,8 @@ class TJMGChunk(base.Chunk):
 
     @utils.retryable(max_retries=33, sleeptime=20)
     def rows(self):
-        extra_query = {k: v 
-                        for k, v in self.query.items() 
+        extra_query = {k: v
+                        for k, v in self.query.items()
                         if k in ['ListaClasse', 'excluirRepetitivos']
                         }
 
@@ -299,7 +299,7 @@ class TJMGChunk(base.Chunk):
                         self.headers,
                         self.session_id,
                         extra_query)
-                        
+
         for act in acts:
             to_download = []
             query = self.query  # default_filters()
@@ -332,21 +332,21 @@ class TJMGChunk(base.Chunk):
 
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
             date_label = soup.find('div', text='Data de Julgamento')
-            
+
             proc_string = '_'.join([element.text for element in soup.find_all(
                 'a', {'title': 'Abrir Andamento Processual'})])
             proc_string = ''.join(char for char in proc_string if char.isdigit() or char == '_')
-            
+
             session_date = date_label.find_next_sibling('div').text
             session_date = pendulum.from_format(session_date, TJMG_DATE_FORMAT)
-            
+
             if browser.is_text_present('Inteiro Teor'):
                 onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
                 pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
                 pdf_url = f'{BASE_URL}/{pdf_url}'
                 pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.pdf'
                 to_download.append(base.ContentFromURL(
-                                            src=pdf_url, 
+                                            src=pdf_url,
                                             dest=pdf_dest,
                                             content_type='application/pdf'))
 
@@ -366,14 +366,14 @@ class TJMGChunk(base.Chunk):
         query.pop('excluirRepetitivos', None)
         query.update(extra_query)
         url = _get_search_url(
-            session_id, 
-            query=query, 
-            start_date=start_date, 
+            session_id,
+            query=query,
+            start_date=start_date,
             end_date=end_date
             )
         response = self.requester.get(url, headers=headers)
         next_page = None
-        
+
         if response.status_code == 200:
             soup = utils.soup_by_content(response.text)
             act_indexes = []
@@ -381,14 +381,14 @@ class TJMGChunk(base.Chunk):
             for link in links:
                 id = get_param_from_url(link['href'], param='numeroRegistro')
                 act_indexes.append(id)
-            
+
             next_page_link = soup.find('a', alt='pr?xima')
             if next_page_link is not None:
                 next_page = get_param_from_url(
                                 next_page_link['href'],
                                 param='paginaNumero')
             return (act_indexes, next_page)
-        
+
         elif response.status_code == 401:
             CaptchaSolver(
                 start_date,
