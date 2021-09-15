@@ -8,12 +8,14 @@ from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 from crawlers.trf2.trf2_crawler import trf2_task
+from crawlers.trf3.trf3_crawler import trf3_task
 from crawlers.trf4.trf4_crawler import trf4_task
 from crawlers.stf.stf_api_crawler import stf_task
 from crawlers.tjsp2.tjsp_crawler import tjsp_task
 from crawlers.tjsp2.tjsp_pdf import tjsp_download_task
 from crawlers.tjrj.tjrj_crawler import tjrj_task
 from crawlers.tjba.tjba_crawler import tjba_task
+from crawlers.tjmg.tjmg_crawler import tjmg_task
 from crawlers.stj.stj_crawler import stj_task
 from crawlers.carf.carf_crawler import carf_task
 from crawlers.tst.tst_crawler import tst_task

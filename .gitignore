@@ -142,5 +142,11 @@ cython_debug/
 logs/*
 data/*
 .service-account.json
-crawlers/tst/exemplo_sem_dtaPublicacao.txt
+
+# Webdrivers
+chromedriver.exe
 geckodriver.exe
+operadriver.exe
+
+# Audio Files
+*.wav
