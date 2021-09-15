@@ -25,8 +25,8 @@ def get_soup_xpath(element):
 
 
 class FirefoxBrowser:
-  def __init__(self, headers=None, headless=True):
-    options = self._get_options(headers, headless)
+  def __init__(self, headers=None, headless=True,page_load_strategy='normal'):
+    options = self._get_options(headers, headless,page_load_strategy)
     self.driver = webdriver.Firefox(options=options)
 
   def get(self, url, wait_for=(By.TAG_NAME, 'body')):
@@ -87,12 +87,24 @@ class FirefoxBrowser:
     except NoSuchElementException:
         return False
 
-  def _get_options(self, headers, headless):
+  def get_cookie(self, cookie_name):
+    value = None
+    cookies = self.driver.get_cookies()
+    for cookie in cookies:
+        if cookie.get('name') == cookie_name:
+            value = cookie['value']
+    if cookie is None:
+        raise Exception(f'Cookie not found: {cookie_name}')
+    return value
+
+  def _get_options(self, headers, headless,page_load_strategy):
     options = Options()
     headers = urlencode(headers or self._sample_headers())
     options.add_argument(headers)
     if headless:
         options.add_argument('--headless')
+    if page_load_strategy:
+        options.add_argument('--page-load-strategy')        
     return options
 
   def _sample_headers(self):

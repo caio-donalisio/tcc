@@ -17,6 +17,8 @@ from crawlers.tjrj.tjrj_crawler import (
   tjrj_command)
 from crawlers.tjba.tjba_crawler import (
   tjba_command)
+from crawlers.tjmg.tjmg_crawler import (
+  tjmg_command)
 from crawlers.stj.stj_crawler import (
   stj_command)
 from crawlers.carf.carf_crawler import (
