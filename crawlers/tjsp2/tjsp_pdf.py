@@ -9,10 +9,11 @@ from app import cli, celery
 import logging
 import utils
 import base
-from crawlers.tjsp2.tjsp_crawler import TJSPClient, TJSPHandler
-from logconfig import logger_factory, setup_cloud_logger
+from crawlers.tjsp2.tjsp_crawler import TJSPClient
+from logconfig import logger_factory
 
 logger = logger_factory('tjsp-pdf')
+
 
 class TJSPDownloader:
 
@@ -70,9 +71,11 @@ class TJSPDownloader:
       allow_redirects=True,
       verify=False,
       timeout=10)
-    if response.headers.get('Content-type') == 'application/pdf;charset=UTF-8':
+    if 'application/pdf' in response.headers.get('Content-type'):
+      logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
       return response
     else:
+      logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')
       logger.warn(
         f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
       raise utils.PleaseRetryException()
@@ -85,7 +88,8 @@ class TJSPDownloader:
         content_type=content_from_url.content_type)
 
 
-@celery.task(queue='tjsp.pdf')
+@celery.task(queue='tjsp.pdf', autoretry_for=(Exception,),
+             default_retry_delay=60, max_retries=3)
 def tjsp_download_task(items, output_uri):
   from tqdm import tqdm
 

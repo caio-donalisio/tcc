@@ -104,6 +104,96 @@ class TJSP(base.ICollector):
     return total
 
 
+class TJSPClientPlain:
+
+  def __init__(self, **options):
+    self.header_generator = utils.HeaderGenerator(
+      origin='http://esaj.tjsp.jus.br', xhr=False)
+    self.session = requests.Session()
+    self.headers = self.header_generator.generate()
+
+  def signin(self):
+    username = os.getenv('TJSP_USERNAME')
+    password = os.getenv('TJSP_PASSWORD')
+    assert username and password
+    response =\
+      self.session.post('http://esaj.tjsp.jus.br/sajcas/login?service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fj_spring_cas_security_check',
+        headers=self.headers,
+        allow_redirects=True,
+        verify=False,
+        data={
+          'username': username,
+          'password': password
+        })
+    return response
+
+  @utils.retryable(max_retries=9)  # type: ignore
+  def set_search(self, start_date, end_date):
+    start_ = '{day}/{month}/{year}'.format(day=start_date.day, month=start_date.month, year=start_date.year)
+    end_   = '{day}/{month}/{year}'.format(day=end_date.day  , month=end_date.month, year=end_date.year)
+
+    response = self.session.post('http://esaj.tjsp.jus.br/cjsg/resultadoCompleta.do',
+      headers=self.headers,
+      verify=False,
+      data={
+        'conversationId': '',
+        'dados.buscaInteiroTeor': '',
+        'dados.pesquisarComSinonimos': 'S',
+        'dados.buscaEmenta': '',
+        'dados.nuProcOrigem': '',
+        'dados.nuRegistro': '',
+        'agenteSelectedEntitiesList': '',
+        'contadoragente':  0,
+        'contadorMaioragente':  0,
+        'codigoCr': '',
+        'codigoTr': '',
+        'nmAgente': '',
+        'juizProlatorSelectedEntitiesList': '',
+        'contadorjuizProlator':  0,
+        'contadorMaiorjuizProlator':  0,
+        'codigoJuizCr': '',
+        'codigoJuizTr': '',
+        'nmJuiz': '',
+        'classesTreeSelection.values': '',
+        'classesTreeSelection.text': '',
+        'assuntosTreeSelection.values': '',
+        'assuntosTreeSelection.text': '',
+        'comarcaSelectedEntitiesList': '',
+        'contadorcomarca':  0,
+        'contadorMaiorcomarca':  0,
+        'cdComarca': '',
+        'nmComarca': '',
+        'secoesTreeSelection.values': '',
+        'secoesTreeSelection.text': '',
+        'dados.dtJulgamentoInicio': '',
+        'dados.dtJulgamentoFim': '',
+        'dados.dtPublicacaoInicio': start_,
+        'dados.dtPublicacaoFim': end_,
+        'dados.origensSelecionadas': 'T',
+        'tipoDecisaoSelecionados':  'A',
+        'dados.ordenarPor': 'dtPublicacao'
+      })
+    assert response.status_code == 200
+
+    elements = utils.soup_by_content(response.text) \
+      .find_all('input', {'id': 'totalResultadoAba-A'})
+    assert len(elements) == 1
+    records = elements[0]['value']
+    return int(records)
+
+  @utils.retryable(max_retries=9)  # type: ignore
+  def get_search_results(self, page):
+    url = f'http://esaj.tjsp.jus.br/cjsg/trocaDePagina.do?tipoDeDecisao=A&pagina={page}&conversationId='
+    response = self.session.get(
+      url,
+      verify=False,
+      headers=self.headers)
+    return response.text
+
+  def close(self):
+    pass
+
+
 class TJSPClient:
 
   def __init__(self, **options):

@@ -25,6 +25,11 @@ services:
       - .:/opt/service
       - .service-account.json:/etc/gcloud/service-account.json
 
+  celery_tjsp:
+    <<: *celery
+    container_name: 'inspira-crawlers-tjsp'
+    command: 'celery -A tasks worker -Q tjsp --concurrency=2 -E --loglevel=INFO -n worker.tjsp'
+
   celery_tjsp_pdf:
     <<: *celery
     container_name: 'inspira-crawlers-tjsp-pdf'
