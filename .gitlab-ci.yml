@@ -11,7 +11,8 @@ services:
 build:
   stage: build
   before_script:
-    - docker login -u _json_key -p "$GOOGLE_CLOUD_ACCOUNT" https://eu.gcr.io
+    - echo $GOOGLE_CLOUD_ACCOUNT
+    - echo $GOOGLE_CLOUD_ACCOUNT | docker login -u _json_key --password-stdin https://gcr.io
   script:
     - |
       if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
