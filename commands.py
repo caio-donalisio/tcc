@@ -5,6 +5,8 @@ from app import cli
 
 from crawlers.trf2.trf2_crawler import (
   trf2_command)
+from crawlers.trf3.trf3_crawler import (
+trf3_command)
 from crawlers.trf4.trf4_crawler import (
   trf4_command)
 from crawlers.stf.stf_api_crawler import (
