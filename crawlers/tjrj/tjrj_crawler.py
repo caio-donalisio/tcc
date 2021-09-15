@@ -197,17 +197,17 @@ class TJRJChunk(base.Chunk):
       extra_contents = []
       fetch_all_pdfs = True
 
-      if act['TemBlobValido']:
-        doc_path = utils.get_filepath(date=str(updated_at), filename=f'{act_id}_inteiro_teor', extension='html')
-        extra_contents.append(base.ContentFromURL(
-          src=f"http://www4.tjrj.jus.br/EJURIS/ExportaInteiroTeor.aspx?CodDoc={act_id}&PageSeq=0&EFT=1",
-          dest=doc_path,
-          content_type='text/html'
-        ))
+      # if act['TemBlobValido']:
+      #   doc_path = utils.get_filepath(date=str(updated_at), filename=f'{act_id}_inteiro_teor', extension='html')
+      #   extra_contents.append(base.ContentFromURL(
+      #     src=f"http://www4.tjrj.jus.br/EJURIS/ExportaInteiroTeor.aspx?CodDoc={act_id}&PageSeq=0&EFT=1",
+      #     dest=doc_path,
+      #     content_type='text/html'
+      #   ))
 
       # INFO: We might won't download all pdfs now. Regardless `TemBlobValid` is False.
       # What we have in `ExportaInteiroTeor` is what matters, not always available though.
-      fetch_all_pdfs = self.options.get('skip_pdf', False) == False
+      fetch_all_pdfs = True #  self.options.get('skip_pdf', False) == False
 
       # fetch extra content as well
       extra_contents.extend(self._fetch_data(
