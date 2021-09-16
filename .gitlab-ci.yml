@@ -15,15 +15,15 @@ build:
   script:
     - |
       if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
-        tag=""
+        tag=":latest"
         echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = 'latest'"
       else
         tag=":$CI_COMMIT_REF_SLUG"
         echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
       fi
     - docker build -t "$IMAGE${tag}" .
-    - docker tag "$IMAGE${tag}" $GCR_IMAGE:$CI_COMMIT_BRANCH
-    - docker push $GCR_IMAGE:$CI_COMMIT_BRANCH
+    - docker tag "$IMAGE${tag}" $GCR_IMAGE${tag}
+    - docker push $GCR_IMAGE${tag}
   rules:
     - if: $CI_COMMIT_BRANCH
       exists:
