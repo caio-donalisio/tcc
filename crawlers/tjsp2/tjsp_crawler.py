@@ -476,7 +476,7 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue,
   if split_tasks:
     start_date, end_date =\
       pendulum.parse(start_date), pendulum.parse(end_date)
-    for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
+    for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
       if enqueue:
         task_id = tjsp_task.delay(
           start.to_date_string(),
