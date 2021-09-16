@@ -351,6 +351,10 @@ class ChunkRunner:
       self.processor.close()
       self.collector.teardown()
 
+    if snapshot:
+      snapshot.set_value('done', True)
+      self.repository.commit(snapshot)
+
 
 class ContentHandler:
 
