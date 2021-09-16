@@ -473,17 +473,63 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue, browser, split_tasks):
   args = (start_date, end_date, output_uri, pdf_async, skip_pdf, browser)
-  if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
+  if split_tasks:
+    start_date, end_date =\
+      pendulum.parse(start_date), pendulum.parse(end_date)
+    for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
+      if enqueue:
         task_id = tjsp_task.delay(
           start.to_date_string(),
           end.to_date_string(),
           output_uri, pdf_async, skip_pdf, browser)
         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjsp_task.delay(*args)
+      else:
+        print(f"running with params {start.to_date_string()} {end.to_date_string()}")
+        tjsp_task(
+          start.to_date_string(),
+          end.to_date_string(),
+          output_uri, pdf_async, skip_pdf, browser)
   else:
-    tjsp_task(*args)
+    if enqueue:
+      tjsp_task.delay(*args)
+    else:
+      tjsp_task(*args)
+
+
+@cli.command(name='tjsp-validate')
+@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+@click.option('--count-pending-pdfs', default=False, help='Count pending pdfs', is_flag=True)
+def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
+  from crawlers.tjsp2.tjsp_utils import list_pending_pdfs
+
+  start_date, end_date =\
+        pendulum.parse(start_date), pendulum.parse(end_date)
+
+  # Read out all avaliable snapshots to assess about completeness of data
+  output     = utils.get_output_strategy_by_path(path=output_uri)
+  repository = base.SnapshotsRepository(output=output)
+
+  for start, end in utils.timely(start_date, end_date, unit='months', step=1):
+    query_params = {
+      'start_date': start, 'end_date': end
+    }
+    snapshot = base.Snapshot(keys=query_params)
+
+    if repository.exists(snapshot):
+      repository.restore(snapshot)
+      snapshot_info = {
+        key: snapshot.get_value(key)
+        for key in ['records', 'expects', 'done']
+      }
+
+      if snapshot_info['done'] == True:
+        logger.info(f'Snapshot {snapshot.hash} params {start.to_date_string()}-{end.to_date_string()} = {snapshot_info}.')
+
+        # validate pdfs as well.
+        if count_pending_pdfs:
+          prefix = f'{start.year}/{start.month:02d}/'
+          pending_pdfs =\
+            list_pending_pdfs(bucket_name=output._bucket_name, prefix=prefix)
+          logger.info(f'Prefix: {prefix} - pending pdfs: {len(list(pending_pdfs))}')

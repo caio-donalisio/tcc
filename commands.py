@@ -12,7 +12,7 @@ from crawlers.trf4.trf4_crawler import (
 from crawlers.stf.stf_api_crawler import (
   stf_command)
 from crawlers.tjsp2.tjsp_crawler import (
-  tjsp_command)
+  tjsp_command, tjsp_validate)
 from crawlers.tjrj.tjrj_crawler import (
   tjrj_command)
 from crawlers.tjba.tjba_crawler import (
