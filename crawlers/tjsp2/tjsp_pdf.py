@@ -11,6 +11,7 @@ import utils
 import base
 from crawlers.tjsp2.tjsp_crawler import TJSPClient
 from logconfig import logger_factory
+from crawlers.tjsp2.tjsp_utils import list_pending_pdfs
 
 logger = logger_factory('tjsp-pdf')
 
@@ -74,6 +75,9 @@ class TJSPDownloader:
     if 'application/pdf' in response.headers.get('Content-type'):
       logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
       return response
+    elif 'text/html' in response.headers.get('Content-type') and \
+      'Não foi possível exibir a decisão solicitada.' in response.text:
+      logger.warn(f'PDF for {content_from_url.src} not available.')
     else:
       logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')
       logger.warn(
@@ -130,32 +134,6 @@ def tjsp_download(items, output_uri, pbar):
     ],
     pbar
   )
-
-
-def list_all(bucket_name, prefix):
-  bucket = utils.get_bucket_ref(bucket_name)
-  for blob in bucket.list_blobs(prefix=prefix):
-    yield blob.name
-
-
-def list_pending_pdfs(bucket_name, prefix):
-  jsons = {}
-  pdfs  = {}
-
-  for name in list_all(bucket_name, prefix):
-    path = pathlib.Path(name)
-    if name.endswith(".json"):
-      jsons[path.stem] = path.parent
-    if name.endswith(".pdf"):
-      pdfs[path.stem] = path.parent
-
-  for name, parent in jsons.items():
-    if name not in pdfs:
-      cdacordao = name.split('_')[-1]
-      yield {'url':
-        f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?conversationId=&cdAcordao={cdacordao}&cdForo=0',
-         'dest': f'{parent}/{name}.pdf'
-      }
 
 
 @cli.command(name='tjsp-pdf')
