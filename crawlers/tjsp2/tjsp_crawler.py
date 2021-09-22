@@ -50,14 +50,18 @@ class TJSP(base.ICollector):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='days', step=1))
 
+
     # Will store number of records+pages based on parameters
     # This will avoid hitting the site to figure out the number of pages.
-    cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
-    cache_store      = base.HashedKeyValue(keys={
-      'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
+    use_cache = self.options.get('skip_cache', False) == False
 
-    if cache_repository.exists(cache_store):
-      cache_repository.restore(cache_store)
+    cache_repository = cache_store = None
+    if use_cache:
+      cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
+      cache_store      = base.HashedKeyValue(keys={
+        'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
+      if cache_repository.exists(cache_store):
+        cache_repository.restore(cache_store)
 
     for start_date, end_date in reversed(ranges):
       cache_key = base.HashedKeyValue(keys={  # just to compute the hash
@@ -65,19 +69,22 @@ class TJSP(base.ICollector):
         'end_date'  : end_date.to_date_string()
       })
 
-      if cache_key.hash in cache_store.state:
+      if cache_store and \
+        cache_key.hash in cache_store.state:
         number_of_records = cache_store.state[cache_key.hash]['number_of_records']
         number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
       else:
         number_of_records = self.client.set_search(start_date, end_date)
         number_of_pages   = math.ceil(number_of_records / 20)
-        cache_store.set_value(cache_key.hash, {
-          'number_of_records': number_of_records,
-          'number_of_pages'  : number_of_pages,
-          'start_date'       : start_date.to_date_string(),
-          'end_date'         : end_date.to_date_string()
-        })
-        cache_repository.commit(cache_store)
+
+        if cache_store:
+          cache_store.set_value(cache_key.hash, {
+            'number_of_records': number_of_records,
+            'number_of_pages'  : number_of_pages,
+            'start_date'       : start_date.to_date_string(),
+            'end_date'         : end_date.to_date_string()
+          })
+          cache_repository.commit(cache_store)
 
       for page in range(1, number_of_pages + 1):
         chunk_params = {
@@ -434,7 +441,7 @@ class TJSPHandler(base.ContentHandler):
 @celery.task(queue='crawlers.tjsp', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,),
              base=Singleton)
-def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
+def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache, browser):
   from logutils import logging_context
 
   with logging_context(crawler='tjsp'):
@@ -453,7 +460,7 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
     client  = TJSPClient(browser=browser)
     handler = TJSPHandler(output=output, client=client, skip_pdf=skip_pdf)
 
-    collector = TJSP(params=query_params, output=output, client=client)
+    collector = TJSP(params=query_params, output=output, client=client, skip_cache=skip_cache)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(
@@ -467,12 +474,13 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, browser):
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
+@click.option('--skip-cache', default=False, help='Skip any cache crawler does', is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--browser'   , default=False, help='Open browser'          , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue, browser, split_tasks):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf, browser)
+def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache, enqueue, browser, split_tasks):
+  args = (start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache, browser)
   if split_tasks:
     start_date, end_date =\
       pendulum.parse(start_date), pendulum.parse(end_date)
@@ -481,14 +489,14 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue,
         task_id = tjsp_task.delay(
           start.to_date_string(),
           end.to_date_string(),
-          output_uri, pdf_async, skip_pdf, browser)
+          output_uri, pdf_async, skip_pdf, skip_cache, browser)
         print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
       else:
         print(f"running with params {start.to_date_string()} {end.to_date_string()}")
         tjsp_task(
           start.to_date_string(),
           end.to_date_string(),
-          output_uri, pdf_async, skip_pdf, browser)
+          output_uri, pdf_async, skip_pdf, skip_cache, browser)
   else:
     if enqueue:
       tjsp_task.delay(*args)
@@ -502,6 +510,8 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue,
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--count-pending-pdfs', default=False, help='Count pending pdfs', is_flag=True)
 def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
+  from tabulate import tabulate
+  from tqdm import tqdm
   from crawlers.tjsp2.tjsp_utils import list_pending_pdfs
 
   start_date, end_date =\
@@ -511,7 +521,9 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
   output     = utils.get_output_strategy_by_path(path=output_uri)
   repository = base.SnapshotsRepository(output=output)
 
-  for start, end in utils.timely(start_date, end_date, unit='months', step=1):
+  results = []
+
+  for start, end in tqdm(list(utils.timely(start_date, end_date, unit='months', step=1))):
     query_params = {
       'start_date': start, 'end_date': end
     }
@@ -524,12 +536,41 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
         for key in ['records', 'expects', 'done']
       }
 
+      pending_pdfs_count = 0
+
       if snapshot_info['done'] == True:
-        logger.info(f'Snapshot {snapshot.hash} params {start.to_date_string()}-{end.to_date_string()} = {snapshot_info}.')
+        logger.debug(f'Snapshot {snapshot.hash} params {start.to_date_string()}-{end.to_date_string()} = {snapshot_info}.')
 
         # validate pdfs as well.
         if count_pending_pdfs:
           prefix = f'{start.year}/{start.month:02d}/'
           pending_pdfs =\
             list_pending_pdfs(bucket_name=output._bucket_name, prefix=prefix)
-          logger.info(f'Prefix: {prefix} - pending pdfs: {len(list(pending_pdfs))}')
+          pending_pdfs_count = len(list(pending_pdfs))
+          logger.debug(f'Prefix: {prefix} - pending pdfs: {pending_pdfs_count}')
+
+      results.append([
+        start.to_date_string(),
+        end.to_date_string()  ,
+        (snapshot_info['records'] or -1),
+        pending_pdfs_count,
+        snapshot_info['done']
+      ])
+    else:
+      results.append([
+        start.to_date_string(),
+        end.to_date_string()  ,
+        0,
+        0,
+        'Unknown',
+      ])
+
+
+
+  print([row[2] for row in results])
+
+  total_records = sum([row[2] for row in results])
+  total_pdfs    = sum([row[3] for row in results])
+  results.append(['', '', total_records, total_pdfs, ''])
+
+  print(tabulate(results, headers=['Start', 'End', 'Records', 'Pending PDFs', 'Finished']))
