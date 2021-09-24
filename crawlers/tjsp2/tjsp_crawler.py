@@ -86,7 +86,7 @@ class TJSP(base.ICollector):
           })
           cache_repository.commit(cache_store)
 
-      for page in range(1, number_of_pages + 1):
+      for page in range(1, number_of_pages + 3):
         chunk_params = {
           'start_date': start_date.to_date_string(),
           'end_date'  : end_date.to_date_string(),
@@ -308,6 +308,16 @@ class TJSPChunk(base.Chunk):
     self.expects    = expects
 
   def rows(self):
+    rows = self.get_row_for_current_page()
+    if rows:
+      return rows
+    else:
+      return []
+
+  @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(utils.PleaseRetryException,))
+  def get_row_for_current_page(self):
+    rows = []
+
     self.client.set_search(self.start_date, self.end_date)
 
     text = self.client.get_search_results(page=self.page)
@@ -319,8 +329,10 @@ class TJSPChunk(base.Chunk):
     records = int(count_elements[0]['value'])
 
     margin = 100. * abs(1 - (records / self.expects))
-    assert margin <= 1., "page {page} was expecting {expects} got {records} (considers a margin of error) (start_date: {start_date}, end_date: {end_date})".format(
-      page=self.page, expects=self.expects, records=records, start_date=self.start_date, end_date=self.end_date)
+    if margin >= 1.:
+      logger.warn("page {page} was expecting {expects} got {records} (considers a margin of error) (start_date: {start_date}, end_date: {end_date})".format(
+        page=self.page, expects=self.expects, records=records, start_date=self.start_date, end_date=self.end_date))
+      raise utils.PleaseRetryException()
 
     current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
 
@@ -334,8 +346,8 @@ class TJSPChunk(base.Chunk):
     items = soup.find_all('tr', {'class': 'fundocinza1'})
     if not is_last_page:
       page_records = len(items)
-      assert 20 == page_records, \
-        f'expecting 20 records on page {self.page}, got {page_records} (start_date: {self.start_date}, end_date: {self.end_date})'  # sanity check
+      if page_records == 0:  # Wasn't expecting that but sometimes it happens. Sadly
+        raise utils.PleaseRetryException()
 
     for item in items:
       links = item.find_all('a', {'class': 'downloadEmenta'})
@@ -370,7 +382,7 @@ class TJSPChunk(base.Chunk):
       pdf_url = f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
       row_content = item.prettify(encoding='cp1252')
 
-      yield [
+      rows.append([
         base.Content(
           content=row_content,
           dest=f'{year}/{month}/doc_{doc_id}.html',
@@ -386,7 +398,9 @@ class TJSPChunk(base.Chunk):
           dest=f'{year}/{month}/doc_{doc_id}.pdf',
           content_type='application/pdf'
         )
-      ]
+      ])
+
+    return rows
 
 
 class TJSPHandler(base.ContentHandler):

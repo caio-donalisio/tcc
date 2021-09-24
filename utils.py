@@ -162,7 +162,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                   http.client.HTTPException,
                   TimeoutException,
                   PleaseRetryException)):
-    assert max_retries > 0 and sleeptime > 1
+    assert max_retries > 0 and sleeptime > 0
 
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
@@ -381,4 +381,3 @@ def find_between(string, start, end):
     return re.search(pattern, string).group(1)
 
 
-        
