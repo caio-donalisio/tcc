@@ -314,6 +314,7 @@ class ChunkRunner:
       dirty   = False
       last_snapshot_taken = 0
       expects = self.collector.count()
+      snapshot.set_value('expects', expects)
       records = 0
 
       with tqdm(total=expects, file=tqdm_out) as pbar:
@@ -354,6 +355,8 @@ class ChunkRunner:
     if snapshot:
       snapshot.set_value('done', True)
       self.repository.commit(snapshot)
+
+    self.logger.info(f'Session finished -- Snapshot: {snapshot.hash if snapshot else "-"}')
 
 
 class ContentHandler:
