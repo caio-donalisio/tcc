@@ -324,6 +324,7 @@ class ChunkRunner:
             pbar.set_postfix({**chunk.keys, **{'ok': True}})
             pbar.update(chunk_records)
             records += chunk_records
+            snapshot.set_value('records', records)
             continue
 
           chunk_result = self.processor.process(chunk)
@@ -355,6 +356,7 @@ class ChunkRunner:
     if snapshot:
       snapshot.set_value('done', True)
       self.repository.commit(snapshot)
+      self.logger.info(f'Snapshot written: expects={snapshot.get_value("expects")} records={snapshot.get_value("records")}.')
 
     self.logger.info(f'Session finished -- Snapshot: {snapshot.hash if snapshot else "-"}')
 
