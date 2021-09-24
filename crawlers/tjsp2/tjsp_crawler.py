@@ -552,6 +552,7 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
       results.append([
         start.to_date_string(),
         end.to_date_string()  ,
+        (snapshot_info['expects'] or -1),
         (snapshot_info['records'] or -1),
         pending_pdfs_count,
         snapshot_info['done']
@@ -560,7 +561,8 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
       results.append([
         start.to_date_string(),
         end.to_date_string()  ,
-        0,
+        None,
+        None,
         0,
         'Unknown',
       ])
@@ -569,8 +571,8 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
 
   print([row[2] for row in results])
 
-  total_records = sum([row[2] for row in results])
-  total_pdfs    = sum([row[3] for row in results])
+  total_records = sum([row[2] for row in results if row[2]])
+  total_pdfs    = sum([row[3] for row in results if row[3]])
   results.append(['', '', total_records, total_pdfs, ''])
 
-  print(tabulate(results, headers=['Start', 'End', 'Records', 'Pending PDFs', 'Finished']))
+  print(tabulate(results, headers=['Start', 'End', 'Expects', 'Records', 'Pending PDFs', 'Finished']))
