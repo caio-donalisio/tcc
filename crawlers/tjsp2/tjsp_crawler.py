@@ -318,7 +318,8 @@ class TJSPChunk(base.Chunk):
     assert len(count_elements) == 1
     records = int(count_elements[0]['value'])
 
-    assert self.expects == records, "page {page} was expecting {expects} got {records} (start_date: {start_date}, end_date: {end_date})".format(
+    margin = 100. * abs(1 - (records / self.expects))
+    assert margin <= 1., "page {page} was expecting {expects} got {records} (considers a margin of error) (start_date: {start_date}, end_date: {end_date})".format(
       page=self.page, expects=self.expects, records=records, start_date=self.start_date, end_date=self.end_date)
 
     current_page_links = soup.find_all('span', {'class': 'paginaAtual'})
