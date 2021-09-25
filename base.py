@@ -354,9 +354,10 @@ class ChunkRunner:
       self.collector.teardown()
 
     if snapshot:
+      snapshot.set_value('total_records', records)
       snapshot.set_value('done', True)
       self.repository.commit(snapshot)
-      self.logger.info(f'Snapshot written: expects={snapshot.get_value("expects")} records={snapshot.get_value("records")}.')
+      self.logger.info(f'Snapshot written: expects={snapshot.get_value("expects")} records={records}.')
 
     self.logger.info(f'Session finished -- Snapshot: {snapshot.hash if snapshot else "-"}')
 
