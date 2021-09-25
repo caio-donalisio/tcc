@@ -328,7 +328,7 @@ class TJSPChunk(base.Chunk):
     assert len(count_elements) == 1
     records = int(count_elements[0]['value'])
 
-    margin = 100. * abs(1 - (records / self.expects))
+    margin = 100. * abs(1 - (records / self.expects)) if self.expects > 0 else 0
     if margin >= 1.:
       logger.warn("page {page} was expecting {expects} got {records} (considers a margin of error) (start_date: {start_date}, end_date: {end_date})".format(
         page=self.page, expects=self.expects, records=records, start_date=self.start_date, end_date=self.end_date))
