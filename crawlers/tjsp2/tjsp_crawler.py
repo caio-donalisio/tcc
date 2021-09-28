@@ -548,7 +548,7 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
       repository.restore(snapshot)
       snapshot_info = {
         key: snapshot.get_value(key)
-        for key in ['records', 'expects', 'done']
+        for key in ['records', 'total_records', 'expects', 'done']
       }
 
       pending_pdfs_count = 0
@@ -564,13 +564,18 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
           pending_pdfs_count = len(list(pending_pdfs))
           logger.debug(f'Prefix: {prefix} - pending pdfs: {pending_pdfs_count}')
 
+      total_records = (snapshot_info.get('total_records') or 0)
+      expects       = (snapshot_info.get('expects') or 0)
+
       results.append([
         start.to_date_string(),
         end.to_date_string()  ,
-        (snapshot_info['expects'] or -1),
-        (snapshot_info['records'] or -1),
+        expects,
+        total_records,
+        total_records - expects,
         pending_pdfs_count,
-        snapshot_info['done']
+        snapshot_info['done'],
+        snapshot.hash
       ])
     else:
       results.append([
@@ -578,16 +583,15 @@ def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
         end.to_date_string()  ,
         None,
         None,
+        None,
         0,
         'Unknown',
+        '-',
       ])
 
+  total_expected = sum([row[2] for row in results if row[2]])
+  total_records  = sum([row[3] for row in results if row[3]])
+  total_pdfs     = sum([row[5] for row in results if row[5]])
+  results.append(['', '', total_expected, total_records, total_records - total_expected, total_pdfs, ''])
 
-
-  print([row[2] for row in results])
-
-  total_records = sum([row[2] for row in results if row[2]])
-  total_pdfs    = sum([row[3] for row in results if row[3]])
-  results.append(['', '', total_records, total_pdfs, ''])
-
-  print(tabulate(results, headers=['Start', 'End', 'Expects', 'Records', 'Pending PDFs', 'Finished']))
+  print(tabulate(results, headers=['Start', 'End', 'Expects', 'Records', 'Diff', 'Pending PDFs', 'Finished', 'Snapshot']))
