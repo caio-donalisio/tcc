@@ -9,9 +9,9 @@ from app import cli, celery
 import logging
 import utils
 import base
-from crawlers.tjsp2.tjsp_crawler import TJSPClient
+from crawlers.tjsp.tjsp_crawler import TJSPClient
 from logconfig import logger_factory
-from crawlers.tjsp2.tjsp_utils import list_pending_pdfs
+from crawlers.tjsp.tjsp_utils import list_pending_pdfs
 
 logger = logger_factory('tjsp-pdf')
 

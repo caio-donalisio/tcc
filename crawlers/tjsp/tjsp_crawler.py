@@ -527,7 +527,7 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cac
 def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
   from tabulate import tabulate
   from tqdm import tqdm
-  from crawlers.tjsp2.tjsp_utils import list_pending_pdfs
+  from crawlers.tjsp.tjsp_utils import list_pending_pdfs
 
   start_date, end_date =\
         pendulum.parse(start_date), pendulum.parse(end_date)
