@@ -1,30 +1,27 @@
-import re
-import os
 import json
 import math
-import requests
-import pendulum
-import utils
-import time
+import os
 import random
-from slugify import slugify
+import re
+import time
+
 import base
-
-from selenium import webdriver
+import pendulum
+import requests
+import utils
 from celery_singleton import Singleton
-
+from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-
+from slugify import slugify
 from urllib3.exceptions import InsecureRequestWarning
-
 from utils import PleaseRetryException
+
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-import ratelimit
-
 import click
-from app import cli, celery
+import ratelimit
+from app import celery, cli
 from logconfig import logger_factory, setup_cloud_logger
 
 ONE_MINUTE = 60
@@ -218,10 +215,10 @@ class TJSPClient:
     self.driver.implicitly_wait(20)
 
   def signin(self):
+    from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.chrome.options import Options
 
     self.driver.get(('https://esaj.tjsp.jus.br/sajcas/login?service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fj_spring_cas_security_check'))
     WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.ID, 'usernameForm')))
@@ -483,6 +480,21 @@ def tjsp_task(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache,
       .run(snapshot=snapshot)
 
 
+@celery.task(queue='crawlers.tjsp', default_retry_delay=5 * 60,
+             autoretry_for=(BaseException,),
+             base=Singleton)
+def tjsp_task_download_from_prev_days(output_uri, max_prev_days=1):
+  start_date = pendulum.now().subtract(days=1)
+  end_date   = pendulum.now().subtract(days=max_prev_days)
+  tjsp_task(start_date.to_date_string(),
+            end_date.to_date_string(),
+            output_uri,
+            pdf_async=True,
+            skip_pdf=True,
+            skip_cache=True,
+            browser=False,)
+
+
 @cli.command(name='tjsp')
 @click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
 @click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
@@ -525,9 +537,9 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cac
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--count-pending-pdfs', default=False, help='Count pending pdfs', is_flag=True)
 def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
+  from crawlers.tjsp.tjsp_utils import list_pending_pdfs
   from tabulate import tabulate
   from tqdm import tqdm
-  from crawlers.tjsp.tjsp_utils import list_pending_pdfs
 
   start_date, end_date =\
         pendulum.parse(start_date), pendulum.parse(end_date)

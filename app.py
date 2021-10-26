@@ -1,14 +1,12 @@
-import conf
 import click
-
+import sentry_sdk
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import setup_logging, worker_process_init, worker_ready
 from celery_singleton import clear_locks
-
-
-import sentry_sdk
 from sentry_sdk.integrations.celery import CeleryIntegration
 
+import conf
 from logconfig import logger_factory
 
 sentry_config = dict(
@@ -44,3 +42,17 @@ def unlock_all(**kwargs):
 @click.pass_context
 def cli(ctx):
   pass
+
+
+@celery.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    from crawlers.tjsp.tjsp_crawler import tjsp_task_download_from_prev_days
+    from crawlers.tjsp.tjsp_pdf import tjsp_download_task
+
+    sender.add_periodic_task(
+      crontab(minute=0, hour=3),
+      tjsp_task_download_from_prev_days.s(
+        output_uri='gs://inspira-tjsp',
+        max_prev_days=1,
+      ),
+    )
