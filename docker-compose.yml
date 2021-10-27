@@ -25,6 +25,14 @@ services:
       - .:/opt/service
       - .service-account.json:/etc/gcloud/service-account.json
 
+  beat:
+    <<: *celery
+    container_name: 'inspira-crawlers-beat'
+    command: 'celery -A tasks beat -s .celerybeat-schedule'
+    volumes:
+      - .:/opt/service
+      - .celerybeat-schedule:/opt/service/.celerybeat-schedule
+
   celery_tjsp:
     <<: *celery
     container_name: 'inspira-crawlers-tjsp'
