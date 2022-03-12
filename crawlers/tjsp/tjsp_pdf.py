@@ -1,17 +1,16 @@
-import click
-import pathlib
-import time
-import random
-
-import pendulum
-from app import cli, celery
-
 import logging
-import utils
+import pathlib
+import random
+import time
+
 import base
+import click
+import pendulum
+import utils
+from app import celery, cli
 from crawlers.tjsp.tjsp_crawler import TJSPClient
-from logconfig import logger_factory
 from crawlers.tjsp.tjsp_utils import list_pending_pdfs
+from logconfig import logger_factory
 
 logger = logger_factory('tjsp-pdf')
 
@@ -23,8 +22,8 @@ class TJSPDownloader:
     self._output = output
 
   def download(self, items, pbar=None):
-    import time
     import concurrent.futures
+    import time
     self._client.signin()
     self._client.set_search(
       start_date=pendulum.DateTime(2020, 1, 1),
@@ -86,10 +85,15 @@ class TJSPDownloader:
 
   def _handle_upload(self, content_from_url, response):
     logger.debug(f'GET {content_from_url.src} UPLOAD')
-    self._output.save_from_contents(
-        filepath=content_from_url.dest,
-        contents=response.content,
-        content_type=content_from_url.content_type)
+
+    if len(response.content) > 0:
+      self._output.save_from_contents(
+          filepath=content_from_url.dest,
+          contents=response.content,
+          content_type=content_from_url.content_type)
+    else:
+      logger.warn(
+        f"Got 0 bytes for {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
 
 
 @celery.task(queue='tjsp.pdf', autoretry_for=(Exception,),
@@ -155,8 +159,9 @@ def tjsp_pdf_command(input_uri, prefix, dry_run, local, count):
 
   # for testing purposes
   if local:
-    from tqdm import tqdm
     import concurrent.futures
+
+    from tqdm import tqdm
 
     # just to count
     pendings = []
