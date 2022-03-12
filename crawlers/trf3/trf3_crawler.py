@@ -154,6 +154,18 @@ class TRF3Chunk(base.Chunk):
                 f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
             soup = BeautifulSoup(response.text, features='html5lib')
 
+            def file_is_error(soup):
+                error_div = soup.find(name='div',id='erro')
+                if error_div:
+                    is_error = error_div.find(text=re.compile(r'^[\s\n]*Ocorreu[\s\n]*um[\s\n]*erro\.?[\s\n]*$'))
+                return bool(error_div and is_error)
+
+            if file_is_error(soup):
+                logger.warn(
+                (f"Server responded error file - status_code={response.status_code} " 
+                f"hash={self.hash} page={self.page} number={proc_number}" ))
+                raise utils.PleaseRetryException()
+
             pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
             pub_date, = DATE_PATTERN.findall(
                 pub_date_div.next_sibling.next_sibling.text)
