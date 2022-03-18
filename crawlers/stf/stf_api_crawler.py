@@ -54,7 +54,7 @@ class STF:
         self.logger.debug(f'Chunk {chunk.hash} ({chunk_records} records) commited.')
 
     self.logger.info(f'Expects {total_records}. Fetched {records_fetch}.')
-    assert total_records == records_fetch
+    assert total_records <= records_fetch
 
   def process_chunk(self, chunk):
     chunk_records = 0
