@@ -16,11 +16,10 @@ import time
 import re
 
 DEFAULT_HEADERS = {
-    # 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36 Edg/93.0.961.38',
+    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
     'Accept': '*/*',
     'Accept-Encoding': 'gzip, deflate',
-    'Referer': 'http://web.trf3.jus.br/base-textual'
+    'Referer': 'https://web.trf3.jus.br/base-textual'
 }
 
 TRF3_DATE_FORMAT = 'DD/MM/YYYY'
@@ -82,7 +81,7 @@ class TRF3Client:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
-        self.session.get('http://web.trf3.jus.br/base-textual',
+        self.session.get('https://web.trf3.jus.br/base-textual',
                          headers=DEFAULT_HEADERS)
 
     @utils.retryable(max_retries=9, sleeptime=20)
@@ -100,9 +99,9 @@ class TRF3Client:
     def fetch(self, filters):
         self.setup()
         post_data = get_post_data(filters)
-        url = 'http://web.trf3.jus.br/base-textual/Home/ResultadoTotais'
+        url = 'https://web.trf3.jus.br/base-textual/Home/ResultadoTotais'
         return self.session.post(url,
-                                 json=post_data,
+                                 data=post_data,
                                  headers=DEFAULT_HEADERS)
 
 
@@ -151,7 +150,7 @@ class TRF3Chunk(base.Chunk):
             to_download = []
 
             response = self.client.session.get(
-                f'http://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
+                f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
             soup = BeautifulSoup(response.text, features='html5lib')
 
             pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
@@ -196,7 +195,7 @@ class TRF3Chunk(base.Chunk):
                 dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
                 url_acordao_inteiro = link_to_inteiro.get('href')
                 to_download.append(base.ContentFromURL(
-                    src=f'http://web.trf3.jus.br{url_acordao_inteiro}',
+                    src=f'https://web.trf3.jus.br{url_acordao_inteiro}',
                     dest=dest_path_inteiro,
                     content_type='text/html'
                 ))
