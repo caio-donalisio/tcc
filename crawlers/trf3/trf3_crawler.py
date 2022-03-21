@@ -11,8 +11,6 @@ from bs4 import BeautifulSoup
 import re
 import hashlib
 from itertools import chain
-from requests.exceptions import RequestException
-import time
 import re
 
 DEFAULT_HEADERS = {
@@ -151,7 +149,18 @@ class TRF3Chunk(base.Chunk):
 
             response = self.client.session.get(
                 f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
+            
+            if response.status_code != 200:
+                logger.warn(f"Response <{response.status_code}> - {response.url}")
+                raise utils.PleaseRetryException
+
             soup = BeautifulSoup(response.text, features='html5lib')
+
+            #THIS CHECK REQUIRES FURTHER TESTING
+            if soup.find('h2', text='Para iniciar uma nova sessão clique em algum dos links ao lado.'):
+                self.client.setup()
+                logger.warn(f"Session expired - trying again")
+                raise utils.PleaseRetryException
 
             pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
             pub_date, = DATE_PATTERN.findall(
@@ -183,13 +192,10 @@ class TRF3Chunk(base.Chunk):
             page_acordao_soup = BeautifulSoup(
                 page_acordao.text, features='html5lib')
 
-            #link_dates = []
-            # for db_name in ['Pje','GEDPRO']:
             link_date = nearest_date(page_acordao_soup.find_all(
                 'a', text=re.compile('\d{2}/\d{2}/\d{4}')), pivot=pub_date)
-            # {'name': db_name}), pub_date))
 
-            if link_date:  # to_inteiro:
+            if link_date:
                 link_to_inteiro = page_acordao_soup.find(
                     'a', text=link_date.format(TRF3_DATE_FORMAT))
                 dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
