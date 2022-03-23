@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 import base
 import math
 import json
@@ -11,21 +12,53 @@ import requests
 
 logger = logger_factory('scrfb')
 
+def get_filters(start_date, end_date):
+    return {
+        'facetsExistentes': '',
+        'orgaosSelecionados': '',
+        'tiposAtosSelecionados': '72%3B+75%3B+73',
+        'lblTiposAtosSelecionados': 'SC%3B+SCI%3B+SD',
+        'ordemColuna': 'Publicacao',
+        'ordemDirecao': 'DESC',
+        'tipoConsulta': 'formulario',
+        'tipoAtoFacet': '',
+        'siglaOrgaoFacet': '',
+        'anoAtoFacet': '',
+        'termoBusca': 'a',
+        'numero_ato': '',
+        'tipoData': '2',
+        'dt_inicio': start_date,
+        'dt_fim': end_date,
+        'ano_ato': '',
+        'optOrdem': 'Publicacao_DESC'
+    }
 
 class SCRFBClient:
 
     def __init__(self):
-        self.url = 'https://acordaos.economia.gov.br/solr/acordaos2/browse?'
+        self.url = 'http://normas.receita.fazenda.gov.br/sijut2consulta/'
 
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
-        result = self.fetch(filters,page=1)
-        return result['response']['numFound']
+        import re
+        result = self.fetch(filters)
+        soup=BeautifulSoup(result.text)
+        count_tag = soup.find('ul', attrs={'class':'pagination total-regs-encontrados'})
+        if count_tag:
+            count = re.search(r'\s*Total de atos localizados:\s*([\.\d]+)[\s\n]+.*',count_tag.text)
+            count = int(count.group(1))
+        else:
+            count = 0
+        return count
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
         try:
+
+            url = f'{self.url}/consulta.action?p={page}&' + urlencode(self.query)
+            self.logger.info(f'GET {url}')
+            response = self.requester.get(url)
 
             items_per_page = filters.get('rows')
 
