@@ -201,7 +201,7 @@ class TRF3Chunk(base.Chunk):
             url_page_acordao = soup.find(
                 'a', {'title': 'Exibir a íntegra do acórdão.'}).get('href')
             page_acordao = requests.get(
-                url_page_acordao, headers=DEFAULT_HEADERS)
+                url_page_acordao, headers=DEFAULT_HEADERS, timeout=120)
             page_acordao_soup = BeautifulSoup(
                 page_acordao.text, features='html5lib')
 
