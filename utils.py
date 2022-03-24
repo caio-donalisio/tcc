@@ -6,6 +6,7 @@ import logging
 import urllib.request
 import time
 import http.client
+import pendulum
 import requests
 import itertools
 import hashlib
@@ -20,6 +21,7 @@ from functools import wraps
 import wrapt
 from urllib.parse import parse_qsl, urlencode, urlsplit
 from selenium.common.exceptions import TimeoutException
+import base    
 
 from storage import (get_bucket_ref, )
 from fake_useragent import UserAgent
@@ -139,6 +141,49 @@ def get_filepath(date, filename, extension):
     _, month, year = date.split('/')
     return f'{year}/{month}/{filename}.{extension}'
 
+def get_count_filepath(
+    court_name:str, 
+    start_date: pendulum.datetime,
+    end_date: pendulum.datetime,
+    filepath=None):
+    
+    if filepath is None:
+        dest_record = f'{court_name.upper()}-COUNT-{start_date.to_date_string()}-{end_date.to_date_string()}'
+    else:
+        dest_record = filepath
+    return dest_record
+
+def get_count_data(
+    start_date:pendulum.datetime,
+    end_date:pendulum.datetime,
+    count:int,
+    count_time: pendulum.datetime,):
+
+    return {
+        'start_date' : start_date.to_date_string(),
+        'end_date' : end_date.to_date_string(),
+        'count' : count,
+        'count_time' : count_time.to_datetime_string(),
+    }
+
+def get_count_data_and_filepath(
+    court_name:str,
+    start_date: pendulum.datetime,
+    end_date: pendulum.datetime,
+    count:int,
+    count_time: pendulum.datetime,
+    filepath=None):
+
+    return tuple([
+        get_count_data(start_date,end_date,count,count_time),
+        get_count_filepath(court_name,start_date,end_date,filepath)
+    ])
+
+def count_data_content(count_data, count_filepath):
+    return [base.Content(
+            content=json.dumps(count_data),
+            dest=count_filepath,
+            content_type='application/json')]
 
 def pdf_content_file_by_url(pdf_url):
     response = urllib.request.urlopen(pdf_url)
