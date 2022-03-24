@@ -9,6 +9,8 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
+from urllib.parse import parse_qsl, urlencode, urlsplit
+
 
 logger = logger_factory('scrfb')
 
@@ -33,6 +35,11 @@ def get_filters(start_date, end_date):
         'optOrdem': 'Publicacao_DESC'
     }
 
+RESULTS_PER_PAGE = 100  # DEFINED BY THEIR SERVER
+INPUT_DATE_FORMAT = 'YYYY-MM-DD'
+SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
+NOW = pendulum.now()
+
 class SCRFBClient:
 
     def __init__(self):
@@ -56,20 +63,22 @@ class SCRFBClient:
     def fetch(self, filters, page=1):
         try:
 
-            url = f'{self.url}/consulta.action?p={page}&' + urlencode(self.query)
-            self.logger.info(f'GET {url}')
-            response = self.requester.get(url)
+            # url = f'{self.url}/consulta.action?p={page}'# + urlencode(self.query)
+            # self.logger.info(f'GET {url}')
+            return requests.get(
+               f'{self.url}/consulta.action?p={page}',
+                params=filters)
 
-            items_per_page = filters.get('rows')
+            # items_per_page = filters.get('rows')
 
-            params = {
-                **filters,
-                **{'start': (page - 1) * items_per_page}
-            }
+            # params = {
+            #     **filters,
+            #     **{'start': (page - 1) * items_per_page}
+            # }
 
-            return requests.get(self.url,
-                                params=params,
-                                verify=False).json()
+            # return requests.get(self.url,
+            #                     params=params,
+            #                     verify=False).json()
 
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
@@ -87,9 +96,8 @@ class SCRFBCollector(base.ICollector):
 
     def chunks(self):
         total = self.count()
-        pages = math.ceil(total/self.filters.get('rows'))
-
-        for page in range(1, pages + 1):
+        pages = range(1, 2 + total//RESULTS_PER_PAGE)
+        for page in pages:
             yield SCRFBChunk(
                 keys={
                     **self.filters  , **{'page': page}
@@ -98,7 +106,6 @@ class SCRFBCollector(base.ICollector):
                 filters=self.filters,
                 page=page,
                 client=self.client
-
             )
 
 
@@ -144,21 +151,12 @@ def scrfb_task(**kwargs):
         output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
         logger.info(f'Output: {output}.')
 
-        start_date = kwargs.get('start_date') + ' 00:00:00'
-        end_date = kwargs.get('end_date') + ' 23:59:59'
+        start_date = kwargs.get('start_date')
+        end_date = kwargs.get('end_date')
 
-        date_format = 'YYYY-MM-DD HH:mm:ss'
-
-        start_date = pendulum.from_format(start_date,date_format).to_iso8601_string()
-        end_date = pendulum.from_format(end_date,date_format).to_iso8601_string()
-        time_interval = f'dt_sessao_tdt:[{start_date} TO {end_date}]'
-
-        query_params = {
-            'sort':'id asc',
-            'rows':10,
-            'wt':'json',
-            'fq':time_interval,
-            }
+        start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT).format(SEARCH_DATE_FORMAT)
+        end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT).format(SEARCH_DATE_FORMAT)
+        query_params = get_filters(start_date=start_date,end_date=end_date)
 
         collector = SCRFBCollector(client=SCRFBClient(), filters=query_params)
         handler   = base.ContentHandler(output=output)
