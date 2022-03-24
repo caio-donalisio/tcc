@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import base
-import math
+import re
 import json
 import pendulum
 import celery
@@ -48,16 +48,23 @@ class SCRFBClient:
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
-        import re
         result = self.fetch(filters)
         soup = utils.soup_by_content(result.text)
         count_tag = soup.find('ul', attrs={'class':'pagination total-regs-encontrados'})
         if count_tag:
-            count = re.search(r'\s*Total de atos localizados:\s*([\d]+)[\s\n]+.*',count_tag.text)
+            count = re.search(r'\s*Total de atos localizados:\s*(\d+)[\s\n].*',count_tag.text)
             count = int(count.group(1))
         else:
             count = 0
         return count
+    
+    def count_periods(self,filters,unit='months'):
+        return sum(1 for _ in utils.timely(
+                    filters.get('start_date'),
+                    filters.get('end_date'),
+                    unit=unit,
+                    step=1)
+                )
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
@@ -82,29 +89,33 @@ class SCRFBCollector(base.ICollector):
         self.filters = filters
 
     def count(self):
-        return self.client.count(self.filters)
+        if self.filters.get('count_only'):
+            return self.client.count_periods(self.filters)
+        else:
+            return self.client.count(self.filters)
 
     def chunks(self):
-        total = self.count()
-        
-        periods = utils.timely(
+        periods = list(utils.timely(
             start_date=self.filters.get('start_date'),
             end_date=self.filters.get('end_date'),
             step=1,
             unit='months',
-        )
-        
-        for start,end in periods:
+        ))
+        total = self.count()
+        if self.filters.get('count_only'):
+            pages = [1]
+        else:
             pages = range(1, 2 + total//RESULTS_PER_PAGE)
+
+        for start,end in reversed(periods):
             for page in pages:
-                # RESTART COLLECTION FROM SCRATCH ONLY IF TOTAL COUNT CHANGES AND THE CURRENT MONTH HAS PASSED 
-                IS_CURRENT_MONTH = [NOW.year,NOW.month] == [end.year,end.month]
                 yield SCRFBChunk(
                     keys={
                         'start_date':start.to_date_string(),
                         'end_date':end.to_date_string(),
                         'page': page,
-                        'count':IS_CURRENT_MONTH/2 or total,
+                        'count': total,
+                        'count_only':self.filters.get('count_only'),
                         },
                     prefix='',
                     filters={
@@ -115,8 +126,6 @@ class SCRFBCollector(base.ICollector):
                     count_only = self.filters.get('count_only'),
                     client=self.client
                 )
-
-
 class SCRFBChunk(base.Chunk):
 
     def __init__(self, keys, prefix, filters, page, count_only, client):
@@ -141,14 +150,54 @@ class SCRFBChunk(base.Chunk):
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
             trs = soup.find_all('tr', class_='linhaResultados')
+            acts = []
+            resume_from_index = 0
+            last_id = None
 
             for index, tr in enumerate(trs):
+                if not tr.a:
+                    continue
+                act_id = self.act_id_from_url(tr.a['href'])
+                if last_id is not None and last_id == act_id:
+                    resume_from_index = index
+                publication_date = tr.find_all('td')[3].text
+                
+                acts.append((act_id, publication_date))
+
                 yield [
                 base.Content(content=json.dumps(record),dest=dest_record,
                     content_type='application/json'),
                 base.ContentFromURL(src=report_url,dest=dest_report,
                     content_type='application/pdf')
                 ]
+
+    def act_id_from_url(url):
+        query = urlsplit(url).query
+        return dict(parse_qsl(query))['idAto']
+
+    def fetch_act(self, act_id, publication_date):
+        url = f'{self.url}/link.action?visao=anotado&idAto={act_id}'
+        self.logger.info(f'GET {url}')
+        response = self.requester.get(url)
+
+        if response.status_code == 200:
+            html_filepath = utils.get_filepath(
+                date=publication_date, filename=act_id, extension='html')
+            self.output.save_from_contents(
+                filepath=html_filepath, contents=response.text)
+
+            soup = utils.soup_by_content(response.text)
+            pdf_link = soup.find('a', text=lambda text: text and 'pdf' in text)
+
+            if pdf_link:
+                pdf_url = BASE_URL + pdf_link['href']
+                pdf_content = utils.pdf_content_file_by_url(pdf_url)
+                pdf_filepath = utils.get_filepath(
+                    date=publication_date, filename=act_id, extension='pdf')
+                self.output.save_from_contents(
+                    filepath=pdf_filepath, contents=pdf_content, mode='wb')
+
+            return act_id
 
 @celery.task(queue='crawlers.scrfb', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
