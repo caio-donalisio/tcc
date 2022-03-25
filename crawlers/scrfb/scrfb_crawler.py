@@ -149,55 +149,42 @@ class SCRFBChunk(base.Chunk):
         else:
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
-            trs = soup.find_all('tr', class_='linhaResultados')
-            acts = []
-            resume_from_index = 0
-            last_id = None
-
-            for index, tr in enumerate(trs):
-                if not tr.a:
+            acts = soup.find_all('tr', class_='linhaResultados')
+            to_download = []
+            for act in acts:
+                if not act.a:
                     continue
-                act_id = self.act_id_from_url(tr.a['href'])
-                if last_id is not None and last_id == act_id:
-                    resume_from_index = index
-                publication_date = tr.find_all('td')[3].text
+                act_id = self.act_id_from_url(act.a['href'])
+                publication_date = act.find_all('td')[3].text
+                date_id = ''.join(publication_date.split('/')[::-1]).replace('/','')
+                html_content,pdf_url=self.fetch_act(act_id=act_id)#,publication_date=publication_date)                
                 
-                acts.append((act_id, publication_date))
+                to_download.append(base.Content(
+                    content=html_content,
+                    dest=utils.get_filepath(publication_date, f'{date_id}_{act_id}', 'html'),
+                    content_type='text/html'))
 
-                yield [
-                base.Content(content=json.dumps(record),dest=dest_record,
-                    content_type='application/json'),
-                base.ContentFromURL(src=report_url,dest=dest_report,
-                    content_type='application/pdf')
-                ]
+                if pdf_url:
+                    to_download.append(base.ContentFromURL(
+                        src=pdf_url,
+                        dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}', 'pdf'),
+                        content_type='application/pdf'))
+                yield to_download
 
-    def act_id_from_url(url):
+    def act_id_from_url(self,url):
         query = urlsplit(url).query
         return dict(parse_qsl(query))['idAto']
 
-    def fetch_act(self, act_id, publication_date):
-        url = f'{self.url}/link.action?visao=anotado&idAto={act_id}'
-        self.logger.info(f'GET {url}')
-        response = self.requester.get(url)
-
+    def fetch_act(self, act_id):
+        base_url = 'http://normas.receita.fazenda.gov.br/sijut2consulta'
+        aux_url = '/link.action'
+        response = requests.get(f'{base_url}{aux_url}',params={
+            'visao':'anotado','idAto':act_id})
         if response.status_code == 200:
-            html_filepath = utils.get_filepath(
-                date=publication_date, filename=act_id, extension='html')
-            self.output.save_from_contents(
-                filepath=html_filepath, contents=response.text)
-
             soup = utils.soup_by_content(response.text)
             pdf_link = soup.find('a', text=lambda text: text and 'pdf' in text)
-
-            if pdf_link:
-                pdf_url = BASE_URL + pdf_link['href']
-                pdf_content = utils.pdf_content_file_by_url(pdf_url)
-                pdf_filepath = utils.get_filepath(
-                    date=publication_date, filename=act_id, extension='pdf')
-                self.output.save_from_contents(
-                    filepath=pdf_filepath, contents=pdf_content, mode='wb')
-
-            return act_id
+            pdf_url = f'{base_url}/{pdf_link["href"]}' if pdf_link else None
+            return response.text,pdf_url
 
 @celery.task(queue='crawlers.scrfb', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
