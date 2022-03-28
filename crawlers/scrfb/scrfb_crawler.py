@@ -87,7 +87,6 @@ class SCRFBCollector(base.ICollector):
         self.filters = filters
 
     def count(self, period=None):
-        if 
         if self.filters.get('count_only'):
             return self.client.count_periods(self.filters)
         else:
@@ -101,7 +100,7 @@ class SCRFBCollector(base.ICollector):
             unit='months',
         ))
         for start,end in reversed(periods):
-            total = self.count(){'start_date':start,'end_date':end})
+            total = self.count()
             pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
             for page in pages:
                 yield SCRFBChunk(
