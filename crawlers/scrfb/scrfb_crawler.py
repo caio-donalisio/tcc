@@ -1,7 +1,5 @@
-from bs4 import BeautifulSoup
 import base
 import re
-import json
 import pendulum
 import celery
 import utils
@@ -9,7 +7,7 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
-from urllib.parse import parse_qsl, urlencode, urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 
 logger = logger_factory('scrfb')
@@ -88,7 +86,8 @@ class SCRFBCollector(base.ICollector):
         self.client = client
         self.filters = filters
 
-    def count(self):
+    def count(self, period=None):
+        if 
         if self.filters.get('count_only'):
             return self.client.count_periods(self.filters)
         else:
@@ -101,13 +100,9 @@ class SCRFBCollector(base.ICollector):
             step=1,
             unit='months',
         ))
-        total = self.count()
-        if self.filters.get('count_only'):
-            pages = [1]
-        else:
-            pages = range(1, 2 + total//RESULTS_PER_PAGE)
-
         for start,end in reversed(periods):
+            total = self.count(){'start_date':start,'end_date':end})
+            pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
             for page in pages:
                 yield SCRFBChunk(
                     keys={
@@ -158,16 +153,19 @@ class SCRFBChunk(base.Chunk):
                 publication_date = act.find_all('td')[3].text
                 date_id = ''.join(publication_date.split('/')[::-1]).replace('/','')
                 html_content,pdf_url=self.fetch_act(act_id=act_id)#,publication_date=publication_date)                
+                content_id= utils.get_content_hash(
+                    soup=utils.soup_by_content(html_content),
+                    tag_descriptions=[{'name':'p','class_':'ementa'}])
                 
                 to_download.append(base.Content(
                     content=html_content,
-                    dest=utils.get_filepath(publication_date, f'{date_id}_{act_id}', 'html'),
+                    dest=utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','html'),
                     content_type='text/html'))
 
                 if pdf_url:
                     to_download.append(base.ContentFromURL(
                         src=pdf_url,
-                        dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}', 'pdf'),
+                        dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','pdf'),
                         content_type='application/pdf'))
                 yield to_download
 
