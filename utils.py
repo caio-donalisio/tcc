@@ -22,6 +22,10 @@ import wrapt
 from urllib.parse import parse_qsl, urlencode, urlsplit
 from selenium.common.exceptions import TimeoutException
 import base    
+import bs4
+from itertools import chain
+from typing import List,Dict
+import hashlib
 
 from storage import (get_bucket_ref, )
 from fake_useragent import UserAgent
@@ -141,12 +145,29 @@ def get_filepath(date, filename, extension):
     _, month, year = date.split('/')
     return f'{year}/{month}/{filename}.{extension}'
 
+def get_content_hash(
+    soup: bs4.BeautifulSoup, 
+    tag_descriptions: List[Dict],
+    length=10):
+    '''
+    Return a hash representing the content of the given tags within a soup
+    '''
+    content_string = ''.join(
+        tag.text
+        for tag in chain.from_iterable(
+            soup.find_all(**tag_description) for tag_description in tag_descriptions
+            )
+        )
+    return hashlib.sha1(content_string.encode('utf-8')).hexdigest()[:length]
+
 def get_count_filepath(
     court_name:str, 
     start_date: pendulum.datetime,
     end_date: pendulum.datetime,
     filepath=None):
-    
+    '''
+    Returns custom or standard count file name
+    '''
     if filepath is None:
         dest_record = f'{court_name.upper()}-COUNT-{start_date.to_date_string()}-{end_date.to_date_string()}'
     else:
@@ -158,7 +179,9 @@ def get_count_data(
     end_date:pendulum.datetime,
     count:int,
     count_time: pendulum.datetime,):
-
+    '''
+    Returns count data dictionary
+    '''
     return {
         'start_date' : start_date.to_date_string(),
         'end_date' : end_date.to_date_string(),
