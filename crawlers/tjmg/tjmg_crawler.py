@@ -41,6 +41,7 @@ EXTRA_PARAMS = [
     {'listaClasse': 602},
     {'excluirRepetitivos': 'true'}
 ]
+RESULTS_PER_PAGE = 10  # 10, 20 or 50
 
 
 def get_param_from_url(url, param):
@@ -79,9 +80,8 @@ def default_filters():
             'listaPesquisa': '',
             'descricaoTextosLegais': '',
             'observacoes': '',
-            'linhasPorPagina': '10',
+            'linhasPorPagina': RESULTS_PER_PAGE,
             'pesquisaPalavras': 'Pesquisar'}
-
 
 def format_date(date):
     if not isinstance(date, str):
@@ -171,7 +171,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
 
     def chunks(self):
         self.total_records = self.count()
-        self.total_pages = math.ceil(self.total_records/10)
+        self.total_pages = math.ceil(self.total_records/RESULTS_PER_PAGE)
 
         dates = [start for start, end in utils.timely(
             start_date=self.params.get('start_date'),
@@ -183,7 +183,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
         for date in dates:
             for query in queries:
                 query_total_records = self.count(date, query)
-                query_total_pages = math.ceil(query_total_records/10)
+                query_total_pages = math.ceil(query_total_records/RESULTS_PER_PAGE)
 
                 for page in range(1, query_total_pages + 1):
                     keys = {
