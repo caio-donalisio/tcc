@@ -92,8 +92,8 @@ def format_date(date):
 
 def _get_search_url(session_id, start_date, end_date, query=None):
     query = query or default_filters()
-    query['dataJulgamentoInicial'] = format_date(start_date)
-    query['dataJulgamentoFinal'] = format_date(end_date)
+    query['dataPublicacaoInicial'] = format_date(start_date)
+    query['dataPublicacaoFinal'] = format_date(end_date)
     endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
     return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
@@ -331,7 +331,7 @@ class TJMGChunk(base.Chunk):
                 browser.click(self._find(id='imgBotao1'))
 
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
-            date_label = soup.find('div', text='Data de Julgamento')
+            date_label = soup.find('div', text='Data da publicação da súmula')
 
             proc_string = '_'.join([element.text for element in soup.find_all(
                 'a', {'title': 'Abrir Andamento Processual'})])
