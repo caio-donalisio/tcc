@@ -87,7 +87,8 @@ class TRF3Client:
         result = self.fetch(filters)
         soup = BeautifulSoup(result.text, features='html5lib')
         count = soup.find(
-            'a', {'href': '/base-textual/Home/ListaResumida/1?np=0'}).text
+            'a', {'href': '/base-textual/Home/ListaResumida/1?np=0'})
+        count = count.text if count else ''
         if count:
             return int(''.join([char for char in count if char.isdigit()]))
         else:
@@ -201,7 +202,7 @@ class TRF3Chunk(base.Chunk):
             url_page_acordao = soup.find(
                 'a', {'title': 'Exibir a íntegra do acórdão.'}).get('href')
             page_acordao = requests.get(
-                url_page_acordao, headers=DEFAULT_HEADERS)
+                url_page_acordao, headers=DEFAULT_HEADERS, timeout=120)
             page_acordao_soup = BeautifulSoup(
                 page_acordao.text, features='html5lib')
 
