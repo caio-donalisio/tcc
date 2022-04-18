@@ -87,7 +87,8 @@ class TRF3Client:
         result = self.fetch(filters)
         soup = BeautifulSoup(result.text, features='html5lib')
         count = soup.find(
-            'a', {'href': '/base-textual/Home/ListaResumida/1?np=0'}).text
+            'a', {'href': '/base-textual/Home/ListaResumida/1?np=0'})
+        count = count.text if count else ''
         if count:
             return int(''.join([char for char in count if char.isdigit()]))
         else:
