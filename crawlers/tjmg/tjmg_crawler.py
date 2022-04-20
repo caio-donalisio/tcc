@@ -34,7 +34,8 @@ TJMG_DATE_FORMAT = "DD/MM/YYYY"
 STANDARD_DATE_FORMAT = "YYYY-MM-DD"
 QUERY = 'NAO e'
 DEFAULT_USER_AGENT = {
-    'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
+    # 'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.44'
 }
 EXTRA_PARAMS = [
     {'listaClasse': 600},
@@ -331,6 +332,11 @@ class TJMGChunk(base.Chunk):
                 browser.click(self._find(id='imgBotao1'))
 
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
+            error_message = soup.find('p',id='localizacao')
+            if error_message and error_message.text == 'Sistema Indisponível':
+                logger.warn(f'Error page for {url=}')
+                continue
+
             date_label = soup.find('div', text='Data da publicação da súmula')
 
             proc_string = '_'.join([element.text for element in soup.find_all(
