@@ -22,7 +22,7 @@ BASE_URL = 'http://www4.tjrj.jus.br'
 EJURIS_URL = f'{BASE_URL}/EJURIS'
 EJUD_URL = f'{BASE_URL}/ejud/WS'
 GED_URL = f'http://www1.tjrj.jus.br/gedcacheweb'
-QUERY = 'ação'
+QUERY = 'a ou o ou de'
 DATE_FORMAT = "%d/%m/%Y"
 
 
@@ -112,6 +112,11 @@ class TJRJ(base.BaseCrawler, base.ICollector):
         field_id='ContentPlaceHolder1_txtTextoPesq', value=QUERY)
     self.browser.select_by_id('ContentPlaceHolder1_cmbAnoInicio', self.params['start_year'])
     self.browser.select_by_id('ContentPlaceHolder1_cmbAnoFim', self.params['end_year'])
+
+    monocratico_button = self._find(id='ContentPlaceHolder1_chkDecMon')
+    if monocratico_button.attrs.get('checked') == 'checked':
+      self.browser.click(monocratico_button)
+
     search_button = self._find(id='ContentPlaceHolder1_btnPesquisar')
     self.browser.click(search_button)
     session_id = None
