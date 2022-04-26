@@ -343,20 +343,20 @@ class TJMGChunk(base.Chunk):
                 'a', {'title': 'Abrir Andamento Processual'})])
             proc_string = ''.join(char for char in proc_string if char.isdigit() or char == '_')
 
-            session_date = date_label.find_next_sibling('div').text
-            session_date = pendulum.from_format(session_date, TJMG_DATE_FORMAT)
+            pub_date = date_label.find_next_sibling('div').text
+            pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
             if browser.is_text_present('Inteiro Teor'):
                 onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
                 pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
                 pdf_url = f'{BASE_URL}/{pdf_url}'
-                pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.pdf'
+                pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
                 to_download.append(base.ContentFromURL(
                                             src=pdf_url,
                                             dest=pdf_dest,
                                             content_type='application/pdf'))
 
-            html_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.html'
+            html_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.html'
             to_download.append(base.Content(
                                     content=browser.page_source(),
                                     dest=html_dest,
