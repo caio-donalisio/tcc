@@ -34,13 +34,15 @@ TJMG_DATE_FORMAT = "DD/MM/YYYY"
 STANDARD_DATE_FORMAT = "YYYY-MM-DD"
 QUERY = 'NAO e'
 DEFAULT_USER_AGENT = {
-    'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
+    # 'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.44'
 }
 EXTRA_PARAMS = [
     {'listaClasse': 600},
     {'listaClasse': 602},
     {'excluirRepetitivos': 'true'}
 ]
+RESULTS_PER_PAGE = 10  # 10, 20 or 50
 
 
 def get_param_from_url(url, param):
@@ -79,9 +81,8 @@ def default_filters():
             'listaPesquisa': '',
             'descricaoTextosLegais': '',
             'observacoes': '',
-            'linhasPorPagina': '10',
+            'linhasPorPagina': RESULTS_PER_PAGE,
             'pesquisaPalavras': 'Pesquisar'}
-
 
 def format_date(date):
     if not isinstance(date, str):
@@ -92,8 +93,8 @@ def format_date(date):
 
 def _get_search_url(session_id, start_date, end_date, query=None):
     query = query or default_filters()
-    query['dataJulgamentoInicial'] = format_date(start_date)
-    query['dataJulgamentoFinal'] = format_date(end_date)
+    query['dataPublicacaoInicial'] = format_date(start_date)
+    query['dataPublicacaoFinal'] = format_date(end_date)
     endpoint = f'{BASE_URL}/pesquisaPalavrasEspelhoAcordao.do'
     return f'{endpoint};jsessionid={session_id}?&{urlencode(query)}'
 
@@ -171,7 +172,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
 
     def chunks(self):
         self.total_records = self.count()
-        self.total_pages = math.ceil(self.total_records/10)
+        self.total_pages = math.ceil(self.total_records/RESULTS_PER_PAGE)
 
         dates = [start for start, end in utils.timely(
             start_date=self.params.get('start_date'),
@@ -183,7 +184,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
         for date in dates:
             for query in queries:
                 query_total_records = self.count(date, query)
-                query_total_pages = math.ceil(query_total_records/10)
+                query_total_pages = math.ceil(query_total_records/RESULTS_PER_PAGE)
 
                 for page in range(1, query_total_pages + 1):
                     keys = {
@@ -331,26 +332,31 @@ class TJMGChunk(base.Chunk):
                 browser.click(self._find(id='imgBotao1'))
 
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
-            date_label = soup.find('div', text='Data de Julgamento')
+            error_message = soup.find('p',id='localizacao')
+            if error_message and error_message.text == 'Sistema Indisponível':
+                logger.warn(f'Error page for {url=}')
+                continue
+
+            date_label = soup.find('div', text='Data da publicação da súmula')
 
             proc_string = '_'.join([element.text for element in soup.find_all(
                 'a', {'title': 'Abrir Andamento Processual'})])
             proc_string = ''.join(char for char in proc_string if char.isdigit() or char == '_')
 
-            session_date = date_label.find_next_sibling('div').text
-            session_date = pendulum.from_format(session_date, TJMG_DATE_FORMAT)
+            pub_date = date_label.find_next_sibling('div').text
+            pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
             if browser.is_text_present('Inteiro Teor'):
                 onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
                 pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
                 pdf_url = f'{BASE_URL}/{pdf_url}'
-                pdf_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.pdf'
+                pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
                 to_download.append(base.ContentFromURL(
                                             src=pdf_url,
                                             dest=pdf_dest,
                                             content_type='application/pdf'))
 
-            html_dest = f'{session_date.year}/{session_date.month:02d}/{session_date.day:02d}_{proc_string}.html'
+            html_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.html'
             to_download.append(base.Content(
                                     content=browser.page_source(),
                                     dest=html_dest,
