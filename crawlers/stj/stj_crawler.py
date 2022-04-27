@@ -11,24 +11,41 @@ from logconfig import logger_factory, setup_cloud_logger
 logger = logger_factory('stj')
 
 
-def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
-  date_filter = f'@DTPB >= {start_date.format("YYYYMMDD")} E @DTPB <= {end_date.format("YYYYMMDD")}'
-  return {
-    'acao': 'pesquisar',
-    'novaConsulta': 'true',
-    'b': 'ACOR',
-    'data': date_filter,
-    'operador': 'e',
-    'thesaurus': 'JURIDICO',
-    'p': 'true',
-    'processo': '',
-    'relator': '',
-    'data_inicial': start_date,
-    'data_final': end_date,
-    'tipo_data': 'DTPB',
-    'g-recaptcha-response': ''
-  }
+NOW = pendulum.now().to_datetime_string()
+DATE_FORMAT_1 = 'YYYYMMDD'
+DATE_FORMAT_2 = 'DD/MM/YYYY'
 
+def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
+  date_filter = f'@DTPB >= {start_date.format(DATE_FORMAT_1)} E @DTPB <= {end_date.format(DATE_FORMAT_1)}'
+  return {
+# 'pesquisaAmigavel':'+%3Cb%3EPublica%E7%E3o%3A+01%2F02%2F2022+a+01%2F03%2F2022%3C%2Fb%3E',
+'acao': 'pesquisar',
+'novaConsulta': 'true',
+# 'i': 1,
+'b': 'ACOR',
+'livre': '',
+'filtroPorOrgao': '',
+'filtroPorMinistro': '',
+'filtroPorNota': '',
+'data': date_filter,
+'operador': 'e',
+'p': 'true',
+'tp': 'T',
+'processo': '',
+'classe': '',
+'uf': '',
+'relator': '',
+'dtpb': date_filter,
+'dtpb1':start_date.format(DATE_FORMAT_2),
+'dtpb2':end_date.format(DATE_FORMAT_2),
+'dtde': '',
+'dtde1': '',
+'dtde2': '',
+'orgao': '',
+'ementa': '',
+'nota': '',
+'ref': '',
+  }
 
 class STJClient:
 
@@ -56,6 +73,7 @@ class STJClient:
   def get(self, path):
     return self.requester.get(f'{self.base_url}/{path}')
 
+  @utils.retryable(max_retries=3)
   def _response_or_retry(self, response):
     soup = utils.soup_by_content(response.content)
 
@@ -65,25 +83,36 @@ class STJClient:
       self.reset_session()
       raise utils.PleaseRetryException()
 
-    if soup \
-        .find('div', {'id': 'infopesquisa'}) is None:
-      logger.warn('Got something else -- reseting session and retrying.')
-      self.reset_session()
-      raise utils.PleaseRetryException()
+    # if soup \
+    #     .find('div', {'id': 'infopesquisa'}) is None:
+    #   logger.warn('Got something else -- reseting session and retrying.')
+    #   self.reset_session()
+    #   raise utils.PleaseRetryException()
 
     return response
 
   def _count_by_content(self, content):
     soup = utils.soup_by_content(content)
-    info = soup.find('div', {'id': 'infopesquisa'})
+    info = soup.find('span', {'class': 'numDocs'}) or \
+      soup.find('div', {'class':'erroMensagem'})
+    
     if not info:
       assert info is not None
-    div_count = info.find_all('div', {'class': 'divCell'})[0]
-    match = re.match(r'(\d+\.?\d+)', div_count.get_text())
-    if match:
-      return int(match.group(0).replace('.', ''))
+      # logger.warn('reseting session.')
+      # self.reset_session()
+      # raise utils.PleaseRetryException()
+    
+    elif info.get_text() == 'Nenhum documento encontrado!':
+      count = 0
+    
     else:
-      return 0
+      match = re.match(r'(\d+\.?\d+)', info.get_text())
+      if match:
+        count = int(match.group(0).replace('.', ''))
+      else:
+        count = 0
+    
+    return count
 
 
 class STJCollector(base.ICollector):
@@ -141,8 +170,9 @@ class STJChunk(base.Chunk):
     docs = soup.find_all(class_='documento')
 
     def _get_pdf_url(doc):
-      pdf_link = doc.find('div', class_='iconesAcoes').a
-      return utils.find_between(pdf_link['href'], start="'", end="'")
+      a = doc.find('a',attrs={'title':'Exibir o inteiro teor do acórdão.'}) or \
+        doc.find('a',attrs={'original-title':'Exibir o inteiro teor do acórdão.'})
+      return utils.find_between(a['href'], start="'", end="'")
 
     for doc in docs:
       pdf_url = _get_pdf_url(doc)
