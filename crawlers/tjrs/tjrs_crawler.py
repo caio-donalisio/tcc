@@ -145,7 +145,7 @@ class TJRSChunk(base.Chunk):
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json'),
-                        base.ContentFromURL(src=report_url,dest=dest_report,
+                    base.ContentFromURL(src=report_url,dest=dest_report,
                         content_type='application/doc')
                 ]
 
@@ -154,6 +154,8 @@ class TJRSChunk(base.Chunk):
                 codigo = record['cod_ementa']
 
                 dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+                dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
+
                 if 'documento_text_aspas' in record:
                     record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
                 if 'documento_text' in record:
@@ -162,7 +164,9 @@ class TJRSChunk(base.Chunk):
 
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
-                        content_type='application/json')
+                        content_type='application/json'),
+                    base.Content(content=record['documento_text'],dest=dest_report,
+                        content_type='text/html')
                 ]
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
