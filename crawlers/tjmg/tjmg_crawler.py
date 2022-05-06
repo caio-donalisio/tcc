@@ -44,6 +44,18 @@ EXTRA_PARAMS = [
 ]
 RESULTS_PER_PAGE = 10  # 10, 20 or 50
 
+#GET IP LIST
+import re, requests
+from bs4 import BeautifulSoup
+from random import choice
+IP_PATTERN = r'\d+\.'*3 + '\d+'
+ips = []
+r = requests.get('https://free-proxy-list.net/')
+soup = BeautifulSoup(r.text,'html.parser')
+for td in soup.find('table').find_all('td'):
+    if re.search(IP_PATTERN, td.text):
+        ips.append(td.text)
+IP = choice(ips)
 
 def get_param_from_url(url, param):
     query = urlsplit(url).query
@@ -137,7 +149,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
                     start_date=start_date,
                     end_date=end_date)
         self.logger.debug(f'GET {url}')
-        response = self.requester.get(url, headers=self.headers)
+        response = self.requester.get(url, headers=self.headers, proxies = {'http':IP}, timeout=30)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, features='html.parser')
             content = soup.find('p', class_='aviso')
@@ -237,7 +249,7 @@ class CaptchaSolver(TJMG):
         while not browser.is_text_present('Resultado da busca') \
                 and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
-            response = self.requester.get(f'{BASE_URL}/captchaAudio.svl', headers=self.headers)
+            response = self.requester.get(f'{BASE_URL}/captchaAudio.svl', headers=self.headers, proxies = {'http': IP}, timeout=30)
             text = self._recognize_audio_by_content(response.content)
             captcha_box = browser.driver.find_element_by_id('captcha_text')
             for char in text:
@@ -377,7 +389,7 @@ class TJMGChunk(base.Chunk):
             start_date=start_date,
             end_date=end_date
             )
-        response = self.requester.get(url, headers=headers)
+        response = self.requester.get(url, headers=headers, proxies = {'http':IP}, timeout=30)
         next_page = None
 
         if response.status_code == 200:
