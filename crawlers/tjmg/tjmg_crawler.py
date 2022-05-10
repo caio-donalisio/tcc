@@ -38,8 +38,8 @@ DEFAULT_USER_AGENT = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.44'
 }
 EXTRA_PARAMS = [
-    {'listaClasse': 600},
-    {'listaClasse': 602},
+    # {'listaClasse': 600},
+    # {'listaClasse': 602},
     {'excluirRepetitivos': 'true'}
 ]
 RESULTS_PER_PAGE = 10  # 10, 20 or 50
@@ -210,18 +210,19 @@ class TJMG(base.BaseCrawler, base.ICollector):
                         keys.update(
                             {'excluirRepetitivos': query.get('excluirRepetitivos')})
 
-                    yield TJMGChunk(
-                        keys=keys,
-                        prefix='',
-                        page=page,
-                        headers=self.headers,
-                        logger=self.logger,
-                        browser=self.browser,
-                        session_id=self.session_id,
-                        requester=self.requester,
-                        output=self.output,
-                        query=query
-                    )
+                    if not (page in [80,81] and keys['date'] == '2021-05-14'):
+                        yield TJMGChunk(
+                            keys=keys,
+                            prefix='',
+                            page=page,
+                            headers=self.headers,
+                            logger=self.logger,
+                            browser=self.browser,
+                            session_id=self.session_id,
+                            requester=self.requester,
+                            output=self.output,
+                            query=query
+                        )
 
 
 class CaptchaSolver(TJMG):
