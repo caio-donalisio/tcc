@@ -15,6 +15,7 @@ from crawlers.tjrj.tjrj_crawler import tjrj_command
 from crawlers.tjrs.tjrs_crawler import tjrs_command
 from crawlers.tjsp.tjsp_crawler import tjsp_command, tjsp_validate
 from crawlers.tjsp.tjsp_pdf import tjsp_pdf_command
+from crawlers.trf1.trf1_crawler import trf1_command
 from crawlers.trf2.trf2_crawler import trf2_command
 from crawlers.trf3.trf3_crawler import trf3_command
 from crawlers.trf4.trf4_crawler import trf4_command
