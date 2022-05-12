@@ -1,2 +1,6 @@
 data
 logs
+
+.gitignore
+.gitlab-ci.yml
+.releaserc

@@ -8,6 +8,8 @@ variables:
 
 stages:
   - build
+  - deploy
+  - release
 
 .configure-gcloud: &configure-gcloud
   - echo $GCP_SERVICE_KEY > gcloud-service-key.json # Google Cloud service accounts
@@ -30,9 +32,8 @@ build:
     - docker push ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}
 
 retag:
-  stage: build
+  stage: deploy
   image: google/cloud-sdk
-  needs: [build]
   rules:
     - if: $CI_COMMIT_TAG
       variables:
@@ -46,3 +47,17 @@ retag:
     - *configure-gcloud
   script:
     - gcloud container images add-tag ${DOCKER_IMAGE}:${CR_DOCKER_FROM_TAG} ${DOCKER_IMAGE}:${CR_DOCKER_TAG}
+
+# ------------------
+# RELEASE
+# ------------------
+release:
+  image: node:16-buster-slim
+  stage: release
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates
+    - npm install -g semantic-release @semantic-release/gitlab semantic-release-slack-bot
+  script:
+    - semantic-release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
