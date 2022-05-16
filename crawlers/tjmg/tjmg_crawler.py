@@ -44,7 +44,7 @@ EXTRA_PARAMS = [
 ]
 RESULTS_PER_PAGE = 10  # 10, 20 or 50
 
-#GET IP LIST
+#GET IP LIST - (WIP)
 import re, requests
 from bs4 import BeautifulSoup
 from random import choice
@@ -340,10 +340,6 @@ class TJMGChunk(base.Chunk):
                 captcha = True
             if captcha:
                 browser.get(url)
-            if browser.is_text_present('Inteiro Teor'):
-                browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
-                browser.click(self._find(id='imgBotao1'))
-
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
             error_message = soup.find('p',id='localizacao')
             if error_message and error_message.text == 'Sistema Indisponível':
@@ -359,15 +355,15 @@ class TJMGChunk(base.Chunk):
             pub_date = date_label.find_next_sibling('div').text
             pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
-            if browser.is_text_present('Inteiro Teor'):
-                onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
-                pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
-                pdf_url = f'{BASE_URL}/{pdf_url}'
-                pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
-                to_download.append(base.ContentFromURL(
-                                            src=pdf_url,
-                                            dest=pdf_dest,
-                                            content_type='application/pdf'))
+            
+            onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
+            pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
+            pdf_url = f'{BASE_URL}/{pdf_url}'
+            pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
+            to_download.append(base.ContentFromURL(
+                                        src=pdf_url,
+                                        dest=pdf_dest,
+                                        content_type='application/pdf'))
 
             html_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.html'
             to_download.append(base.Content(
