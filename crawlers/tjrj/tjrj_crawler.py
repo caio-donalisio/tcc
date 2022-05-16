@@ -145,7 +145,7 @@ class TJRJHandler(base.ContentHandler):
     response = requests.get(content_from_url.src,
       allow_redirects=True,
       verify=False,
-      timeout=10)
+      timeout=20)
 
     if content_from_url.content_type == 'text/html':
       if response.status_code == 200:
