@@ -19,7 +19,7 @@ with open(f'crawlers/tjba/query.graphql', 'r') as f:
 
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   return {
-    'assunto': 'a OR o OR de OR por',
+    'assunto': '',
     'orgaos': [],
     'relatores': [],
     'classes': [],
@@ -27,6 +27,8 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
     'dataFinal': end_date.end_of('day').to_iso8601_string(),
     'segundoGrau': True,
     'turmasRecursais': True,
+    'tipoAcordaos': True,
+    'tipoDecisoesMonocraticas': False,
     'ordenadoPor': 'dataPublicacao'
   }
 

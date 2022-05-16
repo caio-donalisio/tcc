@@ -4,6 +4,7 @@ import click
 import pendulum
 
 from app import cli
+from crawlers.scrfb.scrfb_crawler import scrfb_command
 from crawlers.carf.carf_crawler import carf_command
 from crawlers.stf.stf_api_crawler import stf_command
 from crawlers.stj.stj_crawler import stj_command

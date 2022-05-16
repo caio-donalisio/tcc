@@ -189,7 +189,13 @@ class TRF3Chunk(base.Chunk):
             processo_num = ''.join(
                 char for char in processo_text if char.isdigit())
 
-            content_hash = get_content_hash(soup)
+            content_hash = utils.get_content_hash(soup,
+            tag_descriptions=[
+                {'name':'p',    'class_': 'docTexto'},
+                {'name':'div',  'class_': 'docTexto'},
+                {'name':'pre',  'class_': 'txtQuebra'}
+            ],
+            length=40)
 
             dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}.html'
 
