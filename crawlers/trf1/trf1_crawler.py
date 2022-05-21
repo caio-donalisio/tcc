@@ -13,12 +13,44 @@ import hashlib
 from itertools import chain
 import re
 
-DEFAULT_HEADERS = {
-    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
-    'Accept': '*/*',
-    'Accept-Encoding': 'gzip, deflate',
-    'Referer': 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
+DEFAULT_HEADERS = headers = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # Requests sorts cookies= alphabetically
+    # 'Cookie': 'JSESSIONID=66BSdO0cBi46284GadjTQChC7oa6tdnuJNUuHh63.taturana04-hc02:jurisprudencia_node02; cookiesession1=678B29C73C8E711A6DC3B1056D62F9B7',
+    'Origin': 'https://www2.cjf.jus.br',
+    'Referer': 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.47',
+    'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="101", "Microsoft Edge";v="101"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
 }
+    #     "
+    # 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    # 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    # 'Cache-Control': 'max-age=0',
+    # 'Connection': 'keep-alive',
+    # # Requests sorts cookies= alphabetically
+    # # 'Cookie': 'JSESSIONID=zr6gdnuSJZEerrbxeliMz3vA7m4SVeYePpS5UuxP.taturana04-hc02:jurisprudencia_node02; cookiesession1=678B29C73C8E711A6DC3B1056D62F9B7',
+    # 'Origin': 'https://www2.cjf.jus.br',
+    # 'Referer': 'https://www2.cjf.jus.br/jurisprudencia/trf1/',
+    # 'Sec-Fetch-Dest': 'document',
+    # 'Sec-Fetch-Mode': 'navigate',
+    # 'Sec-Fetch-Site': 'same-origin',
+    # 'Sec-Fetch-User': '?1',
+    # 'Upgrade-Insecure-Requests': '1',
+    # 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.47',
+    # 'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="101", "Microsoft Edge";v="101"',
+    # 'sec-ch-ua-mobile': '?0',
+    # 'sec-ch-ua-platform': '"Windows"',
+
 
 TRF1_DATE_FORMAT = 'DD/MM/YYYY'
 CRAWLER_DATE_FORMAT = 'YYYY-MM-DD'
@@ -27,55 +59,83 @@ FILES_PER_PAGE = 30
 
 logger = logger_factory('trf1')
 
-def get_content_hash(soup):
-    content_string = ''.join(
-        tag.text
-        for tag in chain(
-            soup.find_all('p',   {'class': 'docTexto'}),
-            soup.find_all('div', {'class': 'docTexto'}),
-            soup.find_all('pre', {'class': 'txtQuebra'}),
-        )
-    )
-    return hashlib.sha1(content_string.encode('utf-8')).hexdigest()
 
+@utils.retryable(max_retries=9, sleeptime=20)
+def get_captcha_response():
+    for n in range(1,11):
+        headers= {
+            'User-Agent':'PostmanRuntime/7.29.0',
+            'Accept':'*/*',
+            'Accept-Encoding':'gzip, deflate, br',
+            'Connection':'keep-alive'
+        }
+        data = {
+            'action':'upload',
+            'key':'INSERIR KEY AQUI',
+            'captchatype':3,
+            'gen_task_id':int(pendulum.now().format('x')),
+            'sitekey':'6LfkZ24UAAAAAMO1KEF_pP-G3wE0dYN69-SG8NxI',
+            'pageurl':'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml',
+        }
+        logger.info(f'Fetching ReCaptcha response...')
+        response = requests.post('http://fasttypers.org/Imagepost.ashx', data=data, headers=headers)#, verify=False)
+        if response.status_code == 200 and len(response.text) > 50:
+            logger.info(f'ReCaptcha Success: {response.text[:10]}...')
+            return response.text
+        else:
+            logger.info(f'ReCaptcha Failure: Attempt #{n}...')
+            raise utils.PleaseRetryException
 
 def get_post_data(filters):
     return {
-    'formulario': 'formulario',
-    'formulario:textoLivre': '',
-    'formulario:ckbAvancada_input': 'on',
-    'formulario:j_idt17': '',
-    'formulario:j_idt19': '',
-    'formulario:j_idt21': '',
-    'formulario:j_idt23': '',
-    'formulario:j_idt25': '',
-    'formulario:j_idt27': '',
-    'formulario:j_idt29': '',
-    'formulario:j_idt31': '',
-    'formulario:j_idt33': '',
-    'formulario:j_idt35': '',
-    'formulario:j_idt37_input': pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT),
-    'formulario:j_idt39_input': pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT),
-    'formulario:combo_tipo_data_focus': '',
-    'formulario:combo_tipo_data_input': 'DTPP',
-    'formulario:selectTiposDocumento': 'ACORDAO',
-    'formulario:j_idt51': 'TRF1',
-    'formulario:actPesquisar': '',
-    # 'g-recaptcha-response': '03AGdBq25jPS6dCc42BnOsTFwfEfBuKJ3WZr8VVIFYeKeQ6EXat_T4fcYszRUfVLEPd2z6pZKdlaKg5oJRfDcXcMpGbER2zsrpz2YmDfwKbTZlsGn8mwR-cq50wpt4uBSL_W0RG7seYeQAOyAK1gvmyj8PtNB4_5-Jk3FeMlcIs_FdX06KaChRYz47e6WzNYsj0XUJ4c8anE3KLVvkdTiQiDROXzy4yUb5Q2s10xjlrPchdj_3OHpAoG5uNGOIOHPEqiqZxImyL7pHxD-10fX1EoO4clfRpJyL7ZdKKbiPQrwCs4_zpj4AY5s43mj2aDrfuNYLewQ-3M7kkLw7iw1qHuMrOAZoFf-8Es1x41nNqXFGqWb0DEfnYOUcb0R-c_r9JxPMa3zULA50rUm2v66hN15LQnr2DVwRRBttEUBw91D3w6W-Uk5wdjrYzR1uJ4IlbqWzwYtiHl0nY6l2NvmxT31Kpaur3bJjSpYfHa0T4t49tnwdrsXXLaDeVjLhF0T4B42yecKHbrscRPIZucjrYG-lGhE2AMg9uw',
-    # 'javax.faces.ViewState': '2752928304182699531:3953093309816495575',
-}
+        "formulario": "formulario",
+        "formulario:textoLivre": "",
+        "formulario:ckbAvancada_input": "on",
+        "formulario:j_idt17": "",
+        "formulario:j_idt19": "",
+        "formulario:j_idt21": "",
+        "formulario:j_idt23": "",
+        "formulario:j_idt25": "",
+        "formulario:j_idt27": "",
+        "formulario:j_idt29": "",
+        "formulario:j_idt31": "",
+        "formulario:j_idt33": "",
+        "formulario:j_idt35": "",
+        "formulario:j_idt37_input": "01/05/2020",#.pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT),
+        "formulario:j_idt39_input": "31/05/2020",#pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT),
+        "formulario:combo_tipo_data_focus": "",
+        "formulario:combo_tipo_data_input": "DTPP",
+        "formulario:selectTiposDocumento": "ACORDAO",
+        "formulario:j_idt51": "TRF1",
+        "formulario:actPesquisar": "",
+        "g-recaptcha-response": get_captcha_response()
+    }
 
 
 class TRF1Client:
 
     def __init__(self):
         import browsers
-        self.browser = browsers.FirefoxBrowser(headless=True)
+        from requests import Session
+        self.session = Session()
+        #browsers.FirefoxBrowser(headless=True)
         #self.session = requests.Session()
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
-        self.browser.get('https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml')
+        from bs4 import BeautifulSoup
+        self.session.headers.update(DEFAULT_HEADERS)
+
+        response = self.session.get('https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml')#, headers=DEFAULT_HEADERS)
+        
+        # javax_faces_ViewState = soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value']
+
+        
+        self.cookies = response.cookies
+        return BeautifulSoup(response.text,'html.parser')
+        # self.cookies['JSESSIONID'] = self.cookies
+        # for cookie in response.cookies:
+        # self.browser.get('https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml')
         # self.session.get('https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml',
                         #  headers=DEFAULT_HEADERS)
 
@@ -95,60 +155,73 @@ class TRF1Client:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def fetch(self, filters):
-        self.setup()
-        post_data = get_post_data(filters)
+        javax = self.setup().find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value']
+        post_data = {**get_post_data(filters),**{"javax.faces.ViewState":javax}}
+        # post_data = get_post_data(filters)
         url = 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
         
-        import time
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.support.ui import WebDriverWait
+        from time import sleep
+        sleep(4)
+        page_response = self.session.post(
+            url, 
+            data=post_data,
+            # cookies=self.cookies, 
+            # headers=DEFAULT_HEADERS, 
+            timeout=35,
+            # verify=False,
+        )
+        print(5)
 
 
-        # time.sleep(1.324142)
-        # box = self.browser.driver.find_element(By.CLASS_NAME,'g-recaptcha')
-        # box = self.browser.driver.find_element(By.CLASS_NAME,'g-recaptcha')
-        # box = self.browser.driver.find_element(By.CLASS_NAME,'recaptcha-checkbox')
+        # import time
+        # from selenium.webdriver.common.by import By
+        # from selenium.webdriver.support import expected_conditions as EC
+        # from selenium.webdriver.support.ui import WebDriverWait
+
+
+        # # time.sleep(1.324142)
+        # # box = self.browser.driver.find_element(By.CLASS_NAME,'g-recaptcha')
+        # # box = self.browser.driver.find_element(By.CLASS_NAME,'g-recaptcha')
+        # # box = self.browser.driver.find_element(By.CLASS_NAME,'recaptcha-checkbox')
         
-        # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:ckbAvancada"))).click()
-        # adv_box = self.browser.driver.find_element_by_id()
-        # self.browser.click(adv_box)
-        from bs4 import BeautifulSoup
-        from selenium.webdriver.support.ui import Select
-        import random
+        # # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:ckbAvancada"))).click()
+        # # adv_box = self.browser.driver.find_element_by_id()
+        # # self.browser.click(adv_box)
+        # from bs4 import BeautifulSoup
+        # from selenium.webdriver.support.ui import Select
+        # import random
 
-        #RECAPTCHA
+        # #RECAPTCHA
 
+
+        # # time.sleep(0.222515161 + random.random() * 1.234641 + random.random() * 0.434641)
+        # # WebDriverWait(self.browser.driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR,"iframe[name^='a-'][src^='https://www.google.com/recaptcha/api2/anchor?']")))
+        # # time.sleep(0.222515161 + random.random() * 1.234641 + random.random() * 0.434641)
+        # # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//span[@id='recaptcha-anchor']"))).click()
+        # # self.browser.driver.switch_to_default_content()
+
+        # self.browser.driver.find_element_by_id('formulario:ckbAvancada').click()
+        # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:j_idt37_input')))
+        # self.browser.fill_in('formulario:j_idt37_input',pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT))
+        # self.browser.fill_in('formulario:j_idt39_input',pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT))
         
-
-        time.sleep(0.222515161 + random.random() * 1.234641 + random.random() * 0.434641)
-        WebDriverWait(self.browser.driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR,"iframe[name^='a-'][src^='https://www.google.com/recaptcha/api2/anchor?']")))
-        time.sleep(0.222515161 + random.random() * 1.234641 + random.random() * 0.434641)
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//span[@id='recaptcha-anchor']"))).click()
-        self.browser.driver.switch_to_default_content()
-
-        self.browser.driver.find_element_by_id('formulario:ckbAvancada').click()
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:j_idt37_input')))
-        self.browser.fill_in('formulario:j_idt37_input',pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT))
-        self.browser.fill_in('formulario:j_idt39_input',pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT))
-        
-        dropdown = self.browser.driver.find_element_by_id('formulario:combo_tipo_data_input')
-        self.browser.driver.execute_script("arguments[0].scrollIntoView();", dropdown)
-        # self.browser.driver.find_element_by_class_name('ui-icon-triangle-1-s').click() #ABRE MENU
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'ui-icon-triangle-1-s'))).click() 
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:combo_tipo_data_1'))).click() 
+        # dropdown = self.browser.driver.find_element_by_id('formulario:combo_tipo_data_input')
+        # self.browser.driver.execute_script("arguments[0].scrollIntoView();", dropdown)
+        # # self.browser.driver.find_element_by_class_name('ui-icon-triangle-1-s').click() #ABRE MENU
+        # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'ui-icon-triangle-1-s'))).click() 
+        # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:combo_tipo_data_1'))).click() 
         # self.browser.driver.find_element_by_id('formulario:combo_tipo_data_1').click() #SELECIONA PUBLICAÇÃO
 
         
-        #RECAPTCHA (WIP)
+        # #RECAPTCHA (WIP)
 
         
 
-        dropdown = self.browser.driver.find_element_by_id('formulario:actPesquisar')
-        self.browser.driver.execute_script("arguments[0].scrollIntoView();", dropdown)
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:actPesquisar'))).click()
+        # dropdown = self.browser.driver.find_element_by_id('formulario:actPesquisar')
+        # self.browser.driver.execute_script("arguments[0].scrollIntoView();", dropdown)
+        # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:actPesquisar'))).click()
 
-        return self.browser.page_source
+        # return self.browser.page_source
 
 
 class TRF1Collector(base.ICollector):
