@@ -17,7 +17,7 @@ WEBSITE_URL = 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
 TRF1_DATE_FORMAT = 'DD/MM/YYYY'
 CRAWLER_DATE_FORMAT = 'YYYY-MM-DD'
 DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
-FILES_PER_PAGE = 30
+FILES_PER_PAGE = 50  #10, 30 or 50
 
 logger = logger_factory('trf1')
 
@@ -28,26 +28,14 @@ class TRF1Client:
         self.browser = browsers.FirefoxBrowser(headless=True)
 
     @utils.retryable(max_retries=9, sleeptime=20)
-    def setup(self):
-        self.browser.get(WEBSITE_URL)
-
-    @utils.retryable(max_retries=9, sleeptime=20)
-    def count(self, filters):
-        result = self.fetch(filters)
-        soup = BeautifulSoup(result, features='html.parser')
-        div = soup.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
-        count = int(''.join(char for char in div.text if char.isdigit()))
-        return count
-
-    @utils.retryable(max_retries=9, sleeptime=20)
-    def fetch(self, filters):
+    def setup(self, filters):
         from captcha import solve_recaptcha
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
-
-        self.setup()
+        self.browser.get(WEBSITE_URL)
         self.browser.wait_for_element((By.ID, "formulario:ckbAvancada")).click()
+        
         #SELECT DATA DE PUBLICAÇÃO
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'ui-icon-triangle-1-s'))).click() 
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:combo_tipo_data_1'))).click()
@@ -60,7 +48,42 @@ class TRF1Client:
         
         #CLICK 'PESQUISAR'
         self.browser.driver.find_element_by_id('formulario:actPesquisar').click()
-        return self.browser.page_source()
+        self.browser.driver.implicitly_wait(10)
+
+        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:tabelaDocumentos:j_id23')))
+        self.browser.select_by_id(field_id='formulario:tabelaDocumentos:j_id23', option=FILES_PER_PAGE)
+        # self.browser.driver.implicitly_wait(10)
+
+    @utils.retryable(max_retries=9, sleeptime=20)
+    def count(self, filters):
+        result = self.fetch(filters)
+        soup = BeautifulSoup(result, features='html.parser')
+        div = soup.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
+        count = int(''.join(char for char in div.text if char.isdigit()))
+        return count
+
+    @utils.retryable(max_retries=9, sleeptime=20)
+    def fetch(self, filters, page=1):
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.common.by import By
+
+        
+
+        self.setup(filters)
+        import bs4
+        soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
+        PAGE_PATTERN = r'.*Página: (\d)+\/.*'
+        page = 2
+        while re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1) != str(page):
+            WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'ui-icon-seek-next'))).click() 
+            self.browser.driver.implicitly_wait(10)
+            soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
+
+
+            
+
+        return 5
 
 class TRF1Collector(base.ICollector):
 
