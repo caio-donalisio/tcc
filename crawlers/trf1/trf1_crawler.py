@@ -96,7 +96,9 @@ class TRF1Client:
                 to_click_class = 'ui-icon-seek-next'
             elif current_page > page:
                 to_click_class = 'ui-icon-seek-prev'
-            WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
+            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+            if current_page != page:
+                WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
             self.browser.driver.implicitly_wait(10)
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
@@ -145,13 +147,16 @@ class TRF1Chunk(base.Chunk):
         soup = self.client.fetch(self.filters, page=self.page)
         rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for row in rows:
+            hash_str = utils.get_content_hash(row, [{'name':'td'}])
             title = row.find(attrs={'class':"titulo_doc"}).text
             title = ''.join(char for char in title if char.isdigit())
             date = re.search(DATE_PATTERN, row.text).groupdict()
-            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{title}.html"
+            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{title}_{hash_str[:10]}.html"
             to_download = []
             to_download.append(base.Content(content=str(row),dest=dest_path,
                 content_type='text/html'))
+            
+            
             yield to_download
             
         # for proc_number in range(
