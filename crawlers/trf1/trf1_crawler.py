@@ -90,6 +90,8 @@ class TRF1Client:
         while  current_page != page:
             if not self.page_searched: 
                 self.make_search(filters)
+            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+            soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             if current_page < page:
                 to_click_class = 'ui-icon-seek-next'
             elif current_page > page:
@@ -117,7 +119,7 @@ class TRF1Collector(base.ICollector):
         total = self.count()
         pages = math.ceil(total/FILES_PER_PAGE)
 
-        for page in range(1, pages + 2):
+        for page in range(1, pages + 1):
             yield TRF1Chunk(
                 keys={**self.filters, **{'page': page}},
                 prefix='',
