@@ -28,12 +28,21 @@ class TRF1Client:
         self.browser = browsers.FirefoxBrowser(headless=True)
 
     @utils.retryable(max_retries=9, sleeptime=20)
-    def setup(self, filters):
-        from captcha import solve_recaptcha
+    def setup(self):
+        self.browser.get(WEBSITE_URL)
+
+    @property
+    def page_searched(self):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(self.browser.page_source(), 'html.parser')
+        return bool(soup.find(name='span', attrs={'class':"ui-paginator-current"}))
+
+    @utils.retryable(max_retries=9, sleeptime=20)
+    def make_search(self,filters):
+        import captcha
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
-        self.browser.get(WEBSITE_URL)
         self.browser.wait_for_element((By.ID, "formulario:ckbAvancada")).click()
         
         #SELECT DATA DE PUBLICAÇÃO
@@ -44,7 +53,7 @@ class TRF1Client:
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:j_idt37_input"))).send_keys(pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT))
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:j_idt39_input"))).send_keys(pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT))
        
-        solve_recaptcha(self.browser, logger, SITE_KEY)
+        captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
         
         #CLICK 'PESQUISAR'
         self.browser.driver.find_element_by_id('formulario:actPesquisar').click()
@@ -52,13 +61,14 @@ class TRF1Client:
 
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:tabelaDocumentos:j_id23')))
         self.browser.select_by_id(field_id='formulario:tabelaDocumentos:j_id23', option=FILES_PER_PAGE)
-        # self.browser.driver.implicitly_wait(10)
+        
+        self.browser.driver.implicitly_wait(10)
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def count(self, filters):
         result = self.fetch(filters)
-        soup = BeautifulSoup(result, features='html.parser')
-        div = soup.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
+        # soup = BeautifulSoup(result, features='html.parser')
+        div = result.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
         count = int(''.join(char for char in div.text if char.isdigit()))
         return count
 
@@ -67,23 +77,30 @@ class TRF1Client:
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.common.by import By
-
-        
-
-        self.setup(filters)
         import bs4
+        
+        while not self.page_searched:
+            self.setup()
+            self.make_search(filters)
+        
         soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
-        PAGE_PATTERN = r'.*Página: (\d)+\/.*'
-        page = 2
-        while re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1) != str(page):
-            WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'ui-icon-seek-next'))).click() 
+        PAGE_PATTERN = r'.*Página: (\d+)\/.*'
+        current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+        # page = 2
+        while  current_page != page:
+            if not self.page_searched: 
+                self.make_search(filters)
+            if current_page < page:
+                to_click_class = 'ui-icon-seek-next'
+            elif current_page > page:
+                to_click_class = 'ui-icon-seek-prev'
+            WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
             self.browser.driver.implicitly_wait(10)
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
-
-
+            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
             
-
-        return 5
+            
+        return soup
 
 class TRF1Collector(base.ICollector):
 
@@ -122,12 +139,24 @@ class TRF1Chunk(base.Chunk):
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
-        self.client.fetch(self.filters)
+        DATE_PATTERN = r'Data da publicação[^\d]*(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})'
+        soup = self.client.fetch(self.filters, page=self.page)
+        rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
+        for row in rows:
+            title = row.find(attrs={'class':"titulo_doc"}).text
+            title = ''.join(char for char in title if char.isdigit())
+            date = re.search(DATE_PATTERN, row.text).groupdict()
+            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{title}.html"
+            to_download = []
+            to_download.append(base.Content(content=str(row),dest=dest_path,
+                content_type='text/html'))
+            yield to_download
+            
         # for proc_number in range(
         #     1 + ((self.page - 1) * FILES_PER_PAGE),
         #     1 + min(self.total, ((self.page) * FILES_PER_PAGE))
         # ):
-        #     to_download = []
+            
 
         #     response = self.client.session.get(
         #         f'https://web.trf1.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}')#, headers=DEFAULT_HEADERS)
