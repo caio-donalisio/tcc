@@ -147,16 +147,20 @@ class TRF1Chunk(base.Chunk):
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.common.by import By
         
-        DATE_PATTERN = r'Data da publicação[^\d]*(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})'
+        DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         soup = self.client.fetch(self.filters, page=self.page)
         rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for row in rows:
             hash_str = utils.get_content_hash(row, [{'name':'td'}])
-            title = row.find(attrs={'class':"titulo_doc"}).text
-            process_number = ''.join(char for char in title if char.isdigit())
-            title = re.sub(r'[^\d\-\.]+','',title)
-            date = re.search(DATE_PATTERN, row.text).groupdict()
-            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{process_number}_{hash_str[:10]}.html"
+            titulo = row.find(attrs={'class':"titulo_doc"}).text
+            process_number = ''.join(char for char in titulo if char.isdigit())
+            title = re.sub(r'[^\d\-\.]+','',titulo)
+            pub_date = re.search(DATE_PATTERN, row.text)
+            dest_path = f"""
+                {pub_date.groupdict().get('year')}/
+                {pub_date.groupdict().get('month')}/
+                {pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.html
+            """
             to_download = []
             to_download.append(base.Content(content=str(row),dest=dest_path,
                 content_type='text/html'))
@@ -164,21 +168,87 @@ class TRF1Chunk(base.Chunk):
             link = row.find('a',text='Acesse aqui').get('href')
             if 'ConsultaPublica/listView.seam' in link:
                 import browsers
-                browser = browsers.FirefoxBrowser(headless=True)
+                browser = browsers.FirefoxBrowser(headless=False)
+
+
                 browser.get(link)
                 browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
                 browser.driver.implicitly_wait(10)
                 WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
                 browser.driver.implicitly_wait(10)
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-                count = inteiro_soup.find('span',attrs={'class':"text-muted"}, text=re.compile(r'.*resultados encontrados')).text
+                count = inteiro_soup.find('span',attrs={'class':"text-muted"}, text=re.compile(r'.*resultados encontrados'))
                 count = ''.join(char for char in count.text if char.isdigit()) or 0
                 count = int(count)
-                if count == 1:
-                    link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
-                    link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
-                    browser.get(f'https://pje2g.trf1.jus.br{link}')
-                    print(4)
+                LINK_PATTERN = r'\n*Visualizar documentos(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
+                # if count == 1:
+                # browser.driver.implicitly_wait(10)
+                import time
+                time.sleep(2)
+                link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
+                link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
+                browser.get(f'https://pje2g.trf1.jus.br{link}')
+
+
+                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
+                table = inteiro_soup.find('table',attrs={'id':'j_id139:processoDocumentoGridTab'})
+                available_links = table.find_all('a')
+                available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
+                available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
+                available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 14]
+                print('LEN:', len(available_links))
+                URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
+                new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
+                browser.get(new_link)
+                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,available_links[0]['id']))).click() 
+                time.sleep(2)
+                WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+                # time.sleep(2)
+
+                # new_soup = BeautifulSoup(browser.page_source(),'html.parser')
+                # link_container =  new_soup.find('a',id='j_id47:downloadPDF')
+                # DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
+                # session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
+
+                # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+
+
+                # post_data = {'j_id47': 'j_id47',
+                # 'javax.faces.ViewState': 'j_id11',
+                # 'j_id47:downloadPDF': 'j_id47:downloadPDF',
+                # 'ca': session_data['ca'],
+                # 'idProcDocBin':session_data['idProcDocBin']}
+
+                # import requests
+                # session = requests.Session()
+                # session.get(new_link)
+                # r = session.post(
+                #     url='http://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam',
+                #     data=post_data
+                # )
+
+                # print(r)
+                browser.driver.quit()
+                
+
+                # info = {}
+                # for n,link in enumerate(available_links,1):
+                #     info[n]['obj'] = link
+                #     info[n]['date'] = re.search(LINK_PATTERN, link.text).groupdict().get('date')
+                #     info[n]['doc'] = re.search(LINK_PATTERN, link.text).groupdict().get('doc')
+                
+
+
+                # def nearest_date(items, pivot):
+                #     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
+                #     if items and pivot:
+                #         return min([pendulum.from_format(item.text, TRF1_DATE_FORMAT) for item in items],
+                #                 key=lambda x: abs(x - pivot))
+                #     else:
+                #         return ''
+
+
+                print(4)
 
             elif 'PesquisaMenuArquivo' in link:
                 import requests
