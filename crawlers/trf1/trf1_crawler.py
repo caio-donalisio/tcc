@@ -143,18 +143,47 @@ class TRF1Chunk(base.Chunk):
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.common.by import By
+        
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})'
         soup = self.client.fetch(self.filters, page=self.page)
         rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for row in rows:
             hash_str = utils.get_content_hash(row, [{'name':'td'}])
             title = row.find(attrs={'class':"titulo_doc"}).text
-            title = ''.join(char for char in title if char.isdigit())
+            process_number = ''.join(char for char in title if char.isdigit())
+            title = re.sub(r'[^\d\-\.]+','',title)
             date = re.search(DATE_PATTERN, row.text).groupdict()
-            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{title}_{hash_str[:10]}.html"
+            dest_path = f"{date.get('year')}/{date.get('month')}/{date.get('day')}_{process_number}_{hash_str[:10]}.html"
             to_download = []
             to_download.append(base.Content(content=str(row),dest=dest_path,
                 content_type='text/html'))
+
+            link = row.find('a',text='Acesse aqui').get('href')
+            if 'ConsultaPublica/listView.seam' in link:
+                import browsers
+                browser = browsers.FirefoxBrowser(headless=True)
+                browser.get(link)
+                browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
+                browser.driver.implicitly_wait(10)
+                WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
+                browser.driver.implicitly_wait(10)
+                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
+                count = inteiro_soup.find('span',attrs={'class':"text-muted"}, text=re.compile(r'.*resultados encontrados')).text
+                count = ''.join(char for char in count.text if char.isdigit()) or 0
+                count = int(count)
+                if count == 1:
+                    link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
+                    link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
+                    browser.get(f'https://pje2g.trf1.jus.br{link}')
+                    print(4)
+
+            elif 'PesquisaMenuArquivo' in link:
+                import requests
+                response = requests.get(link)
+
             
             
             yield to_download
