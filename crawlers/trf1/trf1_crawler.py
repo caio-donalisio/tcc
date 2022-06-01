@@ -156,11 +156,7 @@ class TRF1Chunk(base.Chunk):
             process_number = ''.join(char for char in titulo if char.isdigit())
             title = re.sub(r'[^\d\-\.]+','',titulo)
             pub_date = re.search(DATE_PATTERN, row.text)
-            dest_path = f"""
-                {pub_date.groupdict().get('year')}/
-                {pub_date.groupdict().get('month')}/
-                {pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.html
-            """
+            dest_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.html"
             to_download = []
             to_download.append(base.Content(content=str(row),dest=dest_path,
                 content_type='text/html'))
@@ -168,8 +164,27 @@ class TRF1Chunk(base.Chunk):
             link = row.find('a',text='Acesse aqui').get('href')
             if 'ConsultaPublica/listView.seam' in link:
                 import browsers
-                browser = browsers.FirefoxBrowser(headless=False)
+                
+                from selenium import webdriver
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.common.keys import Keys
+                from selenium.webdriver.support.wait import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                import requests, time
 
+
+
+                # options = webdriver.FirefoxOptions()
+                # options.set_preference("browser.download.folderList", 2)
+                # options.set_preference("browser.download.dir", f"/home/caiod/Inspira/inspira-crawlers/data/trf1/{pub_date.groupdict().get('year')}/{pub_date.groupdict().get('month')}/")
+                # options.set_preference("browser.download.useDownloadDir", True)
+                # options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
+                # options.set_preference("pdfjs.disabled", True)
+                # driver = webdriver.Firefox(options = options, executable_path="geckodriver")
+                browser = browsers.FirefoxBrowser(headless=False, pub_date=pub_date)
+
+                # driver.get("https://www.okcc.online/")
+                # driver.maximize_window()
 
                 browser.get(link)
                 browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
@@ -184,14 +199,16 @@ class TRF1Chunk(base.Chunk):
                 # if count == 1:
                 # browser.driver.implicitly_wait(10)
                 import time
+                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'fa-external-link')))
                 time.sleep(2)
+                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
                 link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
                 link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
                 browser.get(f'https://pje2g.trf1.jus.br{link}')
-
+                time.sleep(1)
 
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
-                table = inteiro_soup.find('table',attrs={'id':'j_id139:processoDocumentoGridTab'})
+                table = inteiro_soup.find('table',attrs={'id':'j_id140:processoDocumentoGridTab'})
                 available_links = table.find_all('a')
                 available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
                 available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
@@ -201,8 +218,9 @@ class TRF1Chunk(base.Chunk):
                 new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
                 browser.get(new_link)
                 # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,available_links[0]['id']))).click() 
-                time.sleep(2)
+                # time.sleep(2)
                 WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+                # base.Content
                 # time.sleep(2)
 
                 # new_soup = BeautifulSoup(browser.page_source(),'html.parser')
