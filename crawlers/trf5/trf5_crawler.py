@@ -138,7 +138,6 @@ class TRF5Chunk(base.Chunk):
 
             dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
             dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
-            #report_url = record['url']
             report_url = None
             content_type_report = "text/html"
 
@@ -207,10 +206,10 @@ class TRF5Chunk(base.Chunk):
 
         self.browser.wait_for_element(locator=(By.ID, 'consultaPublicaForm:captcha:captchaImg'), timeout=30)
 
-        numeroProcesso = self._format_process_number(doc['numeroProcesso'])
-        logger.info(numeroProcesso)
+        judgment_id = self._format_process_number(doc['numeroProcesso'])
+        logger.info(judgment_id)
         process_input = self.browser.driver.find_element_by_id('consultaPublicaForm:Processo:ProcessoDecoration:Processo')  
-        self.browser.driver.execute_script(f"arguments[0].value='{numeroProcesso}';", process_input)
+        self.browser.driver.execute_script(f"arguments[0].value='{judgment_id}';", process_input)
 
         while not self.browser.is_text_present('Ver Detalhes', tag='img'):
             captcha_img = self.browser.driver.find_element_by_id('consultaPublicaForm:captcha:captchaImg')
