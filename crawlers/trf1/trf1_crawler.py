@@ -162,10 +162,10 @@ class TRF1Chunk(base.Chunk):
                 content_type='text/html'))
 
             link = row.find('a',text='Acesse aqui').get('href')
-            if 'ConsultaPublica/listView.seam' in link:
+            if True:#'ConsultaPublica/listView.seam' in link:
                 import browsers
-                
-                from selenium import webdriver
+                from seleniumrequests import Firefox
+                # from selenium import webdriver
                 from selenium.webdriver.common.by import By
                 from selenium.webdriver.common.keys import Keys
                 from selenium.webdriver.support.wait import WebDriverWait
@@ -181,31 +181,22 @@ class TRF1Chunk(base.Chunk):
                 # options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
                 # options.set_preference("pdfjs.disabled", True)
                 # driver = webdriver.Firefox(options = options, executable_path="geckodriver")
-                browser = browsers.FirefoxBrowser(headless=False, pub_date=pub_date)
-
-                # driver.get("https://www.okcc.online/")
-                # driver.maximize_window()
-
-                browser.get(link)
+                browser = browsers.FirefoxBrowser(headless=False)#, pub_date=pub_date)
+                TRF1_SEARCH_LINK = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/listView.seam'
+                browser.get(TRF1_SEARCH_LINK)
                 browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
                 browser.driver.implicitly_wait(10)
                 WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
                 browser.driver.implicitly_wait(10)
-                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-                count = inteiro_soup.find('span',attrs={'class':"text-muted"}, text=re.compile(r'.*resultados encontrados'))
-                count = ''.join(char for char in count.text if char.isdigit()) or 0
-                count = int(count)
-                LINK_PATTERN = r'\n*Visualizar documentos(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
-                # if count == 1:
-                # browser.driver.implicitly_wait(10)
+                LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
+                browser.driver.implicitly_wait(10)
                 import time
-                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'fa-external-link')))
                 time.sleep(2)
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
                 link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
                 link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
                 browser.get(f'https://pje2g.trf1.jus.br{link}')
-                time.sleep(1)
+                browser.driver.implicitly_wait(10)
 
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
                 table = inteiro_soup.find('table',attrs={'id':'j_id140:processoDocumentoGridTab'})
@@ -219,29 +210,74 @@ class TRF1Chunk(base.Chunk):
                 browser.get(new_link)
                 # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,available_links[0]['id']))).click() 
                 # time.sleep(2)
-                WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
                 # base.Content
                 # time.sleep(2)
 
-                # new_soup = BeautifulSoup(browser.page_source(),'html.parser')
-                # link_container =  new_soup.find('a',id='j_id47:downloadPDF')
-                # DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
-                # session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
+                new_soup = BeautifulSoup(browser.page_source(),'html.parser')
+                link_container =  new_soup.find('a',id='j_id47:downloadPDF')
+                DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
+                session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
 
-                # WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+                WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
+                time.sleep(3)
+                time.sleep(1)
+                
+                post_data = {'j_id47': 'j_id47',
+                'javax.faces.ViewState': new_soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
+                'j_id47:downloadPDF': 'j_id47:downloadPDF',
+                'ca': session_data['ca'],
+                'idProcDocBin':session_data['idProcDocBin']}
+
+                import requests
+
+                cookies = {
+                    'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
+                }
+
+                data = {
+                    'j_id47': 'j_id47',
+                    'javax.faces.ViewState': new_soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
+                    'j_id47:downloadPDF': 'j_id47:downloadPDF',
+                    'ca': session_data['ca'],
+                    'idProcDocBin': session_data['idProcDocBin'],
+                }
+
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    # 'Accept-Encoding': 'gzip, deflate, br',
+                    'Origin': 'https://pje2g.trf1.jus.br',
+                    'Connection': 'keep-alive',
+                    'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-User': '?1',
+                }
 
 
-                # post_data = {'j_id47': 'j_id47',
-                # 'javax.faces.ViewState': 'j_id11',
-                # 'j_id47:downloadPDF': 'j_id47:downloadPDF',
-                # 'ca': session_data['ca'],
-                # 'idProcDocBin':session_data['idProcDocBin']}
+
+                response = requests.post('https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam', cookies=cookies, headers=headers, data=data)
+
+                print(response.content)
+                dest_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.pdf"
+
+                to_download.append(base.Content(content=response.content, content_type='application/pdf',dest=dest_path))
+                print(5)
+
+                # response = browser.driver.request('POST', 'http://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam', 
+                # data=post_data, headers = headers)
+
+
 
                 # import requests
                 # session = requests.Session()
                 # session.get(new_link)
                 # r = session.post(
-                #     url='http://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam',
+                #     url='',
                 #     data=post_data
                 # )
 
@@ -266,99 +302,14 @@ class TRF1Chunk(base.Chunk):
                 #         return ''
 
 
-                print(4)
+                print('-')
 
             elif 'PesquisaMenuArquivo' in link:
                 import requests
                 response = requests.get(link)
-
-            
-            
+                print('OUTRO')
             yield to_download
-            
-        # for proc_number in range(
-        #     1 + ((self.page - 1) * FILES_PER_PAGE),
-        #     1 + min(self.total, ((self.page) * FILES_PER_PAGE))
-        # ):
-            
-
-        #     response = self.client.session.get(
-        #         f'https://web.trf1.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}')#, headers=DEFAULT_HEADERS)
-            
-        #     if response.status_code != 200:
-        #         logger.warn(f"Response <{response.status_code}> - {response.url}")
-        #         raise utils.PleaseRetryException()
-
-        #     soup = BeautifulSoup(response.text, features='html.parser')
-
-        #     #THIS CHECK REQUIRES FURTHER TESTING
-        #     if soup.find('h2', text='Para iniciar uma nova sessão clique em algum dos links ao lado.'):
-        #         self.client.setup()
-        #         logger.warn(f"Session expired - trying again")
-        #         raise utils.PleaseRetryException()
-
-        #     def file_is_error(soup):
-        #         error_div = soup.find(name='div',id='erro')
-        #         if error_div:
-        #             is_error = error_div.find(text=re.compile(r'^[\s\n]*Ocorreu[\s\n]*um[\s\n]*erro\.?[\s\n]*$'))
-        #         return bool(error_div and is_error)
-
-           
-        #     pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
-        #     pub_date, = DATE_PATTERN.findall(
-        #         pub_date_div.next_sibling.next_sibling.text)
-
-        #     data_julg_div = soup.find('div', text='Data do Julgamento ')
-        #     session_at = data_julg_div.next_sibling.next_sibling.text.strip()
-        #     session_at = pendulum.from_format(session_at, TRF1_DATE_FORMAT)
-
-        #     processo_text = soup.find(
-        #         'h4', text='Processo').next_sibling.next_sibling.text.strip()
-        #     processo_num = ''.join(
-        #         char for char in processo_text if char.isdigit())
-
-        #     content_hash = utils.get_content_hash(soup,
-        #     tag_descriptions=[
-        #         {'name':'p',    'class_': 'docTexto'},
-        #         {'name':'div',  'class_': 'docTexto'},
-        #         {'name':'pre',  'class_': 'txtQuebra'}
-        #     ],
-        #     length=40)
-
-        #     dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}.html'
-
-        #     to_download.append(base.Content(
-        #         content=BeautifulSoup(
-        #             response.text, features='html5lib').encode('latin-1'),
-        #         dest=dest_path,
-        #         content_type='text/html'))
-
-        #     url_page_acordao = soup.find(
-        #         'a', {'title': 'Exibir a íntegra do acórdão.'}).get('href')
-        #     page_acordao = requests.get(
-        #         url_page_acordao)#, headers=DEFAULT_HEADERS, timeout=120)
-        #     page_acordao_soup = BeautifulSoup(
-        #         page_acordao.text, features='html5lib')
-
-        #     link_date = nearest_date(page_acordao_soup.find_all(
-        #         'a', text=re.compile('\d{2}/\d{2}/\d{4}')), pivot=pub_date)
-
-        #     if link_date:
-        #         link_to_inteiro = page_acordao_soup.find(
-        #             'a', text=link_date.format(TRF1_DATE_FORMAT))
-        #         dest_path_inteiro = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}_INTEIRO.html'
-        #         url_acordao_inteiro = link_to_inteiro.get('href')
-        #         to_download.append(base.ContentFromURL(
-        #             src=f'https://web.trf1.jus.br{url_acordao_inteiro}',
-        #             dest=dest_path_inteiro,
-        #             content_type='text/html'
-        #         ))
-        #     else:
-        #         logger.error(
-        #             f'Link not available for full document of: {processo_text}')
-
-        #     yield to_download
-
+ 
 @celery.task(queue='crawlers.trf1', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def trf1_task(**kwargs):
