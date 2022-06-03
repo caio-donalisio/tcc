@@ -18,6 +18,7 @@ from crawlers.tjsp.tjsp_pdf import tjsp_pdf_command
 from crawlers.trf2.trf2_crawler import trf2_command
 from crawlers.trf3.trf3_crawler import trf3_command
 from crawlers.trf4.trf4_crawler import trf4_command
+from crawlers.trf5.trf5_crawler import trf5_command
 from crawlers.tst.tst_crawler import tst_command
 
 
