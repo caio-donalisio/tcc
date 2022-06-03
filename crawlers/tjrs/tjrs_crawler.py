@@ -156,17 +156,23 @@ class TJRSChunk(base.Chunk):
                 dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
                 dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
 
+                extra_contents = []
+
                 if 'documento_text_aspas' in record:
                     record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
                 if 'documento_text' in record:
-                    record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
                     logger.warn(f'File {dest_record} has no full document text')
+                    record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
+                    extra_contents.append(base.Content(content=record['documento_text'],dest=dest_report,
+                        content_type='text/html')
+                    )
+                else:
+                    logger.warn(f'File {dest_record} has no document text as well')
 
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json'),
-                    base.Content(content=record['documento_text'],dest=dest_report,
-                        content_type='text/html')
+                    *extra_contents                    
                 ]
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
