@@ -24,6 +24,7 @@ import browsers
 import math
 import pendulum
 import random
+import proxy
 
 logger = logger_factory('tjmg')
 
@@ -43,19 +44,10 @@ EXTRA_PARAMS = [
     {'excluirRepetitivos': 'true'}
 ]
 RESULTS_PER_PAGE = 10  # 10, 20 or 50
+IP = proxy.get_random_proxy()
 
-#GET IP LIST - (WIP)
-import re, requests
-from bs4 import BeautifulSoup
-from random import choice
-IP_PATTERN = r'\d+\.'*3 + '\d+'
-ips = []
-r = requests.get('https://free-proxy-list.net/')
-soup = BeautifulSoup(r.text,'html.parser')
-for td in soup.find('table').find_all('td'):
-    if re.search(IP_PATTERN, td.text):
-        ips.append(td.text)
-IP = choice(ips)
+
+
 
 def get_param_from_url(url, param):
     query = urlsplit(url).query
