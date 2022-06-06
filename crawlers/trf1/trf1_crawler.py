@@ -18,6 +18,8 @@ TRF1_DATE_FORMAT = 'DD/MM/YYYY'
 CRAWLER_DATE_FORMAT = 'YYYY-MM-DD'
 DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
 FILES_PER_PAGE = 50  #10, 30 or 50
+PDF_URL = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam'
+TRF1_SEARCH_LINK = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/listView.seam'
 
 logger = logger_factory('trf1')
 
@@ -147,42 +149,74 @@ class TRF1Chunk(base.Chunk):
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.common.by import By
         
+        @utils.retryable(max_retries=9, sleeptime=20)
+        def download_pdf(browser, soup):
+            """Download PDF as bytes when browser is in the page where the "Gerar PDF" button is available"""
+            import requests
+            link_container =  soup.find('a',id='j_id47:downloadPDF')
+            DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
+            session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
+
+            cookies = {
+                'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
+            }
+
+            data = {
+                'j_id47': 'j_id47',
+                'javax.faces.ViewState': soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
+                'j_id47:downloadPDF': 'j_id47:downloadPDF',
+                'ca': session_data['ca'],
+                'idProcDocBin': session_data['idProcDocBin'],
+            }
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                # 'Accept-Encoding': 'gzip, deflate, br',
+                'Origin': 'https://pje2g.trf1.jus.br',
+                'Connection': 'keep-alive',
+                'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-User': '?1',
+            }
+            response = requests.post(PDF_URL, cookies=cookies, headers=headers, data=data)
+            return response.content
+
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         soup = self.client.fetch(self.filters, page=self.page)
         rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for row in rows:
             hash_str = utils.get_content_hash(row, [{'name':'td'}])
-            titulo = row.find(attrs={'class':"titulo_doc"}).text
-            process_number = ''.join(char for char in titulo if char.isdigit())
-            title = re.sub(r'[^\d\-\.]+','',titulo)
+            
+            acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
+            title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
+            process_number = ''.join(char for char in acordao_titulo if char.isdigit())
+            
             pub_date = re.search(DATE_PATTERN, row.text)
-            dest_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.html"
+            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}"
+            
             to_download = []
+            dest_path = f"{base_path}.html"
             to_download.append(base.Content(content=str(row),dest=dest_path,
                 content_type='text/html'))
 
             link = row.find('a',text='Acesse aqui').get('href')
-            if True:#'ConsultaPublica/listView.seam' in link:
+            
+            if 'ConsultaPublica/listView.seam' in link:
+                continue 
+
                 import browsers
-                from seleniumrequests import Firefox
-                # from selenium import webdriver
                 from selenium.webdriver.common.by import By
-                from selenium.webdriver.common.keys import Keys
                 from selenium.webdriver.support.wait import WebDriverWait
                 from selenium.webdriver.support import expected_conditions as EC
-                import requests, time
-
-
-
-                # options = webdriver.FirefoxOptions()
-                # options.set_preference("browser.download.folderList", 2)
-                # options.set_preference("browser.download.dir", f"/home/caiod/Inspira/inspira-crawlers/data/trf1/{pub_date.groupdict().get('year')}/{pub_date.groupdict().get('month')}/")
-                # options.set_preference("browser.download.useDownloadDir", True)
-                # options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
-                # options.set_preference("pdfjs.disabled", True)
-                # driver = webdriver.Firefox(options = options, executable_path="geckodriver")
-                browser = browsers.FirefoxBrowser(headless=False)#, pub_date=pub_date)
-                TRF1_SEARCH_LINK = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/listView.seam'
+                import requests
+               
+                browser = browsers.FirefoxBrowser(headless=False)
+                
                 browser.get(TRF1_SEARCH_LINK)
                 browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
                 browser.driver.implicitly_wait(10)
@@ -190,16 +224,21 @@ class TRF1Chunk(base.Chunk):
                 browser.driver.implicitly_wait(10)
                 LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
                 browser.driver.implicitly_wait(10)
-                import time
-                time.sleep(2)
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
                 link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
+                
+                if not link:
+                    logger.warn(f'Document not available for: {acordao_titulo}')
+                    browser.driver.quit()
+                    continue
+
                 link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
                 browser.get(f'https://pje2g.trf1.jus.br{link}')
                 browser.driver.implicitly_wait(10)
 
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
-                table = inteiro_soup.find('table',attrs={'id':'j_id140:processoDocumentoGridTab'})
+                # table = inteiro_soup.find('table',attrs={'id':'j_id140:processoDocumentoGridTab'})
+                table = inteiro_soup.find_all('table')[-3]
                 available_links = table.find_all('a')
                 available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
                 available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
@@ -208,108 +247,32 @@ class TRF1Chunk(base.Chunk):
                 URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
                 new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
                 browser.get(new_link)
-                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,available_links[0]['id']))).click() 
-                # time.sleep(2)
-                # WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
-                # base.Content
-                # time.sleep(2)
+                browser.driver.implicitly_wait(10)
 
                 new_soup = BeautifulSoup(browser.page_source(),'html.parser')
-                link_container =  new_soup.find('a',id='j_id47:downloadPDF')
-                DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
-                session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
 
-                WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.TAG_NAME,'i'))).click() 
-                time.sleep(3)
-                time.sleep(1)
                 
-                post_data = {'j_id47': 'j_id47',
-                'javax.faces.ViewState': new_soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
-                'j_id47:downloadPDF': 'j_id47:downloadPDF',
-                'ca': session_data['ca'],
-                'idProcDocBin':session_data['idProcDocBin']}
-
-                import requests
-
-                cookies = {
-                    'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
-                }
-
-                data = {
-                    'j_id47': 'j_id47',
-                    'javax.faces.ViewState': new_soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
-                    'j_id47:downloadPDF': 'j_id47:downloadPDF',
-                    'ca': session_data['ca'],
-                    'idProcDocBin': session_data['idProcDocBin'],
-                }
-
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    # 'Accept-Encoding': 'gzip, deflate, br',
-                    'Origin': 'https://pje2g.trf1.jus.br',
-                    'Connection': 'keep-alive',
-                    'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'same-origin',
-                    'Sec-Fetch-User': '?1',
-                }
-
-
-
-                response = requests.post('https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam', cookies=cookies, headers=headers, data=data)
-
-                print(response.content)
-                dest_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}.pdf"
-
-                to_download.append(base.Content(content=response.content, content_type='application/pdf',dest=dest_path))
-                print(5)
-
-                # response = browser.driver.request('POST', 'http://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam', 
-                # data=post_data, headers = headers)
-
-
-
-                # import requests
-                # session = requests.Session()
-                # session.get(new_link)
-                # r = session.post(
-                #     url='',
-                #     data=post_data
-                # )
-
-                # print(r)
+                
+                dest_path = f"{base_path}.pdf"
+                to_download.append(base.Content(
+                    content=download_pdf(browser,new_soup), content_type='application/pdf',dest=dest_path
+                    ))
                 browser.driver.quit()
-                
-
-                # info = {}
-                # for n,link in enumerate(available_links,1):
-                #     info[n]['obj'] = link
-                #     info[n]['date'] = re.search(LINK_PATTERN, link.text).groupdict().get('date')
-                #     info[n]['doc'] = re.search(LINK_PATTERN, link.text).groupdict().get('doc')
-                
-
-
-                # def nearest_date(items, pivot):
-                #     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
-                #     if items and pivot:
-                #         return min([pendulum.from_format(item.text, TRF1_DATE_FORMAT) for item in items],
-                #                 key=lambda x: abs(x - pivot))
-                #     else:
-                #         return ''
-
-
-                print('-')
 
             elif 'PesquisaMenuArquivo' in link:
+                print('outro')
                 import requests
+                TRF1_ARCHIVE = 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Farquivo.trf1.jus.br'
                 response = requests.get(link)
-                print('OUTRO')
+                soup = BeautifulSoup(response.text, 'html.parser')
+                links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
+                for link in links:
+                    to_download.append(base.ContentFromURL(src=f"{TRF1_ARCHIVE}{link['href']}", 
+                        dest=f"{base_path}.doc")#, content_type ='application/doc')
+                    )
+                
             yield to_download
- 
+
 @celery.task(queue='crawlers.trf1', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def trf1_task(**kwargs):
