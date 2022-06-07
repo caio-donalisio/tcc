@@ -210,8 +210,8 @@ class TRF4(base.BaseCrawler):
         'vetPaginacao': pagination['vetPaginacao'],
         'paginaAtual': page,
         'totalRegistros': pagination['total'],
-        'rdoCampoPesquisa': '',
-        'chkAcordaos': '',
+        'rdoCampoPesquisa': 'I',
+        'chkAcordaos': 'on',
         'chkDecMono': '',
         'textoPesqLivre': '',
         'chkDocumentosSelecionados': '',
@@ -221,7 +221,7 @@ class TRF4(base.BaseCrawler):
         'arrorgaos': '',
         'arrclasses': '',
         'hdnAcao': '',
-        'hdnTipo': 4
+        'hdnTipo': 1
       }}
       text = self._make_request(req_params)
 
@@ -310,10 +310,10 @@ class TRF4(base.BaseCrawler):
       yield [
         base.Content(content=doc_html,
           dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
-        base.Content(content=doc_url,
-          dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
-        # base.ContentFromURL(src=doc_url,
-        #   dest=f'{base_path}/{doc_id}_report.html', content_type='text/html')
+        # base.Content(content=doc_url,
+        #   dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
+        base.ContentFromURL(src=doc_url,
+          dest=f'{base_path}/{doc_id}_INTEIRO.html', content_type='text/html')
       ]
 
   def _find_optimal_filters(self, start_date, end_date, **filters):
@@ -449,10 +449,10 @@ class TRF4(base.BaseCrawler):
 
   def _get_query_params(self, **overrides):
     return {**{
-      'rdoTipo': 4,
-      'chkAcordaos': '',
+      'rdoTipo': 1,
       'rdoCampoPesquisa': 'I',
       'textoPesqLivre': '',
+      'chkAcordaos': 'on',
       'numProcesso': '',
       'cboRelator': '',
       'dataIni': '',

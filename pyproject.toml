@@ -30,6 +30,7 @@ backoff = "^1.11.1"
 ratelimit = "^2.2.1"
 SpeechRecognition = "^3.8.1"
 tabulate = "^0.8.9"
+comtypes = "^1.1.11"
 
 [tool.poetry.dev-dependencies]
 
