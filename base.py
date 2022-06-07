@@ -400,7 +400,7 @@ class ContentHandler:
         .split(';')[0].strip()
       dest = f'{event.dest}{guess_extension(content_type)}'
 
-    if response.status_code == 200:
+    if response.status_code == 200 and len(response.content) > 0:
       self.output.save_from_contents(
         filepath=dest,
         contents=response.content,
