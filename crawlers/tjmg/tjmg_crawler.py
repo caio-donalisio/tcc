@@ -24,6 +24,7 @@ import browsers
 import math
 import pendulum
 import random
+import proxy
 
 logger = logger_factory('tjmg')
 
@@ -38,11 +39,14 @@ DEFAULT_USER_AGENT = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.44'
 }
 EXTRA_PARAMS = [
-    {'listaClasse': 600},
-    {'listaClasse': 602},
+    # {'listaClasse': 600},
+    # {'listaClasse': 602},
     {'excluirRepetitivos': 'true'}
 ]
 RESULTS_PER_PAGE = 10  # 10, 20 or 50
+IP = proxy.get_random_proxy()
+
+
 
 
 def get_param_from_url(url, param):
@@ -137,7 +141,7 @@ class TJMG(base.BaseCrawler, base.ICollector):
                     start_date=start_date,
                     end_date=end_date)
         self.logger.debug(f'GET {url}')
-        response = self.requester.get(url, headers=self.headers)
+        response = self.requester.get(url, headers=self.headers, proxies = {'http':IP}, timeout=30)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, features='html.parser')
             content = soup.find('p', class_='aviso')
@@ -198,18 +202,19 @@ class TJMG(base.BaseCrawler, base.ICollector):
                         keys.update(
                             {'excluirRepetitivos': query.get('excluirRepetitivos')})
 
-                    yield TJMGChunk(
-                        keys=keys,
-                        prefix='',
-                        page=page,
-                        headers=self.headers,
-                        logger=self.logger,
-                        browser=self.browser,
-                        session_id=self.session_id,
-                        requester=self.requester,
-                        output=self.output,
-                        query=query
-                    )
+                    if not (page in [80,81] and keys['date'] == '2021-05-14'):
+                        yield TJMGChunk(
+                            keys=keys,
+                            prefix='',
+                            page=page,
+                            headers=self.headers,
+                            logger=self.logger,
+                            browser=self.browser,
+                            session_id=self.session_id,
+                            requester=self.requester,
+                            output=self.output,
+                            query=query
+                        )
 
 
 class CaptchaSolver(TJMG):
@@ -237,7 +242,7 @@ class CaptchaSolver(TJMG):
         while not browser.is_text_present('Resultado da busca') \
                 and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
-            response = self.requester.get(f'{BASE_URL}/captchaAudio.svl', headers=self.headers)
+            response = self.requester.get(f'{BASE_URL}/captchaAudio.svl', headers=self.headers, proxies = {'http': IP}, timeout=30)
             text = self._recognize_audio_by_content(response.content)
             captcha_box = browser.driver.find_element_by_id('captcha_text')
             for char in text:
@@ -327,10 +332,6 @@ class TJMGChunk(base.Chunk):
                 captcha = True
             if captcha:
                 browser.get(url)
-            if browser.is_text_present('Inteiro Teor'):
-                browser.wait_for_element(locator=(By.ID, 'imgBotao1'))
-                browser.click(self._find(id='imgBotao1'))
-
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
             error_message = soup.find('p',id='localizacao')
             if error_message and error_message.text == 'Sistema Indisponível':
@@ -346,15 +347,15 @@ class TJMGChunk(base.Chunk):
             pub_date = date_label.find_next_sibling('div').text
             pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
-            if browser.is_text_present('Inteiro Teor'):
-                onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
-                pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
-                pdf_url = f'{BASE_URL}/{pdf_url}'
-                pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
-                to_download.append(base.ContentFromURL(
-                                            src=pdf_url,
-                                            dest=pdf_dest,
-                                            content_type='application/pdf'))
+            
+            onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})['onclick']
+            pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
+            pdf_url = f'{BASE_URL}/{pdf_url}'
+            pdf_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.pdf'
+            to_download.append(base.ContentFromURL(
+                                        src=pdf_url,
+                                        dest=pdf_dest,
+                                        content_type='application/pdf'))
 
             html_dest = f'{pub_date.year}/{pub_date.month:02d}/{pub_date.day:02d}_{proc_string}.html'
             to_download.append(base.Content(
@@ -377,7 +378,7 @@ class TJMGChunk(base.Chunk):
             start_date=start_date,
             end_date=end_date
             )
-        response = self.requester.get(url, headers=headers)
+        response = self.requester.get(url, headers=headers, proxies = {'http':IP}, timeout=30)
         next_page = None
 
         if response.status_code == 200:
