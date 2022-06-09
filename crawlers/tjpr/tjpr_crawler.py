@@ -12,45 +12,145 @@ from urllib.parse import parse_qsl, urlsplit
 
 logger = logger_factory('tjpr')
 
-def get_filters(start_date, end_date,**kwargs):
-    return {
-        'facetsExistentes': '',
-        'orgaosSelecionados': '',
-        'tiposAtosSelecionados': '72%3B+75%3B+73',
-        'lblTiposAtosSelecionados': 'SC%3B+SCI%3B+SD',
-        'ordemColuna': 'Publicacao',
-        'ordemDirecao': 'DESC',
-        'tipoConsulta': 'formulario',
-        'tipoAtoFacet': '',
-        'siglaOrgaoFacet': '',
-        'anoAtoFacet': '',
-        'termoBusca': 'a',
-        'numero_ato': '',
-        'tipoData': '2',  # DATA DE PUBLICAÇÃO
-        'dt_inicio': start_date.format(SEARCH_DATE_FORMAT),
-        'dt_fim': end_date.format(SEARCH_DATE_FORMAT),
-        'ano_ato': '',
-        'optOrdem': 'Publicacao_DESC'
-    }
+# BASE_URL = 'https://portal.tjpr.jus.br'
+# LAWSUITS_URL = 'https://portal.tjpr.jus.br/jurisprudencia/publico/pesquisa.do?actionType=pesquisar'
 
+# JUDGMENT_ID_SELECTOR = 'div.juris-tabela-propriedades > a'
+# DECISION_ID_SELECTOR = 'input[name="id"]'
+# DECISION_ABSTRACT_SELECTOR = '#ementa'
+# DECISION_FULL_CONTENT_SELECTOR = '#texto'
+# DECISION_TABLE_DATA_SELECTOR = 'table.resultTable.linksacizentados.juris-dados-completos > tbody > tr > td'
+
+# DECISION_FIELDS = {
+#   'Relator(a):': 'reportingJudge',
+#   'Órgão Julgador:': 'judgingBody',
+#   'Data do Julgamento:': 'decisionDate',
+#   'Fonte/Data da Publicação:': 'publishingDate'
+# }
+
+# import requests
+# from bs4 import BeautifulSoup
+
+# data = {
+#   "idLocalPesquisa": 99,
+#   "ambito": 6,
+#   "idsTipoDecisaoSelecionados": 1,
+#   "segredoJustica": 'pesquisar com',
+#   "iniciar": 'Pesquisar',
+#   "pageSize": 10,
+#   "pageNumber": 1,
+# }
+
+# response = requests.post(LAWSUITS_URL, data)
+# soup = BeautifulSoup(response.text, 'html.parser')
+
+# lawsuits = []
+
+# for judgment_id in soup.select(JUDGMENT_ID_SELECTOR):
+#   path = judgment_id.get('href')
+#   url = f'{BASE_URL}{path}'
+#   judgmentId = judgment_id.contents[0].strip()
+
+#   lawsuits.append({ 'judgmentId': judgmentId, 'url': url })
+
+# lawsuits
+
+# decisions = []
+
+# for lawsuit in lawsuits:
+#   response = requests.get(lawsuit['url'])
+#   soup = BeautifulSoup(response.text, 'html.parser')
+
+#   decision = {}
+
+#   decision['judgmentId'] = lawsuit['judgmentId']
+#   decision['courtId'] = 'TJPR'
+#   id = soup.select_one(DECISION_ID_SELECTOR)['value']
+#   decision['abstract'] = soup.select_one(f'{DECISION_ABSTRACT_SELECTOR}{id}').text.strip()
+#   decision['fullContent'] = soup.select_one(f'{DECISION_FULL_CONTENT_SELECTOR}{id}').text.strip()
+  
+#   for element in soup.select(DECISION_TABLE_DATA_SELECTOR):
+#     for child in element.children:
+#       if (child.name == 'b'):
+#         field = child.text
+#         value = [text for text in element.stripped_strings][1]
+        
+#         if (field in DECISION_FIELDS):
+#           decision[DECISION_FIELDS[field]] = value
+
+#   decisions.append(decision)
+
+# decisions
 COURT_NAME = 'tjpr'
-RESULTS_PER_PAGE = 100  # DEFINED BY THEIR SERVER
+RESULTS_PER_PAGE = 10  # DEFINED BY THEIR SERVER, SHOULDN'T BE CHANGED
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
+BASE_URL = 'https://portal.tjpr.jus.br'
+
+DEFAULT_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    # 'Accept-Encoding': 'gzip, deflate, br',
+    'Origin': 'https://portal.tjpr.jus.br',
+    'Connection': 'keep-alive',
+    'Referer': 'https://portal.tjpr.jus.br/jurisprudencia/',
+    # Requests sorts cookies= alphabetically
+    # 'Cookie': 'JSESSIONID=a2577f334c309880f8481b48ac29; _ga=GA1.3.1119819283.1654806370; _gid=GA1.3.346843250.1654806370',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    # Requests doesn't support trailers
+    # 'TE': 'trailers',
+}
+
+def get_filters(start_date, end_date, **kwargs):
+    return {
+    'backURL': '',
+    'postCampo': '',
+    'tmp': '',
+    'criterioPesquisa': '',
+    'processo': '',
+    'acordao': '',
+    'idRelator': '',
+    'nomeRelator': '',
+    'idOrgaoJulgadorSelecao': '',
+    'nomeOrgaoJulgador': '',
+    'idComarca': '',
+    'nomeComarca': '',
+    'idClasseProcessual': '',
+    'descricaoClasseProcessualHidden': '',
+    'descricaoClasseProcessual': '',
+    'idAssunto': '',
+    'descricaoAssuntoHidden': '',
+    'descricaoAssunto': '',
+    'dataJulgamentoInicio': '',
+    'dataJulgamentoFim': '',
+    'dataPublicacaoInicio': start_date.format(SEARCH_DATE_FORMAT),
+    'dataPublicacaoFim':  end_date.format(SEARCH_DATE_FORMAT),
+    'idLocalPesquisa': '1',
+    'ambito': '-1',
+    'idsTipoDecisaoSelecionados': '1',
+    'segredoJustica': 'pesquisar com',
+    'iniciar': 'Pesquisar',
+}
 
 class TJPRClient:
 
     def __init__(self):
-        self.url = 'http://normas.receita.fazenda.gov.br/sijut2consulta/'
+        self.session = requests.Session()
+        self.url = f'{BASE_URL}/jurisprudencia/publico/pesquisa.do'
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
         result = self.fetch(filters)
         soup = utils.soup_by_content(result.text)
-        count_tag = soup.find('ul', attrs={'class':'pagination total-regs-encontrados'})
+        count_tag = soup.find('div', attrs={'class':'navLeft'})
         if count_tag:
-            count = re.search(r'\s*Total de atos localizados:\s*(\d+)[\s\n].*',count_tag.text)
+            count = re.search(r'^\s*(\d+) registro.*$',count_tag.text)
             count = int(count.group(1))
         else:
             count = 0
@@ -66,12 +166,16 @@ class TJPRClient:
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
+        self.session.headers.update(DEFAULT_HEADERS)
         try:
-            return requests.get(
-                url=f'{self.url}/consulta.action?',
-                params={
+            return self.session.post(
+                url=f'{self.url}',
+                data={
                     **get_filters(**filters),
-                    'p':page
+                    'pageNumber':str(page)
+                },
+                params = {
+                'actionType': 'pesquisar',
                 }
             )
 
@@ -145,29 +249,31 @@ class TJPRChunk(base.Chunk):
         else:
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
-            acts = soup.find_all('tr', class_='linhaResultados')
+            act_links = soup.find_all('a',class_="acordao negrito")
             to_download = []
-            for act in acts:
-                if not act.a:
-                    continue
-                act_id = self.act_id_from_url(act.a['href'])
-                publication_date = act.find_all('td')[3].text
-                date_id = ''.join(publication_date.split('/')[::-1]).replace('/','')
-                html_content,pdf_url=self.fetch_act(act_id=act_id)#,publication_date=publication_date)                
-                content_id= utils.get_content_hash(
-                    soup=utils.soup_by_content(html_content),
-                    tag_descriptions=[{'name':'p','class_':'ementa'}])
-                
-                to_download.append(base.Content(
-                    content=html_content,
-                    dest=utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','html'),
-                    content_type='text/html'))
+            for act_link in act_links:
+                response = requests.get(f"{BASE_URL}{act_link['href']}", 
+                    headers=DEFAULT_HEADERS)
 
-                if pdf_url:
-                    to_download.append(base.ContentFromURL(
-                        src=pdf_url,
-                        dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','pdf'),
-                        content_type='application/pdf'))
+                act_soup = utils.soup_by_content(response.text)
+                act_id = act_soup.find('b',text=re.compile(r'.*Processo.*')).next.next
+                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
+                publication_date=  act_soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
+                publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
+                content_hash = utils.get_content_hash(act_soup, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
+                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{act_id}_{content_hash}'
+                to_download.append(base.Content(
+                    content=str(act_soup.find('div',class_='secaoFormulario')),
+                    dest=f'{base_path}.html',
+                    content_type='text/html'))
+                
+                # pdf_link = act_soup.find('a',attrs={'onclick':re.compile(r'.*')})
+
+                # if pdf_link:
+                #     to_download.append(base.ContentFromURL(
+                #         src=pdf_url,
+                #         dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','pdf'),
+                #         content_type='application/pdf'))
                 yield to_download
 
     def act_id_from_url(self,url):
