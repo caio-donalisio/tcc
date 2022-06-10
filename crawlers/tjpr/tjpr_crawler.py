@@ -261,19 +261,38 @@ class TJPRChunk(base.Chunk):
                 publication_date=  act_soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
                 publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
                 content_hash = utils.get_content_hash(act_soup, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
-                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{act_id}_{content_hash}'
+                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
                 to_download.append(base.Content(
                     content=str(act_soup.find('div',class_='secaoFormulario')),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
                 
-                # pdf_link = act_soup.find('a',attrs={'onclick':re.compile(r'.*')})
+                pdf_link = [link for link in act_soup.find_all('a') if link.next.next=='Carregar documento']
+                if pdf_link:
+                    pdf_link = pdf_link.pop()    
+                    from io import BytesIO
+                    from zipfile import ZipFile
+                    from PyPDF2 import PdfFileMerger, PdfFileReader
 
-                # if pdf_link:
-                #     to_download.append(base.ContentFromURL(
-                #         src=pdf_url,
-                #         dest= utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','pdf'),
-                #         content_type='application/pdf'))
+                    PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
+                    new = PATTERN.search(pdf_link['href']).group(1)
+                    url = f"{BASE_URL}{new}"
+                    requests.get(url).content
+                    resp = requests.get(url)
+                    zipfile = ZipFile(BytesIO(resp.content))
+                    # files = []
+                    merger = PdfFileMerger()
+                    for file in sorted(zipfile.namelist()):
+                        merger.append(zipfile.open(file))
+                    with BytesIO() as bytes_stream:
+                        content=merger._create_stream(bytes_stream)
+                    
+                    to_download.append(base.Content(
+                        content=merger.inputs[0][0].read(),
+                        dest=f'{base_path}.pdf',
+                        content_type='application/pdf'))
+                else:
+                    logger.warn(f'Inteiro not available for {act_id}')
                 yield to_download
 
     def act_id_from_url(self,url):
