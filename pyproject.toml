@@ -30,6 +30,7 @@ backoff = "^1.11.1"
 ratelimit = "^2.2.1"
 SpeechRecognition = "^3.8.1"
 tabulate = "^0.8.9"
+PyPDF2 = "^2.1.0"
 
 [tool.poetry.dev-dependencies]
 

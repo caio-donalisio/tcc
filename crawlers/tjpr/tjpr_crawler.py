@@ -284,11 +284,13 @@ class TJPRChunk(base.Chunk):
                     merger = PdfFileMerger()
                     for file in sorted(zipfile.namelist()):
                         merger.append(zipfile.open(file))
-                    with BytesIO() as bytes_stream:
-                        content=merger._create_stream(bytes_stream)
-                    
+
+                    from io import BytesIO
+                    b = BytesIO()
+                    merger.write(b)
+
                     to_download.append(base.Content(
-                        content=merger.inputs[0][0].read(),
+                        content=b.getvalue(),
                         dest=f'{base_path}.pdf',
                         content_type='application/pdf'))
                 else:
