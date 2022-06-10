@@ -62,6 +62,7 @@ class TRF1Client:
         self.browser.driver.find_element_by_id('formulario:actPesquisar').click()
         self.browser.driver.implicitly_wait(10)
 
+        #SELECT NUMBER OF PROCESS PER PAGE
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:tabelaDocumentos:j_id23')))
         self.browser.select_by_id(field_id='formulario:tabelaDocumentos:j_id23', option=FILES_PER_PAGE)
         
@@ -70,7 +71,6 @@ class TRF1Client:
     @utils.retryable(max_retries=9, sleeptime=20)
     def count(self, filters):
         result = self.fetch(filters)
-        # soup = BeautifulSoup(result, features='html.parser')
         div = result.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
         count = int(''.join(char for char in div.text if char.isdigit()))
         return count
@@ -89,7 +89,7 @@ class TRF1Client:
         soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
         PAGE_PATTERN = r'.*Página: (\d+)\/.*'
         current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
-        # page = 2
+        
         while  current_page != page:
             if not self.page_searched: 
                 self.make_search(filters)
@@ -192,6 +192,21 @@ class TRF1Chunk(base.Chunk):
             else:
                 raise utils.PleaseRetryException
 
+        def search_trf1_process_documents(browser):
+            browser.get(TRF1_SEARCH_LINK)
+            browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
+            browser.driver.implicitly_wait(10)
+            WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
+            browser.driver.implicitly_wait(10)
+            inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
+            link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
+            if not link:
+                return False
+            link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
+            browser.get(f'https://pje2g.trf1.jus.br{link}')
+            browser.driver.implicitly_wait(10)
+            return True
+
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         soup = self.client.fetch(self.filters, page=self.page)
         rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
@@ -212,59 +227,8 @@ class TRF1Chunk(base.Chunk):
 
             process_link = row.find('a',text='Acesse aqui').get('href')
             
-            if 'ConsultaPublica/listView.seam' in process_link:
-                # continue 
-                browser = browsers.FirefoxBrowser(headless=not DEBUG)
-                LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
 
-                def search_trf1_process_documents(browser):
-                    browser.get(TRF1_SEARCH_LINK)
-                    browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
-                    browser.driver.implicitly_wait(10)
-                    WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
-                    browser.driver.implicitly_wait(10)
-                    inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-                    link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
-                    if not link:
-                        return False
-                    link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
-                    browser.get(f'https://pje2g.trf1.jus.br{link}')
-                    browser.driver.implicitly_wait(10)
-                    return True
-
-                sucess = search_trf1_process_documents(browser)
-
-                if not sucess:
-                    logger.warn(f'Document not available for: {acordao_titulo}')
-                    browser.driver.quit()
-                    continue
-                
-                dest_path = f"{base_path}_TYPE_B.html"
-                to_download.append(base.Content(content=browser.page_source(),dest=dest_path,
-                content_type='text/html'))
-                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
-                table = inteiro_soup.find_all('table')[-3]
-                available_links = table.find_all('a')
-                available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
-                available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
-                available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 14]
-                print('LEN:', len(available_links))
-                URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
-                new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
-                browser.get(new_link)
-                browser.driver.implicitly_wait(10)
-
-                new_soup = BeautifulSoup(browser.page_source(),'html.parser')
-
-                
-                
-                dest_path = f"{base_path}.pdf"
-                to_download.append(base.Content(
-                    content=download_pdf(browser,new_soup), content_type='application/pdf',dest=dest_path
-                    ))
-                browser.driver.quit()
-
-            elif 'PesquisaMenuArquivo' in process_link:
+            if 'PesquisaMenuArquivo' in process_link:
                 print('outro')
                 import requests
                 # TRF1_ARCHIVE = 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Farquivo.trf1.jus.br'
@@ -296,6 +260,46 @@ class TRF1Chunk(base.Chunk):
                 for link in date_links:
                     to_download.append(base.ContentFromURL(src=f"{TRF1_ARCHIVE}{link['href']}", 
                         dest=f"{base_path}.doc", content_type ='application/doc'))
+
+            elif 'ConsultaPublica/listView.seam' in process_link:
+                # continue 
+                browser = browsers.FirefoxBrowser(headless=not DEBUG)
+                LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
+
+
+
+                sucess = search_trf1_process_documents(browser)
+                if not sucess:
+                    logger.warn(f'Document not available for: {acordao_titulo}')
+                    browser.driver.quit()
+                    continue
+                
+                dest_path = f"{base_path}_TYPE_B.html"
+                to_download.append(base.Content(content=browser.page_source(),dest=dest_path,
+                content_type='text/html'))
+                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
+                table = inteiro_soup.find_all('table')[-3]
+                available_links = table.find_all('a')
+                available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
+                available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
+                available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 14]
+                print('LEN:', len(available_links))
+                URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
+                new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
+                browser.get(new_link)
+                browser.driver.implicitly_wait(10)
+
+                new_soup = BeautifulSoup(browser.page_source(),'html.parser')
+
+                
+                
+                dest_path = f"{base_path}.pdf"
+                to_download.append(base.Content(
+                    content=download_pdf(browser,new_soup), content_type='application/pdf',dest=dest_path
+                    ))
+                browser.driver.quit()
+
+
                 
             yield to_download
 
