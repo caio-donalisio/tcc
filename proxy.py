@@ -2,7 +2,7 @@ def get_random_proxy():
     import re, requests
     from bs4 import BeautifulSoup
     from random import choice
-    IP_PATTERN = r'\d+\.'*3 + '\d+'
+    IP_PATTERN = r'\d+\.\d+\.\d+\.\d+'
     PORT_PATTERN = r'^\d+$'
     ips, ports = [], []
     r = requests.get('https://free-proxy-list.net/')
@@ -12,5 +12,6 @@ def get_random_proxy():
             ips.append(td.text)
         elif re.search(PORT_PATTERN, td.text):
             ports.append(td.text)
+    assert len(ips) == len(ports)
     addresses = [f'{ip}:{port}' for ip,port in zip(ips,ports)]
     return choice(addresses)
