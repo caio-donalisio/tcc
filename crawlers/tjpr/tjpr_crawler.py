@@ -203,47 +203,58 @@ class TJPRChunk(base.Chunk):
             for act in acts:
                 act_id = get_act_id(act)
                 publication_date = get_publication_date(act)
-                content_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
-                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
+                ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
+                # base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
+
+                pdf_link = [link for link in act.find_all('a') if link.next.next=='Carregar documento']
+                pdf_bytes, pdf_hash = self.download_pdf(pdf_link, act_id)
+                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{ementa_hash}_{pdf_hash}'
+
+                if pdf_bytes:
+                    to_download.append(base.Content(
+                        content=pdf_bytes,
+                        dest=f'{base_path}.pdf',
+                        content_type='application/pdf'))
+                else:
+                    logger.warn(f'Inteiro not available for {act_id}')
 
                 to_download.append(base.Content(
                     content=str(act),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
 
-                pdf_link = [link for link in act.find_all('a') if link.next.next=='Carregar documento']
-                if pdf_link:
-                    to_download.append(base.Content(
-                        content=self.download_pdf(pdf_link, act_id),
-                        dest=f'{base_path}.pdf',
-                        content_type='application/pdf'))
-                else:
-                    logger.warn(f'Inteiro not available for {act_id}')
                 yield to_download
 
     @utils.retryable()
-    def download_pdf(self, pdf_link, act_id):
+    def download_pdf(self, pdf_link, act_id, hash_len=10):
                 from io import BytesIO
                 import zipfile
                 from PyPDF2 import PdfFileMerger
-                
-                pdf_link = pdf_link.pop()    
-                PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
-                relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
-                url = f"{BASE_URL}{relative_pdf_url}"
-                resp = requests.get(url)
-                try:
-                    zipfile = zipfile.ZipFile(BytesIO(resp.content))
-                except zipfile.BadZipFile:
-                    logger.warn(f'Could not download ZIP from {act_id}, retrying...')
-                    raise utils.PleaseRetryException()
-                    
-                merger = PdfFileMerger()
-                for file in sorted(zipfile.namelist()):
-                    merger.append(zipfile.open(file))
-                pdf_bytes = BytesIO()
-                merger.write(pdf_bytes)
-                return pdf_bytes.getvalue()
+                import hashlib
+
+                if pdf_link:
+                    pdf_link = pdf_link.pop()    
+                    PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
+                    relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
+                    url = f"{BASE_URL}{relative_pdf_url}"
+                    resp = requests.get(url)
+                    try:
+                        zipfile = zipfile.ZipFile(BytesIO(resp.content))
+                    except zipfile.BadZipFile:
+                        logger.warn(f'Could not download ZIP from {act_id}, retrying...')
+                        raise utils.PleaseRetryException()
+                        
+                    merger = PdfFileMerger()
+                    for file in sorted(zipfile.namelist()):
+                        merger.append(zipfile.open(file))
+                    pdf_bytes = BytesIO()
+                    merger.write(pdf_bytes)
+                    bytes_value = pdf_bytes.getvalue()
+                    pdf_hash = hashlib.sha1(bytes_value).hexdigest()[:hash_len]
+                else:
+                    bytes_value = b''
+                    pdf_hash = 0 * hash_len
+                return bytes_value, pdf_hash
 
 
 @celery.task(queue='crawlers.tjpr', default_retry_delay=5 * 60,
