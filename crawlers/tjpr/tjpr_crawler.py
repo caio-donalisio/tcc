@@ -211,16 +211,17 @@ class TJPRChunk(base.Chunk):
                 pdf_link = [link for link in act.find_all('a') if link.next.next=='Carregar documento']
                 if pdf_link:
                     to_download.append(base.Content(
-                        content=self.download_pdf(pdf_link),
+                        content=self.download_pdf(pdf_link, act_id),
                         dest=f'{base_path}.pdf',
                         content_type='application/pdf'))
                 else:
                     logger.warn(f'Inteiro not available for {act_id}')
                 yield to_download
 
-    def download_pdf(self, pdf_link):
+    @utils.retryable()
+    def download_pdf(self, pdf_link, act_id):
                 from io import BytesIO
-                from zipfile import ZipFile
+                import zipfile
                 from PyPDF2 import PdfFileMerger
                 
                 pdf_link = pdf_link.pop()    
@@ -228,7 +229,12 @@ class TJPRChunk(base.Chunk):
                 relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
                 url = f"{BASE_URL}{relative_pdf_url}"
                 resp = requests.get(url)
-                zipfile = ZipFile(BytesIO(resp.content))
+                try:
+                    zipfile = zipfile.ZipFile(BytesIO(resp.content))
+                except zipfile.BadZipFile:
+                    logger.warn(f'Could not download ZIP from {act_id}, retrying...')
+                    raise utils.PleaseRetryException
+                    
                 merger = PdfFileMerger()
                 for file in sorted(zipfile.namelist()):
                     merger.append(zipfile.open(file))
