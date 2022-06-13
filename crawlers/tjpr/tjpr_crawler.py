@@ -66,6 +66,7 @@ def get_filters(start_date, end_date, **kwargs):
     'ambito': '6',
     'idsTipoDecisaoSelecionados': '1',
     'segredoJustica': 'pesquisar sem',
+    'mostrarCompleto': 'true',
     'iniciar': 'Pesquisar',
 }
 
@@ -192,24 +193,20 @@ class TJPRChunk(base.Chunk):
 
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
-            act_links = soup.find_all('a',class_="acordao negrito")
+            acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
             to_download = []
-            for act_link in act_links:
-                response = requests.get(f"{BASE_URL}{act_link['href']}", 
-                    headers=DEFAULT_HEADERS)
-
-                act_soup = utils.soup_by_content(response.text)
-                act_id = get_act_id(act_soup)
-                publication_date = get_publication_date(act_soup)
-                content_hash = utils.get_content_hash(act_soup, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
+            for act in acts:
+                act_id = get_act_id(act)
+                publication_date = get_publication_date(act)
+                content_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
 
                 to_download.append(base.Content(
-                    content=str(act_soup.find('div',class_='secaoFormulario')),
+                    content=str(act),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
 
-                pdf_link = [link for link in act_soup.find_all('a') if link.next.next=='Carregar documento']
+                pdf_link = [link for link in act.find_all('a') if link.next.next=='Carregar documento']
                 if pdf_link:
                     to_download.append(base.Content(
                         content=self.download_pdf(pdf_link),
