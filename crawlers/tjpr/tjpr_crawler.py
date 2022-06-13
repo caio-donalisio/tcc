@@ -169,7 +169,8 @@ class TJPRChunk(base.Chunk):
         self.page = page
         self.client = client
         self.count_only = count_only
-
+    
+    @utils.retryable()
     def rows(self):
         if self.count_only:
             count_data,count_filepath = utils.get_count_data_and_filepath(
