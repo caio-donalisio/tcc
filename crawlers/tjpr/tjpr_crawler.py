@@ -197,6 +197,8 @@ class TJPRChunk(base.Chunk):
             soup = utils.soup_by_content(result.text)
             acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
             to_download = []
+            if not acts:
+                raise utils.PleaseRetryException()
             for act in acts:
                 act_id = get_act_id(act)
                 publication_date = get_publication_date(act)
@@ -233,7 +235,7 @@ class TJPRChunk(base.Chunk):
                     zipfile = zipfile.ZipFile(BytesIO(resp.content))
                 except zipfile.BadZipFile:
                     logger.warn(f'Could not download ZIP from {act_id}, retrying...')
-                    raise utils.PleaseRetryException
+                    raise utils.PleaseRetryException()
                     
                 merger = PdfFileMerger()
                 for file in sorted(zipfile.namelist()):
