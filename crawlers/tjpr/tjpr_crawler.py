@@ -98,6 +98,7 @@ class TJPRClient:
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
+        import proxy
         self.session.headers.update(DEFAULT_HEADERS)
         try:
             return self.session.post(
@@ -108,7 +109,8 @@ class TJPRClient:
                 },
                 params = {
                 'actionType': 'pesquisar',
-                }
+                },
+                proxies={'http':proxy.get_random_proxy()}
             )
 
         except Exception as e:
@@ -225,7 +227,6 @@ class TJPRChunk(base.Chunk):
                 PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
                 relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
                 url = f"{BASE_URL}{relative_pdf_url}"
-                requests.get(url).content
                 resp = requests.get(url)
                 zipfile = ZipFile(BytesIO(resp.content))
                 merger = PdfFileMerger()
