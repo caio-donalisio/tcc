@@ -65,7 +65,7 @@ def get_filters(start_date, end_date, **kwargs):
     'idLocalPesquisa': '1',
     'ambito': '6',
     'idsTipoDecisaoSelecionados': '1',
-    'segredoJustica': 'pesquisar com',
+    'segredoJustica': 'pesquisar sem',
     'iniciar': 'Pesquisar',
 }
 
