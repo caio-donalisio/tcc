@@ -12,75 +12,6 @@ from urllib.parse import parse_qsl, urlsplit
 
 logger = logger_factory('tjpr')
 
-# BASE_URL = 'https://portal.tjpr.jus.br'
-# LAWSUITS_URL = 'https://portal.tjpr.jus.br/jurisprudencia/publico/pesquisa.do?actionType=pesquisar'
-
-# JUDGMENT_ID_SELECTOR = 'div.juris-tabela-propriedades > a'
-# DECISION_ID_SELECTOR = 'input[name="id"]'
-# DECISION_ABSTRACT_SELECTOR = '#ementa'
-# DECISION_FULL_CONTENT_SELECTOR = '#texto'
-# DECISION_TABLE_DATA_SELECTOR = 'table.resultTable.linksacizentados.juris-dados-completos > tbody > tr > td'
-
-# DECISION_FIELDS = {
-#   'Relator(a):': 'reportingJudge',
-#   'Órgão Julgador:': 'judgingBody',
-#   'Data do Julgamento:': 'decisionDate',
-#   'Fonte/Data da Publicação:': 'publishingDate'
-# }
-
-# import requests
-# from bs4 import BeautifulSoup
-
-# data = {
-#   "idLocalPesquisa": 99,
-#   "ambito": 6,
-#   "idsTipoDecisaoSelecionados": 1,
-#   "segredoJustica": 'pesquisar com',
-#   "iniciar": 'Pesquisar',
-#   "pageSize": 10,
-#   "pageNumber": 1,
-# }
-
-# response = requests.post(LAWSUITS_URL, data)
-# soup = BeautifulSoup(response.text, 'html.parser')
-
-# lawsuits = []
-
-# for judgment_id in soup.select(JUDGMENT_ID_SELECTOR):
-#   path = judgment_id.get('href')
-#   url = f'{BASE_URL}{path}'
-#   judgmentId = judgment_id.contents[0].strip()
-
-#   lawsuits.append({ 'judgmentId': judgmentId, 'url': url })
-
-# lawsuits
-
-# decisions = []
-
-# for lawsuit in lawsuits:
-#   response = requests.get(lawsuit['url'])
-#   soup = BeautifulSoup(response.text, 'html.parser')
-
-#   decision = {}
-
-#   decision['judgmentId'] = lawsuit['judgmentId']
-#   decision['courtId'] = 'TJPR'
-#   id = soup.select_one(DECISION_ID_SELECTOR)['value']
-#   decision['abstract'] = soup.select_one(f'{DECISION_ABSTRACT_SELECTOR}{id}').text.strip()
-#   decision['fullContent'] = soup.select_one(f'{DECISION_FULL_CONTENT_SELECTOR}{id}').text.strip()
-  
-#   for element in soup.select(DECISION_TABLE_DATA_SELECTOR):
-#     for child in element.children:
-#       if (child.name == 'b'):
-#         field = child.text
-#         value = [text for text in element.stripped_strings][1]
-        
-#         if (field in DECISION_FIELDS):
-#           decision[DECISION_FIELDS[field]] = value
-
-#   decisions.append(decision)
-
-# decisions
 COURT_NAME = 'tjpr'
 RESULTS_PER_PAGE = 10  # DEFINED BY THEIR SERVER, SHOULDN'T BE CHANGED
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
@@ -132,7 +63,7 @@ def get_filters(start_date, end_date, **kwargs):
     'dataPublicacaoInicio': start_date.format(SEARCH_DATE_FORMAT),
     'dataPublicacaoFim':  end_date.format(SEARCH_DATE_FORMAT),
     'idLocalPesquisa': '1',
-    'ambito': '-1',
+    'ambito': '6',
     'idsTipoDecisaoSelecionados': '1',
     'segredoJustica': 'pesquisar com',
     'iniciar': 'Pesquisar',
@@ -199,6 +130,7 @@ class TJPRCollector(base.ICollector):
             return self.client.count(self.filters)
 
     def chunks(self):
+        from math import ceil
         periods = list(utils.timely(
             start_date=self.filters.get('start_date'),
             end_date=self.filters.get('end_date'),
@@ -247,6 +179,17 @@ class TJPRChunk(base.Chunk):
             yield utils.count_data_content(count_data,count_filepath)
 
         else:
+
+            def get_act_id(soup):
+                act_id = soup.find('b',text=re.compile(r'.*Processo.*')).next.next
+                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
+                return act_id
+                
+            def get_publication_date(soup):
+                publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
+                publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
+                return publication_date
+
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
             act_links = soup.find_all('a',class_="acordao negrito")
@@ -256,61 +199,45 @@ class TJPRChunk(base.Chunk):
                     headers=DEFAULT_HEADERS)
 
                 act_soup = utils.soup_by_content(response.text)
-                act_id = act_soup.find('b',text=re.compile(r'.*Processo.*')).next.next
-                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
-                publication_date=  act_soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
-                publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
+                act_id = get_act_id(act_soup)
+                publication_date = get_publication_date(act_soup)
                 content_hash = utils.get_content_hash(act_soup, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
+
                 to_download.append(base.Content(
                     content=str(act_soup.find('div',class_='secaoFormulario')),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
-                
+
                 pdf_link = [link for link in act_soup.find_all('a') if link.next.next=='Carregar documento']
                 if pdf_link:
-                    pdf_link = pdf_link.pop()    
-                    from io import BytesIO
-                    from zipfile import ZipFile
-                    from PyPDF2 import PdfFileMerger, PdfFileReader
-
-                    PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
-                    new = PATTERN.search(pdf_link['href']).group(1)
-                    url = f"{BASE_URL}{new}"
-                    requests.get(url).content
-                    resp = requests.get(url)
-                    zipfile = ZipFile(BytesIO(resp.content))
-                    # files = []
-                    merger = PdfFileMerger()
-                    for file in sorted(zipfile.namelist()):
-                        merger.append(zipfile.open(file))
-
-                    from io import BytesIO
-                    b = BytesIO()
-                    merger.write(b)
-
                     to_download.append(base.Content(
-                        content=b.getvalue(),
+                        content=self.download_pdf(pdf_link),
                         dest=f'{base_path}.pdf',
                         content_type='application/pdf'))
                 else:
                     logger.warn(f'Inteiro not available for {act_id}')
                 yield to_download
 
-    def act_id_from_url(self,url):
-        query = urlsplit(url).query
-        return dict(parse_qsl(query))['idAto']
+    def download_pdf(self, pdf_link):
+                from io import BytesIO
+                from zipfile import ZipFile
+                from PyPDF2 import PdfFileMerger
+                
+                pdf_link = pdf_link.pop()    
+                PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
+                relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
+                url = f"{BASE_URL}{relative_pdf_url}"
+                requests.get(url).content
+                resp = requests.get(url)
+                zipfile = ZipFile(BytesIO(resp.content))
+                merger = PdfFileMerger()
+                for file in sorted(zipfile.namelist()):
+                    merger.append(zipfile.open(file))
+                pdf_bytes = BytesIO()
+                merger.write(pdf_bytes)
+                return pdf_bytes.getvalue()
 
-    def fetch_act(self, act_id):
-        base_url = 'http://normas.receita.fazenda.gov.br/sijut2consulta'
-        aux_url = '/link.action'
-        response = requests.get(f'{base_url}{aux_url}',params={
-            'visao':'anotado','idAto':act_id})
-        if response.status_code == 200:
-            soup = utils.soup_by_content(response.text)
-            pdf_link = soup.find('a', text=lambda text: text and 'pdf' in text)
-            pdf_url = f'{base_url}/{pdf_link["href"]}' if pdf_link else None
-            return response.text,pdf_url
 
 @celery.task(queue='crawlers.tjpr', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
