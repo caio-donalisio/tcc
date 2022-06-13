@@ -200,7 +200,7 @@ class TJPRChunk(base.Chunk):
             for act in acts:
                 act_id = get_act_id(act)
                 publication_date = get_publication_date(act)
-                content_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(re.compile(r'ementa.*'))}])
+                content_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
 
                 to_download.append(base.Content(
