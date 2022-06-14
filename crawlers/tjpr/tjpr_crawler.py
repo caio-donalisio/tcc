@@ -170,6 +170,17 @@ class TJPRChunk(base.Chunk):
         self.client = client
         self.count_only = count_only
     
+    def get_act_id(self, soup):
+                act_id = soup.find('b',text=re.compile(r'.*Processo.*')).next.next
+                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
+                return act_id
+        
+    def get_publication_date(self, soup):
+        publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
+        publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
+        return publication_date
+
+
     @utils.retryable()
     def rows(self):
         if self.count_only:
@@ -183,17 +194,6 @@ class TJPRChunk(base.Chunk):
             yield utils.count_data_content(count_data,count_filepath)
 
         else:
-
-            def get_act_id(soup):
-                act_id = soup.find('b',text=re.compile(r'.*Processo.*')).next.next
-                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
-                return act_id
-                
-            def get_publication_date(soup):
-                publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
-                publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
-                return publication_date
-
             result = self.client.fetch(self.filters,self.page)
             soup = utils.soup_by_content(result.text)
             acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
@@ -201,13 +201,12 @@ class TJPRChunk(base.Chunk):
             if not acts:
                 raise utils.PleaseRetryException()
             for act in acts:
-                act_id = get_act_id(act)
-                publication_date = get_publication_date(act)
+                act_id = self.get_act_id(act)
+                publication_date = self.get_publication_date(act)
                 ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
                 # base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
 
-                pdf_link = [link for link in act.find_all('a') if link.next.next=='Carregar documento']
-                pdf_bytes, pdf_hash = self.download_pdf(pdf_link, act_id)
+                pdf_bytes, pdf_hash = self.download_pdf(act)
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{ementa_hash}_{pdf_hash}'
 
                 if pdf_bytes:
@@ -226,35 +225,47 @@ class TJPRChunk(base.Chunk):
                 yield to_download
 
     @utils.retryable()
-    def download_pdf(self, pdf_link, act_id, hash_len=10):
-                from io import BytesIO
-                import zipfile
-                from PyPDF2 import PdfFileMerger
-                import hashlib
+    def download_pdf(self, act, hash_len=10):
+        from io import BytesIO
+        import zipfile
+        from PyPDF2 import PdfFileMerger
+        import hashlib
 
-                if pdf_link:
-                    pdf_link = pdf_link.pop()    
-                    PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
-                    relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
-                    url = f"{BASE_URL}{relative_pdf_url}"
-                    resp = requests.get(url)
-                    try:
-                        zipfile = zipfile.ZipFile(BytesIO(resp.content))
-                    except zipfile.BadZipFile:
-                        logger.warn(f'Could not download ZIP from {act_id}, retrying...')
-                        raise utils.PleaseRetryException()
-                        
-                    merger = PdfFileMerger()
-                    for file in sorted(zipfile.namelist()):
-                        merger.append(zipfile.open(file))
-                    pdf_bytes = BytesIO()
-                    merger.write(pdf_bytes)
-                    bytes_value = pdf_bytes.getvalue()
-                    pdf_hash = hashlib.sha1(bytes_value).hexdigest()[:hash_len]
-                else:
-                    bytes_value = b''
-                    pdf_hash = 0 * hash_len
-                return bytes_value, pdf_hash
+        is_zip = lambda text: 'Carregar documento' in text
+        is_single_file = lambda text: 'PDF assinado' in text
+
+        pdf_link = [link for link in act.find_all('a') if link.next.next in ['Carregar documento','PDF assinado']]
+
+        if pdf_link:
+            pdf_link = pdf_link.pop()    
+            PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
+            relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
+            url = f"{BASE_URL}{relative_pdf_url}"
+            response = requests.get(url)
+            
+            if is_zip(pdf_link):
+                try:
+                    zipfile = zipfile.ZipFile(BytesIO(response.content))
+                except zipfile.BadZipFile:
+                    logger.warn(f'Could not download ZIP from {self.get_act_id(act)}, retrying...')
+                    raise utils.PleaseRetryException()
+                merger = PdfFileMerger()
+                for file in sorted(zipfile.namelist()):
+                    merger.append(zipfile.open(file))
+                pdf_bytes = BytesIO()
+                merger.write(pdf_bytes)
+                bytes_value = pdf_bytes.getvalue()
+
+            elif is_single_file(pdf_link):
+                bytes_value = response.content
+
+            pdf_hash = hashlib.sha1(bytes_value).hexdigest()[:hash_len]
+
+        elif not pdf_link:
+            bytes_value = b''
+            pdf_hash = 0 * hash_len
+
+        return bytes_value, pdf_hash
 
 
 @celery.task(queue='crawlers.tjpr', default_retry_delay=5 * 60,
