@@ -18,6 +18,7 @@ INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
 BASE_URL = 'https://portal.tjpr.jus.br'
+DOC_TO_PDF_CONTAINER_URL = 'http://localhost/unoconv/pdf'
 
 DEFAULT_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
@@ -205,7 +206,6 @@ class TJPRChunk(base.Chunk):
                 act_id = self.get_act_id(act)
                 publication_date = self.get_publication_date(act)
                 ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
-                # base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{content_hash}'
 
                 pdf_bytes, pdf_hash = self.download_pdf(act)
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{ementa_hash}_{pdf_hash}'
@@ -252,7 +252,12 @@ class TJPRChunk(base.Chunk):
                     raise utils.PleaseRetryException()
                 merger = PdfFileMerger()
                 for file in sorted(zipfile.namelist()):
-                    merger.append(zipfile.open(file))
+                    bytes = zipfile.open(file)
+                    if file.endswith('.doc'):
+                        bytes = utils.convert_doc_to_pdf(bytes, container_url=DOC_TO_PDF_CONTAINER_URL)
+                        bytes = BytesIO(bytes)
+                    merger.append(bytes)
+                    
                 pdf_bytes = BytesIO()
                 merger.write(pdf_bytes)
                 bytes_value = pdf_bytes.getvalue()
