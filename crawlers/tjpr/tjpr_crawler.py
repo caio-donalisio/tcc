@@ -78,16 +78,19 @@ class TJPRClient:
         self.url = f'{BASE_URL}/jurisprudencia/publico/pesquisa.do'
 
     @utils.retryable(max_retries=3)
-    def count(self,filters):
-        result = self.fetch(filters)
-        soup = utils.soup_by_content(result.text)
-        count_tag = soup.find('div', attrs={'class':'navLeft'})
-        if count_tag:
-            count = re.search(r'^\s*(\d+) registro.*$',count_tag.text)
-            count = int(count.group(1))
-        else:
-            count = 0
-        return count
+    def count(self,filters, min_votes=3):
+        counts = []
+        while not any(counts.count(n) >= min_votes for n in counts):
+            result = self.fetch(filters)
+            soup = utils.soup_by_content(result.text)
+            count_tag = soup.find('div', attrs={'class':'navLeft'})
+            if count_tag:
+                count = re.search(r'^\s*(\d+) registro.*$',count_tag.text)
+                count = int(count.group(1))
+            else:
+                count = 0
+            counts.append(count)
+        return max(counts, key=lambda n: counts.count(n))
     
     def count_periods(self,filters,unit='months'):
         return sum(1 for _ in utils.timely(
