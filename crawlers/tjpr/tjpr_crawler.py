@@ -267,7 +267,7 @@ class TJPRChunk(base.Chunk):
 
         elif not pdf_link:
             bytes_value = b''
-            pdf_hash = 0 * hash_len
+            pdf_hash = '0' * hash_len
 
         return bytes_value, pdf_hash
 
