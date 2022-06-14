@@ -132,6 +132,7 @@ class TJPRCollector(base.ICollector):
         else:
             return self.client.count(self.filters)
 
+    @utils.retryable()
     def chunks(self):
         from math import ceil
         periods = list(utils.timely(
@@ -260,6 +261,9 @@ class TJPRChunk(base.Chunk):
                 bytes_value = response.content
 
             pdf_hash = hashlib.sha1(bytes_value).hexdigest()[:hash_len]
+
+            if len(bytes_value) < 10:
+                raise utils.PleaseRetryException()
 
         elif not pdf_link:
             bytes_value = b''
