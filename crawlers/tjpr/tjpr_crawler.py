@@ -231,7 +231,7 @@ class TJPRChunk(base.Chunk):
                     dest=f'{base_path}.html',
                     content_type='text/html'))
 
-            yield to_download
+                yield to_download
 
     @utils.retryable()
     def download_pdf(self, act, hash_len=10):
