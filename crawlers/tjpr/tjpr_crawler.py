@@ -185,7 +185,7 @@ class TJPRChunk(base.Chunk):
         publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
         return publication_date
 
-    @utils.retryable()
+    @utils.retryable(max_retries=10)
     def get_acts(self):
         result = self.client.fetch(self.filters,self.page)
         soup = utils.soup_by_content(result.text)
