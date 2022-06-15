@@ -136,6 +136,9 @@ def write_file(filename, content):
     with open(filename, mode) as file:
         file.write(content)
 
+def convert_doc_to_pdf(bytes, container_url):
+    """Returns PDF Bytes, converted by the unoconv container"""
+    return requests.post(container_url, files={'file':bytes}).content
 
 def soup_by_content(content):
     return BeautifulSoup(content, features='html.parser')
