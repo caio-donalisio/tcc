@@ -138,7 +138,11 @@ def write_file(filename, content):
 
 def convert_doc_to_pdf(bytes, container_url):
     """Returns PDF Bytes, converted by the unoconv container"""
-    return requests.post(container_url, files={'file':bytes}).content
+    response = requests.post(container_url, files={'file':bytes})
+    if response.status_code == 200:
+        return response.content
+    else:
+        raise PleaseRetryException()
 
 def soup_by_content(content):
     return BeautifulSoup(content, features='html.parser')

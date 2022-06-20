@@ -18,9 +18,10 @@ WEBSITE_URL = 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
 TRF1_DATE_FORMAT = 'DD/MM/YYYY'
 CRAWLER_DATE_FORMAT = 'YYYY-MM-DD'
 DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
-FILES_PER_PAGE = 50  #10, 30 or 50
+FILES_PER_PAGE = 30  #10, 30 or 50
 PDF_URL = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam'
 TRF1_SEARCH_LINK = 'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/listView.seam'
+DOC_TO_PDF_CONTAINER_URL = 'http://localhost/unoconv/pdf'
 
 logger = logger_factory('trf1')
 
@@ -90,7 +91,7 @@ class TRF1Client:
         PAGE_PATTERN = r'.*Página: (\d+)\/.*'
         current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
         
-        while  current_page != page:
+        while current_page != page:
             if not self.page_searched: 
                 self.make_search(filters)
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
@@ -139,73 +140,17 @@ class TRF1Chunk(base.Chunk):
 
     def __init__(self, keys, prefix, page, total, filters, client):
         super(TRF1Chunk, self).__init__(keys, prefix)
-        import browsers
         self.page = page
         self.total = total
         self.filters = filters
         self.client = client
 
+
+
     @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.common.by import By
+        #REFACTOR 
         import browsers
-        
-        @utils.retryable(max_retries=9, sleeptime=20)
-        def download_pdf(browser, soup):
-            """Download PDF as bytes when browser is in the page where the "Gerar PDF" button is available"""
-            import requests
-            link_container =  soup.find('a',id='j_id47:downloadPDF')
-            DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
-            session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
-
-            cookies = {
-                'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
-            }
-
-            data = {
-                'j_id47': 'j_id47',
-                'javax.faces.ViewState': soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
-                'j_id47:downloadPDF': 'j_id47:downloadPDF',
-                'ca': session_data['ca'],
-                'idProcDocBin': session_data['idProcDocBin'],
-            }
-
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                # 'Accept-Encoding': 'gzip, deflate, br',
-                'Origin': 'https://pje2g.trf1.jus.br',
-                'Connection': 'keep-alive',
-                'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Fetch-User': '?1',
-            }
-            response = requests.post(PDF_URL, cookies=cookies, headers=headers, data=data)
-            if response.status_code == 200 and len(response.text) > 50:
-                return response.content
-            else:
-                raise utils.PleaseRetryException
-
-        def search_trf1_process_documents(browser):
-            browser.get(TRF1_SEARCH_LINK)
-            browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
-            browser.driver.implicitly_wait(10)
-            WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
-            browser.driver.implicitly_wait(10)
-            inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-            link = inteiro_soup.find('a', attrs={'title':'Ver Detalhes'})
-            if not link:
-                return False
-            link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
-            browser.get(f'https://pje2g.trf1.jus.br{link}')
-            browser.driver.implicitly_wait(10)
-            return True
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         soup = self.client.fetch(self.filters, page=self.page)
@@ -218,90 +163,164 @@ class TRF1Chunk(base.Chunk):
             process_number = ''.join(char for char in acordao_titulo if char.isdigit())
             
             pub_date = re.search(DATE_PATTERN, row.text)
-            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str[:10]}"
+            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str}"
             
             to_download = []
-            dest_path = f"{base_path}_TYPE_A.html"
-            to_download.append(base.Content(content=str(row),dest=dest_path,
+
+            to_download.append(base.Content(content=str(row), dest=f"{base_path}_A.html",
                 content_type='text/html'))
 
             process_link = row.find('a',text='Acesse aqui').get('href')
             
 
             if 'PesquisaMenuArquivo' in process_link:
-                print('outro')
+                # continue
+                def get_nearest_date(items, pivot):
+                    pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
+                    if items and pivot:
+                        return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
+                                key=lambda x: abs(x - pivot))
+                    else:
+                        return ''
+
                 import requests
-                # TRF1_ARCHIVE = 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Farquivo.trf1.jus.br'
-                TRF1_ARCHIVE = 'https://arquivo.trf1.jus.br'
                 response = requests.get(process_link)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
                 dates = [link.text for link in date_links]
-                #nearest_date = get_nearest_date()
-                #date_links = [link for link in date_links if pendulum.parse(link.text) == nearest_date]
-
-                import sys
-                import os
-                import docx2pdf
-                # import comtypes.client
-
-                wdFormatPDF = 17
-
+                d = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
+                nearest_date = get_nearest_date(dates, d)
+                date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
                 
-                in_file = os.path.abspath(sys.argv[1])
-                out_file = os.path.abspath(sys.argv[2])
-
-                word = comtypes.client.CreateObject('Word.Application')
-                doc = word.Documents.Open(in_file)
-                doc.SaveAs(out_file, FileFormat=wdFormatPDF)
-                doc.Close()
-                word.Quit()
-
-                for link in date_links:
-                    to_download.append(base.ContentFromURL(src=f"{TRF1_ARCHIVE}{link['href']}", 
-                        dest=f"{base_path}.doc", content_type ='application/doc'))
-
+                to_download.append(base.Content(
+                    content=self.merge_pdfs_from_links(date_links, is_doc=True), 
+                    dest=f"{base_path}.pdf", content_type ='application/pdf')
+                )
+                
             elif 'ConsultaPublica/listView.seam' in process_link:
                 # continue 
                 browser = browsers.FirefoxBrowser(headless=not DEBUG)
                 LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
 
-
-
-                sucess = search_trf1_process_documents(browser)
-                if not sucess:
-                    logger.warn(f'Document not available for: {acordao_titulo}')
-                    browser.driver.quit()
-                    continue
-                
-                dest_path = f"{base_path}_TYPE_B.html"
-                to_download.append(base.Content(content=browser.page_source(),dest=dest_path,
-                content_type='text/html'))
+                success = self.search_trf1_process_documents(browser, title)
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
-                table = inteiro_soup.find_all('table')[-3]
-                available_links = table.find_all('a')
-                available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
-                available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
-                available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 14]
-                print('LEN:', len(available_links))
-                URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
-                new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
-                browser.get(new_link)
-                browser.driver.implicitly_wait(10)
 
-                new_soup = BeautifulSoup(browser.page_source(),'html.parser')
-
+                error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
+                if not success or error_div:
+                    logger.warn(f'Document not available for: {title}')
+                    browser.driver.quit()
                 
-                
-                dest_path = f"{base_path}.pdf"
-                to_download.append(base.Content(
-                    content=download_pdf(browser,new_soup), content_type='application/pdf',dest=dest_path
-                    ))
-                browser.driver.quit()
+                else:
+                    to_download.append(base.Content(content=browser.page_source(), dest=f"{base_path}_B.html",
+                        content_type='text/html'))
 
+                    table = inteiro_soup.find_all('table')[-3]
+                    available_links = table.find_all('a')
+                    available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
+                    available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text)]
+                    available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
+                    available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
+                    # print('LEN:', len(available_links))
+                    URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
+                    new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
+                    browser.get(new_link)
+                    browser.driver.implicitly_wait(10)
 
+                    new_soup = BeautifulSoup(browser.page_source(),'html.parser')
+
+                    to_download.append(base.Content(
+                        content=self.download_pdf(browser,new_soup), content_type='application/pdf',
+                        dest=f"{base_path}.pdf"))
+                    browser.driver.quit()
+
+            else:
+                logger.warn(f'Error fetching document for process {acordao_titulo}')
                 
             yield to_download
+
+    @utils.retryable()
+    def merge_pdfs_from_links(self, document_links, is_doc=False):
+        from PyPDF2 import PdfFileMerger
+        from io import BytesIO
+        TRF1_ARCHIVE = 'https://arquivo.trf1.jus.br'
+        merger = PdfFileMerger()
+        for link in document_links:
+            
+            file = requests.get(f"{TRF1_ARCHIVE}{link['href']}")
+            if file.status_code == 200:
+                if is_doc:
+                    bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
+                bytes = BytesIO(bytes)
+            else:
+                raise utils.PleaseRetryException()
+            merger.append(bytes)
+        pdf_bytes = BytesIO()
+        merger.write(pdf_bytes)
+        return pdf_bytes.getvalue()
+
+
+    @utils.retryable(max_retries=9, sleeptime=20)
+    def search_trf1_process_documents(self, browser, title):
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.by import By
+        from selenium.common.exceptions import TimeoutException
+
+
+        browser.get(TRF1_SEARCH_LINK)
+        browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
+        browser.driver.implicitly_wait(10)
+        WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
+        try:
+            WebDriverWait(browser.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
+        except TimeoutException:
+            return False
+        page_soup = BeautifulSoup(browser.page_source(), 'html.parser')
+        link = page_soup.find('a', attrs={'title':'Ver Detalhes'})
+        link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
+        browser.get(f'https://pje2g.trf1.jus.br{link}')
+        browser.driver.implicitly_wait(10)
+        return True
+
+    @utils.retryable(max_retries=9, sleeptime=20)
+    def download_pdf(self, browser, soup):
+        """Download PDF as bytes when browser is in the page where the "Gerar PDF" button is available"""
+        import requests
+        link_container =  soup.find('a',id='j_id47:downloadPDF')
+        DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
+        session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
+
+        cookies = {
+            'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
+        }
+
+        data = {
+            'j_id47': 'j_id47',
+            'javax.faces.ViewState': soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
+            'j_id47:downloadPDF': 'j_id47:downloadPDF',
+            'ca': session_data['ca'],
+            'idProcDocBin': session_data['idProcDocBin'],
+        }
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            # 'Accept-Encoding': 'gzip, deflate, br',
+            'Origin': 'https://pje2g.trf1.jus.br',
+            'Connection': 'keep-alive',
+            'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+        }
+        response = requests.post(PDF_URL, cookies=cookies, headers=headers, data=data)
+        if response.status_code == 200 and len(response.text) > 50:
+            return response.content
+        else:
+            raise utils.PleaseRetryException()
 
 @celery.task(queue='crawlers.trf1', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
