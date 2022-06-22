@@ -1,16 +1,42 @@
----
-version: '2'
+version: '3'
+
+volumes:
+  redis-data: { }
+
 services:
-  redis:
-    image: redis:latest
-    container_name: 'inspira-crawlers-redis'
+  chrome:
+    image: selenium/node-chrome:4.2.2-20220622
+    shm_size: 1gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+
+  firefox:
+    image: selenium/node-firefox:4.2.2-20220622
+    shm_size: 1gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+
+  selenium-hub:
+    image: selenium/hub:4.2.2-20220622
+    container_name: selenium-hub
     ports:
-      - "5555:5555"
+      - "4442:4442"
+      - "4443:4443"
+      - "4444:4444"
 
   celery: &celery
-    build: .
     image: inspira-crawlers
-    network_mode: 'service:redis'
+    build:
+      context: ./
+      dockerfile: Dockerfile
     container_name: 'inspira-crawlers-celery'
     command: 'celery -A tasks worker -Q persistence,crawlers,crawlers.tjrj,crawlers.trf3,crawlers.tjmg,crawlers.trf4,crawlers.scrfb,crawlers.stj,crawlers.tst,crawlers.titsp,crawlers.carf,crawlers.tjsp,crawlers.tjrs,crawlers.tjba,downloader --concurrency=2 -E --loglevel=INFO'
     environment:
@@ -21,17 +47,20 @@ services:
       - TJSP_USERNAME
       - TJSP_PASSWORD
       - CLOUD_LOGGING_ENABLED
+      - ENV=production
+    depends_on:
+      - redis
     volumes:
       - .:/opt/service
-      - .service-account.json:/etc/gcloud/service-account.json
+      - ./service-account.json:/etc/gcloud/service-account.json
 
-  beat:
-    <<: *celery
-    container_name: 'inspira-crawlers-beat'
-    command: 'celery -A tasks beat -s .celerybeat-schedule'
-    volumes:
-      - .:/opt/service
-      - .celerybeat-schedule:/opt/service/.celerybeat-schedule
+  #  beat:
+  #    <<: *celery
+  #    container_name: 'inspira-crawlers-beat'
+  #    command: 'celery -A tasks beat -s .celerybeat-schedule'
+  #    volumes:
+  #      - .:/opt/service
+  #      - .celerybeat-schedule:/opt/service/.celerybeat-schedule
 
   celery_tjsp:
     <<: *celery
@@ -43,12 +72,23 @@ services:
     container_name: 'inspira-crawlers-tjsp-pdf'
     command: 'celery -A tasks worker -Q tjsp.pdf --concurrency=5 -E --loglevel=INFO -n worker.tjsp-pdf'
 
+  redis:
+    image: redis:6.2.5
+    container_name: "redis"
+    command: [ "redis-server", "--appendonly", "yes" ]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    logging:
+      driver: none
+
   flower:
-    build: .
     image: inspira-crawlers
-    network_mode: 'service:redis'
     container_name: 'inspira-crawlers-flower'
-    command: 'celery -A tasks flower --port=5555'
+    command: 'celery -A tasks flower'
+    ports:
+      - "5555:5555"
     environment:
       - CELERYD_HIJACK_ROOT_LOGGER=false
       - C_FORCE_ROOT='true'
