@@ -250,14 +250,18 @@ class SearchPageSelenium:
     self.browser.get(query_url)
     WebDriverWait(self.browser.driver, 60) \
       .until(EC.presence_of_element_located((By.ID, 'resultados')))
+    self.click_to_show_ements()
+    return self.browser.page_source()
 
+  @utils.retryable()
+  def click_to_show_ementas(self):
     select_objects = self.browser.driver.find_elements(By.XPATH,'//*[text()="Ver texto completo"]')
     for n, link in enumerate(select_objects):
       self.browser.driver.implicitly_wait(10)      
       self.browser.driver.execute_script("arguments[0].scrollIntoView(true);", link)
       link.click()
       self.browser.driver.implicitly_wait(10)      
-    return self.browser.page_source()
+
 
   @property
   def text(self):
