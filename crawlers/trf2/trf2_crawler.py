@@ -250,7 +250,7 @@ class SearchPageSelenium:
     self.browser.get(query_url)
     WebDriverWait(self.browser.driver, 60) \
       .until(EC.presence_of_element_located((By.ID, 'resultados')))
-    self.click_to_show_ements()
+    self.click_to_show_ementas()
     return self.browser.page_source()
 
   @utils.retryable()
