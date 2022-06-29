@@ -29,7 +29,7 @@ class TRF1Client:
 
     def __init__(self):
         import browsers
-        self.browser = browsers.FirefoxBrowser(headless=False)
+        self.browser = browsers.FirefoxBrowser(headless=True)
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
@@ -218,41 +218,46 @@ class TRF1Chunk(base.Chunk):
                     to_download.append(base.Content(content=browser.page_source(), dest=f"{base_path}_B.html",
                         content_type='text/html'))
 #############################################
-                    slider = browser.driver.find_element(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]")
-                if slider:
-                    browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
+                    slider = browser.driver.find_elements(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]")
+                    if len(slider) > 1:
+                        print(process_number)
+                    else:
+                        browser.driver.quit()
+                        continue
+                # if slider:
+                #     browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
 
-                    slider_total_pages_td = browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
-                    slider_total_pages = int(slider_total_pages_td.text)
+                #     slider_total_pages_td = browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
+                #     slider_total_pages = int(slider_total_pages_td.text)
 
-                    slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
-                    slider_page = int(slider_page_input.get_attribute('value'))
+                #     slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
+                #     slider_page = int(slider_page_input.get_attribute('value'))
 
-                    links = []
-                    while slider_page <= slider_total_pages:
-                        html = browser.driver.page_source
-                        soup = BeautifulSoup(html, features='html.parser')
-                        table = soup.find("table", id="j_id141:processoDocumentoGridTab")
-                        for link in table.find_all('a'):
-                            links.append(link)
-                        # tds = table.find_all("td", {"class": "rich-table-cell"})
-                        # for td in tds:
-                        #     match = re.search(pattern, td.text)
-                        #     if match:
-                        #         a = td.find('a')
-                        #         doc_date = pendulum.parse(f'{match.group(3)}-{match.group(2)}-{match.group(1)}')
-                        #         days = doc_date.diff(judgment_date).in_days()
-                        #         if days >= 0 and a:
-                        #             links.append({
-                        #                 'days': days,
-                        #                 'url': self._extract_url_from_event(a.get('onclick'))
-                        #             })
+                #     links = []
+                #     while slider_page <= slider_total_pages:
+                #         html = browser.driver.page_source
+                #         soup = BeautifulSoup(html, features='html.parser')
+                #         table = soup.find("table", id="j_id141:processoDocumentoGridTab")
+                #         for link in table.find_all('a'):
+                #             links.append(link)
+                                            # tds = table.find_all("td", {"class": "rich-table-cell"})
+                                            # for td in tds:
+                                            #     match = re.search(pattern, td.text)
+                                            #     if match:
+                                            #         a = td.find('a')
+                                            #         doc_date = pendulum.parse(f'{match.group(3)}-{match.group(2)}-{match.group(1)}')
+                                            #         days = doc_date.diff(judgment_date).in_days()
+                                            #         if days >= 0 and a:
+                                            #             links.append({
+                                            #                 'days': days,
+                                            #                 'url': self._extract_url_from_event(a.get('onclick'))
+                                            #             })
                         
-                        slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
-                        browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
-                        slider_page = int(slider_page_input.get_attribute('value'))
-                        browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
-                        time.sleep(2)
+                        # slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
+                        # browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
+                        # slider_page = int(slider_page_input.get_attribute('value'))
+                        # browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
+                        # time.sleep(2)
 ###################################################
 
 
@@ -263,6 +268,11 @@ class TRF1Chunk(base.Chunk):
                     available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
                     available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
                     # print('LEN:', len(available_links))
+                    if not available_links:
+                        logger.info('NOT AVAILABLE', process_number)
+                        browser.driver.quit()
+                        continue
+
                     URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
                     new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
                     browser.get(new_link)
