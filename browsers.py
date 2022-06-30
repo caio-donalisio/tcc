@@ -1,3 +1,5 @@
+import os
+
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -5,6 +7,8 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from urllib.parse import urlencode
+
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 
 def get_soup_xpath(element):
@@ -27,7 +31,16 @@ def get_soup_xpath(element):
 class FirefoxBrowser:
   def __init__(self, headers=None, headless=True,page_load_strategy='normal'):
     options = self._get_options(headers, headless,page_load_strategy)
-    self.driver = webdriver.Firefox(options=options)
+
+    env = os.getenv('ENV', 'development')
+
+    if env == "development":
+        self.driver = webdriver.Firefox(options=options)
+    else:
+        self.driver = webdriver.Remote(
+            command_executor='http://selenium-hub:4444/wd/hub',
+            desired_capabilities=DesiredCapabilities.FIREFOX
+        )
 
   def get(self, url, wait_for=(By.TAG_NAME, 'body')):
     self.driver.get(url)
@@ -104,7 +117,7 @@ class FirefoxBrowser:
     if headless:
         options.add_argument('--headless')
     if page_load_strategy:
-        options.add_argument('--page-load-strategy')        
+        options.add_argument('--page-load-strategy')
     return options
 
   def _sample_headers(self):
