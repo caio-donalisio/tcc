@@ -21,7 +21,7 @@ from crawlers.trf4.trf4_crawler import trf4_command
 from crawlers.trf5.trf5_crawler import trf5_command
 from crawlers.tst.tst_crawler import tst_command
 from crawlers.tjpr.tjpr_crawler import tjpr_command
-
+from crawlers.tjdf.tjdf_crawler import tjdf_command
 
 @cli.command(name='clear-locks')
 def clear_celery_singleton_locks():
