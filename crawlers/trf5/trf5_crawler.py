@@ -212,6 +212,7 @@ class TRF5Chunk(base.Chunk):
         self.browser.driver.execute_script(f"arguments[0].value='{judgment_id}';", process_input)
 
         while not self.browser.is_text_present('Ver Detalhes', tag='img'):
+            logger.debug(f'Solving Captcha...')
             captcha_img = self.browser.driver.find_element_by_id('consultaPublicaForm:captcha:captchaImg')
 
             captcha_img_base64 = self.browser.driver.execute_script("""
@@ -223,6 +224,7 @@ class TRF5Chunk(base.Chunk):
                 """, captcha_img)
 
             captcha_resolved = self._resolve_captcha(captcha_img_base64)
+            logger.debug(f'Captcha API Resolved: {captcha_resolved}')
             captcha_input = self.browser.driver.find_element_by_id('consultaPublicaForm:captcha:j_id268:verifyCaptcha')
             captcha_input.send_keys(captcha_resolved)
 
@@ -231,9 +233,11 @@ class TRF5Chunk(base.Chunk):
             time.sleep(1)
         
             if not self.browser.is_text_present('Resposta incorreta'):
-                self.browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=30)
+                self.browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
                 doc_link = self.browser.driver.find_element_by_id('consultaPublicaList2:0:j_id315:j_id318')                                            
                 return self._extract_judgment_detail_url(doc_link)
+            else:
+                logger.warn(f'Incorrect Captcha!!! Trying again...')
 
     
     def _format_process_number(self, value):
@@ -277,16 +281,20 @@ class TRF5Chunk(base.Chunk):
         pattern = '(\d{2})\/(\d{2})\/(\d{4})\s(\d{2})\:(\d{2})\:(\d{2})\s- Inteiro Teor - Inteiro Teor do Acórdão'
         self.browser.get(url)
         self.browser.driver.maximize_window()
-        self.browser.wait_for_element(locator=(By.ID, 'processoEvento'))
+        time.sleep(0.5)
+        self.browser.wait_for_element(locator=(By.ID, 'processoEvento'), timeout=60)
 
-        slider = self.browser.driver.find_element(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]")
-        self.browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
+        slider_page = 1
+        slider_total_pages = 1
+        if self.browser.driver.find_elements(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]"):
+            slider = self.browser.driver.find_element(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]")
+            self.browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
 
-        slider_total_pages_td = self.browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
-        slider_total_pages = int(slider_total_pages_td.text)
+            slider_total_pages_td = self.browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
+            slider_total_pages = int(slider_total_pages_td.text)
 
-        slider_page_input = self.browser.driver.find_element_by_id('j_id423:j_id424Input')
-        slider_page = int(slider_page_input.get_attribute('value'))
+            slider_page_input = self.browser.driver.find_element_by_id('j_id423:j_id424Input')
+            slider_page = int(slider_page_input.get_attribute('value'))
 
         links = []
         while slider_page <= slider_total_pages:
@@ -305,12 +313,15 @@ class TRF5Chunk(base.Chunk):
                             'days': days,
                             'url': self._extract_url_from_event(a.get('onclick'))
                         })
-            
-            slider_page_input = self.browser.driver.find_element_by_id('j_id423:j_id424Input')
-            self.browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
-            slider_page = int(slider_page_input.get_attribute('value'))
-            self.browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
-            time.sleep(2)
+                        
+            if self.browser.driver.find_elements_by_id('j_id423:j_id424Input'):
+                slider_page_input = self.browser.driver.find_element_by_id('j_id423:j_id424Input')
+                self.browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
+                slider_page = int(slider_page_input.get_attribute('value'))
+                self.browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
+                time.sleep(2)
+            else:
+                slider_page += 1
 
         return self._get_judgment_doc_url_by_closest_date(links)
 

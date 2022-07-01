@@ -185,6 +185,16 @@ class TJPRChunk(base.Chunk):
         publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
         return publication_date
 
+    @utils.retryable(max_retries=10)
+    def get_acts(self):
+        result = self.client.fetch(self.filters,self.page)
+        soup = utils.soup_by_content(result.text)
+        acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
+        if acts:
+            return acts
+        else:
+            raise utils.PleaseRetryException()
+
 
     @utils.retryable()
     def rows(self):
@@ -199,13 +209,8 @@ class TJPRChunk(base.Chunk):
             yield utils.count_data_content(count_data,count_filepath)
 
         else:
-            result = self.client.fetch(self.filters,self.page)
-            soup = utils.soup_by_content(result.text)
-            acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
             to_download = []
-            if not acts:
-                raise utils.PleaseRetryException()
-            for act in acts:
+            for act in self.get_acts():
                 act_id = self.get_act_id(act)
                 publication_date = self.get_publication_date(act)
                 ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])

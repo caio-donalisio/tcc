@@ -17,6 +17,8 @@ from slugify import slugify
 from urllib3.exceptions import InsecureRequestWarning
 from utils import PleaseRetryException
 
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 import click
@@ -207,12 +209,23 @@ class TJSPClient:
     self.request_cookies_browser = []
     self.options = (options or {})
 
-    chrome_options = Options()
-    if not self.options.get('browser', False):
-      chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    self.driver = webdriver.Chrome(options=chrome_options)
-    self.driver.implicitly_wait(20)
+    env = os.getenv('ENV', 'development')
+
+    if env == "development":
+      chrome_options = Options()
+
+      if not self.options.get('browser', False):
+        chrome_options.add_argument("--headless")
+
+      chrome_options.add_argument("--no-sandbox")
+
+      self.driver = webdriver.Chrome(options=chrome_options)
+      self.driver.implicitly_wait(20)
+    else:
+      self.driver = webdriver.Remote(
+        command_executor='http://selenium-hub:4444/wd/hub',
+        desired_capabilities=DesiredCapabilities.CHROME
+      )
 
   def signin(self):
     from selenium.webdriver.chrome.options import Options

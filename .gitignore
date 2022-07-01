@@ -151,3 +151,5 @@ operadriver.exe
 # Audio Files
 *.wav
 .celerybeat-schedule
+
+/.idea

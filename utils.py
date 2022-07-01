@@ -176,7 +176,7 @@ def get_count_filepath(
     Returns custom or standard count file name
     '''
     if filepath is None:
-        dest_record = f'{court_name.upper()}-COUNT-{start_date.to_date_string()}-{end_date.to_date_string()}'
+        dest_record = f'{court_name.upper()}-COUNT-{start_date.to_date_string()}-{end_date.to_date_string()}.json'
     else:
         dest_record = filepath
     return dest_record
