@@ -29,7 +29,7 @@ class TRF1Client:
 
     def __init__(self):
         import browsers
-        self.browser = browsers.FirefoxBrowser(headless=True)
+        self.browser = browsers.FirefoxBrowser(headless=False)
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
@@ -94,6 +94,7 @@ class TRF1Client:
         while current_page != page:
             if not self.page_searched: 
                 self.make_search(filters)
+            self.browser.driver.implicitly_wait(10)
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             if current_page < page:
@@ -106,6 +107,7 @@ class TRF1Client:
             self.browser.driver.implicitly_wait(10)
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+            # print(page,current_page)
             
             
         return soup
@@ -176,16 +178,17 @@ class TRF1Chunk(base.Chunk):
 
             process_link = row.find('a',text='Acesse aqui').get('href')
             
-
-            if 'PesquisaMenuArquivo' in process_link:
-                # continue
-                def get_nearest_date(items, pivot):
+            def get_nearest_date(items, pivot):
                     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
                     if items and pivot:
                         return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
                                 key=lambda x: abs(x - pivot))
                     else:
                         return ''
+            MAXIMUM_TIME_DISTANCE = 120
+            if 'PesquisaMenuArquivo' in process_link:
+                # continue
+                
 
                 import requests
                 response = requests.get(process_link)
@@ -194,17 +197,57 @@ class TRF1Chunk(base.Chunk):
                 dates = [link.text for link in date_links]
                 d = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
                 nearest_date = get_nearest_date(dates, d)
-                date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
                 
-                to_download.append(base.Content(
-                    content=self.merge_pdfs_from_links(date_links, is_doc=True), 
-                    dest=f"{base_path}.pdf", content_type ='application/pdf')
-                )
+                if abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days) > MAXIMUM_TIME_DISTANCE:
+                    logger.info('Document not available for: ' + acordao_titulo)
+                else:
+                # [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
+                    date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
+                    to_download.append(base.Content(
+                        content=self.merge_pdfs_from_links(date_links, is_doc=True), 
+                        dest=f"{base_path}.pdf", content_type ='application/pdf')
+                    )
                 
             elif 'ConsultaPublica/listView.seam' in process_link:
+
+                def click_next_document_page(browser, slider_id):
+                    try:
+                        slider_page_input = browser.driver.find_element_by_id(slider_id);
+                    except Exception as e:
+                        return
+                    browser.driver.execute_script("arguments[0].value =  Number(arguments[0].value) + 1;", slider_page_input);
+                    # slider_page = int(slider_page_input.get_attribute('value'));
+                    browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
+
+                def collect_all_links(browser):
+                        links = []
+                        while True:
+                            soup = BeautifulSoup(browser.page_source(),'html.parser')
+                            table = soup.find(id=re.compile(r'j_id\d+:processoDocumentoGridTabPanel_body'))
+                            hypers = table.find_all('a')
+                            links.extend(hypers)
+                            last_page = table.find('td', class_='rich-inslider-right-num')
+                            if not last_page:
+                                break
+                            last_page = int(last_page.text)
+                            current_page = table.find('input',attrs={'class':"rich-inslider-field-right rich-inslider-field"})
+                            current_page = int(current_page['value'])
+                            
+                            if last_page and not last_page < current_page + 1:
+                                click_next_document_page(browser, 'j_id141:j_id633:j_id634Input')
+                            else:
+                                break
+                        
+                        return links
+
+                def filter_links(links):
+                    links = [link for link in links if re.search(r'\d{2}',link.text)]
+                    links = [link for link in links if re.search('Acórdão', link.text, re.IGNORECASE + re.UNICODE)]
+                    links = list(set(links))
+                    return links
                 # continue 
                 browser = browsers.FirefoxBrowser(headless=not DEBUG)
-                LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
+                # LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
 
                 success = self.search_trf1_process_documents(browser, title)
                 inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
@@ -212,90 +255,125 @@ class TRF1Chunk(base.Chunk):
                 error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
                 if not success or error_div:
                     logger.warn(f'Document not available for: {title}')
-                    browser.driver.quit()
                 
                 else:
                     to_download.append(base.Content(content=browser.page_source(), dest=f"{base_path}_B.html",
                         content_type='text/html'))
-#############################################
-                    slider = browser.driver.find_elements(By.XPATH, "//div[contains(@class, 'rich-inslider-handler')]")
-                    if len(slider) > 1:
-                        print(process_number)
+
+                    links = collect_all_links(browser)
+                    ls = []
+                    for link in filter_links(links):
+                        D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
+                        U = r".*\'(?P<pdf_link>http.*?)\'.*"
+                        ls.append({
+                            'date':re.search(D, link.text).group(1), 
+                            'url': re.search(U, link['onclick']).group(1)
+                            })
+                    
+                    min_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
+                    ls = [l for l in ls if l['date'] == min_date.format(TRF1_DATE_FORMAT)]
+                    if not ls or abs(pendulum.parse(pub_date.groupdict().get('date')).days - nearest_date) > MAXIMUM_TIME_DISTANCE:
+                        logger.info('Document not available for: ' + acordao_titulo)
+                        # continue
                     else:
-                        browser.driver.quit()
-                        continue
-                # if slider:
-                #     browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
-
-                #     slider_total_pages_td = browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
-                #     slider_total_pages = int(slider_total_pages_td.text)
-
-                #     slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
-                #     slider_page = int(slider_page_input.get_attribute('value'))
-
-                #     links = []
-                #     while slider_page <= slider_total_pages:
-                #         html = browser.driver.page_source
-                #         soup = BeautifulSoup(html, features='html.parser')
-                #         table = soup.find("table", id="j_id141:processoDocumentoGridTab")
-                #         for link in table.find_all('a'):
-                #             links.append(link)
-                                            # tds = table.find_all("td", {"class": "rich-table-cell"})
-                                            # for td in tds:
-                                            #     match = re.search(pattern, td.text)
-                                            #     if match:
-                                            #         a = td.find('a')
-                                            #         doc_date = pendulum.parse(f'{match.group(3)}-{match.group(2)}-{match.group(1)}')
-                                            #         days = doc_date.diff(judgment_date).in_days()
-                                            #         if days >= 0 and a:
-                                            #             links.append({
-                                            #                 'days': days,
-                                            #                 'url': self._extract_url_from_event(a.get('onclick'))
-                                            #             })
-                        
-                        # slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
-                        # browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
-                        # slider_page = int(slider_page_input.get_attribute('value'))
-                        # browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
-                        # time.sleep(2)
-###################################################
-
-
-                    table = inteiro_soup.find_all('table')[-3]
-                    available_links = table.find_all('a')
-                    available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
-                    available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text)]
-                    available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
-                    available_links = [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
-                    # print('LEN:', len(available_links))
-                    if not available_links:
-                        logger.info('NOT AVAILABLE', process_number)
-                        browser.driver.quit()
-                        continue
-
-                    URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
-                    new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
-                    browser.get(new_link)
-                    browser.driver.implicitly_wait(10)
-
-                    new_soup = BeautifulSoup(browser.page_source(),'html.parser')
-
-                    to_download.append(base.Content(
-                        content=self.download_pdf(browser,new_soup), content_type='application/pdf',
-                        dest=f"{base_path}.pdf"))
-                    browser.driver.quit()
-
+                        browser.get(ls[0]['url'])
+                        browser.driver.implicitly_wait(10)
+                        new_soup = BeautifulSoup(browser.page_source(),'html.parser')
+                        to_download.append(base.Content(
+                            content=self.download_pdf(browser,new_soup), content_type='application/pdf',
+                            dest=f"{base_path}.pdf"))
+                browser.driver.quit()
+            
             else:
                 logger.warn(f'Error fetching document for process {acordao_titulo}')
-                
+
             yield to_download
+
+            
+                
+
+#                     # else:   
+#                     #     browser.driver.quit()
+#                     #     continue
+#                 # if slider:
+#                 #     browser.driver.execute_script("arguments[0].scrollIntoView()", slider);
+
+#                 #     slider_total_pages_td = browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
+#                 #     slider_total_pages = int(slider_total_pages_td.text)
+
+#                 #     slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
+#                 #     slider_page = int(slider_page_input.get_attribute('value'))
+
+#                 #     links = []
+#                 #     while slider_page <= slider_total_pages:
+#                 #         html = browser.driver.page_source
+#                 #         soup = BeautifulSoup(html, features='html.parser')
+#                 #         table = soup.find("table", id="j_id141:processoDocumentoGridTab")
+#                 #         for link in table.find_all('a'):
+#                 #             links.append(link)
+#                                             # tds = table.find_all("td", {"class": "rich-table-cell"})
+#                                             # for td in tds:
+#                                             #     match = re.search(pattern, td.text)
+#                                             #     if match:
+#                                             #         a = td.find('a')
+#                                             #         doc_date = pendulum.parse(f'{match.group(3)}-{match.group(2)}-{match.group(1)}')
+#                                             #         days = doc_date.diff(judgment_date).in_days()
+#                                             #         if days >= 0 and a:
+#                                             #             links.append({
+#                                             #                 'days': days,
+#                                             #                 'url': self._extract_url_from_event(a.get('onclick'))
+#                                             #             })
+#                         # A4J.AJAX.Submit(\'j_id141:j_id633\',event,{\'similarityGroupingId\':\'j_id141:j_id633:j_id635\',\'actionUrl\':\'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam\',\'eventsQueue\':\'\',\'containerId\':\'j_id141:j_id549\',\'parameters\':{\'j_id141:j_id633:j_id635\':\'j_id141:j_id633:j_id635\'} ,\'status\':\'_viewRoot:status\'} )','showArrows':true} )//]]>
+                        
+                        
+#                         # slider_page_input = browser.driver.find_element_by_id('j_id141:j_id633:j_id634Input')
+#                         # browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
+#                         # slider_page = int(slider_page_input.get_attribute('value'))
+#                         # browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
+#                         # time.sleep(2)
+# ###################################################
+#                     # try:
+
+#                     #     def click_next_document_page(browser, slider_id):
+#                     #         try:
+#                     #             slider_page_input = browser.driver.find_element_by_id(slider_id);
+#                     #         except Exception as e:
+#                     #             return
+#                     #         browser.driver.execute_script("arguments[0].value =  Number(arguments[0].value) + 1;", slider_page_input);
+#                     #         slider_page = int(slider_page_input.get_attribute('value'));
+#                     #         browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
+                        
+#                     #     click_next_document_page(browser, 'j_id141:j_id633:j_id634Input')
+#                     #     print()
+#                     # except:
+#                     #     pass
+                        
+                   
+
+#                     tables = inteiro_soup.find_all('table')
+#                     available_links = table.find_all('a')
+#                     available_links = [link for link in available_links if any(char.isdigit() for char in link.text)]
+#                     available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text)]
+#                     available_links = [link for link in available_links if re.search(LINK_PATTERN, link.text).groupdict()['doc'] == 'Acórdão']
+
+#                     # print('LEN:', len(available_links))
+                    # if not available_links:
+                    #     logger.info('NOT AVAILABLE ' + process_number)
+                    #     browser.driver.quit()
+                    #     continue
+
+                    # URL_PATTERN = r".*(http\:\/\/.*?)\'\)"
+                    # new_link = re.search(URL_PATTERN, available_links[0]['onclick']).group(1)
+                    # browser.get(new_link)
+
+                
 
     @utils.retryable()
     def merge_pdfs_from_links(self, document_links, is_doc=False):
-        from PyPDF2 import PdfFileMerger
+        import PyPDF2 
         from io import BytesIO
         TRF1_ARCHIVE = 'https://arquivo.trf1.jus.br'
-        merger = PdfFileMerger()
+        merger = PyPDF2.PdfFileMerger()
         for link in document_links:
             
             file = requests.get(f"{TRF1_ARCHIVE}{link['href']}")
@@ -305,7 +383,11 @@ class TRF1Chunk(base.Chunk):
                 bytes = BytesIO(bytes)
             else:
                 raise utils.PleaseRetryException()
-            merger.append(bytes)
+            try:
+                merger.append(bytes)
+            except PyPDF2.errors.PdfReadError:
+                raise utils.PleaseRetryException()
+
         pdf_bytes = BytesIO()
         merger.write(pdf_bytes)
         return pdf_bytes.getvalue()
@@ -328,8 +410,10 @@ class TRF1Chunk(base.Chunk):
         except TimeoutException:
             return False
         page_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-        link = page_soup.find('a', attrs={'title':'Ver Detalhes'})
-        link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link['onclick']).group(1)
+        link = page_soup.find_all('a', attrs={'title':'Ver Detalhes'})
+        if len(link) != 1:
+            return False
+        link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link[0]['onclick']).group(1)
         browser.get(f'https://pje2g.trf1.jus.br{link}')
         browser.driver.implicitly_wait(10)
         return True
@@ -340,18 +424,18 @@ class TRF1Chunk(base.Chunk):
         import requests
         link_container =  soup.find('a',id='j_id47:downloadPDF')
         DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
-        session_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
+        page_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
 
         cookies = {
-            'JSESSIONID': browser.get_cookie('JSESSIONID')#R2hwndCXkAYiGuJNZnivYf9u-dN6FuhAnmuXhO7I.srvpje2gcons04',
+            'JSESSIONID': browser.get_cookie('JSESSIONID')
         }
 
         data = {
             'j_id47': 'j_id47',
             'javax.faces.ViewState': soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
             'j_id47:downloadPDF': 'j_id47:downloadPDF',
-            'ca': session_data['ca'],
-            'idProcDocBin': session_data['idProcDocBin'],
+            'ca': page_data['ca'],
+            'idProcDocBin': page_data['idProcDocBin'],
         }
 
         headers = {
@@ -361,7 +445,7 @@ class TRF1Chunk(base.Chunk):
             # 'Accept-Encoding': 'gzip, deflate, br',
             'Origin': 'https://pje2g.trf1.jus.br',
             'Connection': 'keep-alive',
-            'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={data["ca"]}&idProcessoDoc={data["idProcDocBin"]}',
+            'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={page_data["ca"]}&idProcessoDoc={page_data["idProcDocBin"]}',
             'Upgrade-Insecure-Requests': '1',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',

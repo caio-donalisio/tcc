@@ -138,11 +138,17 @@ def write_file(filename, content):
 
 def convert_doc_to_pdf(bytes, container_url):
     """Returns PDF Bytes, converted by the unoconv container"""
-    response = requests.post(container_url, files={'file':bytes})
+    # zrrrzzt/docker-unoconv-webservice
+    try:
+        response = requests.post(container_url, files={'file':bytes})
+    except requests.exceptions.ConnectionError:
+        logger.warn('doc-to-pdf container not available ')
+        raise PleaseRetryException()
     if response.status_code == 200:
         return response.content
     else:
-        raise PleaseRetryException()
+        logger.warn('Could not convert doc to pdf')
+        
 
 def soup_by_content(content):
     return BeautifulSoup(content, features='html.parser')
