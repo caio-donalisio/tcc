@@ -271,10 +271,11 @@ class TRF1Chunk(base.Chunk):
                     for link in filter_links(links):
                         D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
                         U = r".*\'(?P<pdf_link>http.*?)\'.*"
-                        ls.append({
-                            'date':re.search(D, link.text).group(1), 
-                            'url': re.search(U, link['onclick']).group(1)
-                            })
+                        if re.search(U, link['onclick']) and re.search(D, link.text).group(1):
+                            ls.append({
+                                'date':re.search(D, link.text).group(1), 
+                                'url': re.search(U, link['onclick']).group(1)
+                                })
                     
                     nearest_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
                     ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
