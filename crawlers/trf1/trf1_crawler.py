@@ -185,7 +185,8 @@ class TRF1Chunk(base.Chunk):
                                 key=lambda x: abs(x - pivot))
                     else:
                         return ''
-            MAXIMUM_TIME_DISTANCE = 120
+            MAXIMUM_TIME_DISTANCE = 80
+            try_pje = False
             if 'PesquisaMenuArquivo' in process_link:
                 # continue
                 
@@ -198,8 +199,10 @@ class TRF1Chunk(base.Chunk):
                 d = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
                 nearest_date = get_nearest_date(dates, d)
                 
-                if abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days) > MAXIMUM_TIME_DISTANCE:
+                if dates and abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days) > MAXIMUM_TIME_DISTANCE:
                     logger.info('Document not available for: ' + acordao_titulo)
+                    try_pje=True
+                
                 else:
                 # [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
                     date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
@@ -208,7 +211,7 @@ class TRF1Chunk(base.Chunk):
                         dest=f"{base_path}.pdf", content_type ='application/pdf')
                     )
                 
-            elif 'ConsultaPublica/listView.seam' in process_link:
+            if 'ConsultaPublica/listView.seam' in process_link or try_pje:
 
                 def click_next_document_page(browser, slider_id):
                     try:
