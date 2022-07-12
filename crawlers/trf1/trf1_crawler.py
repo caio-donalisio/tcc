@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 import re
 import re
 
-DEBUG = False
+DEBUG = True
 SITE_KEY = '6LfkZ24UAAAAAMO1KEF_pP-G3wE0dYN69-SG8NxI' # k value of recaptcha, found inside page
 WEBSITE_URL = 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
 TRF1_DATE_FORMAT = 'DD/MM/YYYY'
@@ -90,11 +90,12 @@ class TRF1Client:
         soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
         PAGE_PATTERN = r'.*Página: (\d+)\/.*'
         current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
-        
+        rows = [1]        
         while current_page != page:
-            if not self.page_searched: 
+            self.browser.driver.implicitly_wait(20)
+            if not self.page_searched or not rows: 
                 self.make_search(filters)
-            self.browser.driver.implicitly_wait(10)
+            self.browser.driver.implicitly_wait(20)
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             if current_page < page:
@@ -103,10 +104,14 @@ class TRF1Client:
                 to_click_class = 'ui-icon-seek-prev'
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
             if current_page != page:
-                WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
-            self.browser.driver.implicitly_wait(10)
+                WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
+            self.browser.driver.implicitly_wait(20)
             soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
             current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+            rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
+
+            # self.browser.driver.refresh()
+
             # print(page,current_page)
             
             
@@ -189,7 +194,7 @@ class TRF1Chunk(base.Chunk):
                 
                 if last_page and not last_page < current_page + 1:
                     click_next_document_page(browser, 'j_id141:j_id633:j_id634Input')
-                    browser.driver.implicitly_wait(10)
+                    browser.driver.implicitly_wait(20)
                 else:
                     break
             
@@ -237,7 +242,7 @@ class TRF1Chunk(base.Chunk):
                 nearest_date = get_nearest_date(dates, d)
                 
                 if not (dates or nearest_date) or abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days) > MAXIMUM_TIME_DISTANCE:
-                    logger.info(f"Trying to fetch: {acordao_titulo.replace('  ',' ')} on PJE...".replace('\n',''))
+                    logger.info(f"Trying to fetch {title} on PJE...")
                     try_pje=True
                 
                 else:
@@ -280,11 +285,11 @@ class TRF1Chunk(base.Chunk):
                     nearest_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
                     ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
                     if not ls or abs(pendulum.from_format(pub_date.groupdict().get('date'), TRF1_DATE_FORMAT) - nearest_date).days > MAXIMUM_TIME_DISTANCE:
-                        logger.info('Document not available for: ' + acordao_titulo)
+                        logger.info(f'Document not available for: {title}')
                         # continue
                     else:
                         browser.get(ls[0]['url'])
-                        browser.driver.implicitly_wait(10)
+                        browser.driver.implicitly_wait(20)
                         new_soup = BeautifulSoup(browser.page_source(),'html.parser')
                         to_download.append(base.Content(
                             content=self.download_pdf(browser,new_soup), content_type='application/pdf',
@@ -325,13 +330,12 @@ class TRF1Chunk(base.Chunk):
         from selenium.webdriver.common.by import By
         from selenium.common.exceptions import TimeoutException
 
-
         browser.get(TRF1_SEARCH_LINK)
         browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
-        browser.driver.implicitly_wait(10)
-        WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
+        browser.driver.implicitly_wait(20)
+        WebDriverWait(browser.driver, 20).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
         try:
-            WebDriverWait(browser.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
+            WebDriverWait(browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
         except TimeoutException:
             return False
         page_soup = BeautifulSoup(browser.page_source(), 'html.parser')
@@ -340,7 +344,7 @@ class TRF1Chunk(base.Chunk):
             return False
         link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link[0]['onclick']).group(1)
         browser.get(f'https://pje2g.trf1.jus.br{link}')
-        browser.driver.implicitly_wait(10)
+        browser.driver.implicitly_wait(20)
         return True
 
     @utils.retryable(max_retries=9, sleeptime=20)
