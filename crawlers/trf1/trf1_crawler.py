@@ -147,6 +147,7 @@ class TRF1Chunk(base.Chunk):
     def rows(self):
         #REFACTOR 
         import browsers
+        import hashlib
 
         def get_nearest_date(items, pivot):
                     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
@@ -199,19 +200,20 @@ class TRF1Chunk(base.Chunk):
         page_soup = self.client.fetch(self.filters, page=self.page)
         rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for n, row in enumerate(rows, 1):
-            hash_str = utils.get_content_hash(row, [{'name':'td'}])
+            inteiro_page_content, pdf_content = '',''
+            meta_hash = utils.get_content_hash(row, [{'name':'td'}])
             
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
             title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
             process_number = ''.join(char for char in acordao_titulo if char.isdigit())
             
             pub_date = re.search(DATE_PATTERN, row.text)
-            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{self.page:02}_{n:02}_{process_number}_{hash_str}"
+            # base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{self.page:02}_{n:02}_{process_number}_{hash_str}"
             
             to_download = []
 
-            to_download.append(base.Content(content=str(row), dest=f"{base_path}_A.html",
-                content_type='text/html'))
+            # to_download.append(base.Content(content=str(row), dest=f"{base_path}_A.html",
+            #     content_type='text/html'))
 
             process_link = row.find('a',text='Acesse aqui').get('href')
             
@@ -237,10 +239,11 @@ class TRF1Chunk(base.Chunk):
                 else:
                 # [link for link in available_links if (pendulum.from_format(re.search(LINK_PATTERN, link.text).groupdict()['date'], TRF1_DATE_FORMAT) - pendulum.from_format(pub_date.groupdict()['date'], TRF1_DATE_FORMAT)).days < 28]
                     date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
-                    to_download.append(base.Content(
-                        content=self.merge_pdfs_from_links(date_links, is_doc=True), 
-                        dest=f"{base_path}.pdf", content_type ='application/pdf')
-                    )
+                    pdf_content = self.merge_pdfs_from_links(date_links, is_doc=True)
+                    # to_download.append(base.Content(
+                    #     content=self.merge_pdfs_from_links(date_links, is_doc=True), 
+                    #     dest=f"{base_path}.pdf", content_type ='application/pdf')
+                    # )
                 
             if try_pje or 'ConsultaPublica/listView.seam' in process_link:
 
@@ -257,9 +260,7 @@ class TRF1Chunk(base.Chunk):
                     logger.warn(f'Document not available for: {title}')
                 
                 else:
-                    to_download.append(base.Content(content=browser.page_source(), dest=f"{base_path}_B.html",
-                        content_type='text/html'))
-
+                    inteiro_page_content = browser.page_source()
                     links = collect_all_links(browser)
                     ls = []
                     for link in filter_links(links):
@@ -279,10 +280,33 @@ class TRF1Chunk(base.Chunk):
                     else:
                         browser.get(ls[0]['url'])
                         browser.driver.implicitly_wait(20)
-                        to_download.append(base.Content(
-                            content=self.download_pdf(browser), content_type='application/pdf',
-                            dest=f"{base_path}.pdf"))
+                        pdf_content = self.download_pdf(browser)
+                        # to_download.append(base.Content(
+                        #     content=self.download_pdf(browser), content_type='application/pdf',
+                        #     dest=f"{base_path}.pdf"))
                 browser.driver.quit()
+
+            HASH_LENGTH = 10
+            pdf_hash = hashlib.sha1(pdf_content).hexdigest()[:HASH_LENGTH] if pdf_content else '0' * HASH_LENGTH
+            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}_{pdf_hash}"
+
+            to_download.append(
+                base.Content(content=str(row), 
+                dest=f"{base_path}_A.html",
+                content_type='text/html'))
+            
+            if inteiro_page_content:
+                to_download.append(
+                     base.Content(content=inteiro_page_content, 
+                     dest=f"{base_path}_B.html",
+                    content_type='text/html')
+                    )
+
+            if pdf_content:
+                to_download.append(
+                    base.Content(content=pdf_content,  
+                    dest=f"{base_path}.pdf", 
+                    content_type ='application/pdf'))
 
             yield to_download
 
