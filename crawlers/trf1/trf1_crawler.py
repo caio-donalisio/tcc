@@ -82,6 +82,7 @@ class TRF1Client:
         from selenium.webdriver.common.by import By
 
         def get_current_page(browser):
+            PAGE_PATTERN = r'.*Página: (\d+)\/.*'
             return int(re.search(
                 PAGE_PATTERN, self.browser.bsoup().find('span', class_='ui-paginator-current').text).group(1)
                 )
@@ -89,8 +90,6 @@ class TRF1Client:
         while not self.page_searched:
             self.setup()
             self.make_search(filters)
-        
-        PAGE_PATTERN = r'.*Página: (\d+)\/.*'
         
         rows = True     
         while get_current_page(self.browser) != page:
@@ -104,6 +103,8 @@ class TRF1Client:
                 WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
             self.browser.driver.implicitly_wait(20)
             rows = self.browser.bsoup().find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
+        if not get_current_page(self.browser) or not rows:
+            raise utils.PleaseRetryException()
         return self.browser.bsoup()
 
 class TRF1Collector(base.ICollector):
@@ -148,6 +149,9 @@ class TRF1Chunk(base.Chunk):
         #REFACTOR 
         import browsers
         import hashlib
+
+        HASH_LENGTH = 10
+
 
         def get_nearest_date(items, pivot):
                     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
@@ -196,12 +200,25 @@ class TRF1Chunk(base.Chunk):
             links = list(set(links))
             return links
 
+        def get_pdf_hash(pdf_content:bytes, remove_whitespace=True, length=10):
+            from io import BytesIO
+            import PyPDF2
+            try:
+                pdf = PyPDF2.PdfReader(BytesIO(pdf_content))
+                pdf_content = ''.join(pdf.getPage(i).extract_text() for i in range(pdf._get_num_pages()))
+                if remove_whitespace:
+                    pdf_content = pdf_content.replace(' ','')
+                pdf_hash = hashlib.sha1(pdf_content).hexdigest()[:length]
+            except TypeError:
+                pdf_hash = '0' * length
+            return  pdf_hash
+
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         page_soup = self.client.fetch(self.filters, page=self.page)
         rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for n, row in enumerate(rows, 1):
             inteiro_page_content, pdf_content = '',''
-            meta_hash = utils.get_content_hash(row, [{'name':'td'}])
+            meta_hash = utils.get_content_hash(row, [{'name':'td'}], length=HASH_LENGTH)
             
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
             title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
@@ -231,8 +248,8 @@ class TRF1Chunk(base.Chunk):
                 dates = [link.text for link in date_links]
                 d = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
                 nearest_date = get_nearest_date(dates, d)
-                
-                if not (dates or nearest_date) or abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days) > MAXIMUM_TIME_DISTANCE:
+                time_from_pub_date = abs((pendulum.from_format(d,TRF1_DATE_FORMAT) - nearest_date).days)
+                if not (dates or nearest_date) or time_from_pub_date > MAXIMUM_TIME_DISTANCE:
                     logger.info(f"Trying to fetch {title} on PJE...")
                     try_pje=True
                 
@@ -286,9 +303,11 @@ class TRF1Chunk(base.Chunk):
                         #     dest=f"{base_path}.pdf"))
                 browser.driver.quit()
 
-            HASH_LENGTH = 10
-            pdf_hash = hashlib.sha1(pdf_content).hexdigest()[:HASH_LENGTH] if pdf_content else '0' * HASH_LENGTH
-            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}_{pdf_hash}"
+
+
+            base_dir = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}"
+            filename = f"{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}_{get_pdf_hash(length=HASH_LENGTH)}"
+            base_path = f"{base_dir}/{filename}"
 
             to_download.append(
                 base.Content(content=str(row), 
