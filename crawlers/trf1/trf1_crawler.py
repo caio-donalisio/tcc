@@ -1,4 +1,3 @@
-from socket import timeout
 import base
 import math
 import pendulum
@@ -81,41 +80,31 @@ class TRF1Client:
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.common.by import By
-        import bs4
-        
+
+        def get_current_page(browser):
+            return int(re.search(
+                PAGE_PATTERN, self.browser.bsoup().find('span', class_='ui-paginator-current').text).group(1)
+                )
+
         while not self.page_searched:
             self.setup()
             self.make_search(filters)
         
-        soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
         PAGE_PATTERN = r'.*Página: (\d+)\/.*'
-        current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
-        rows = [1]        
-        while current_page != page:
+        
+        rows = True     
+        while get_current_page(self.browser) != page:
             self.browser.driver.implicitly_wait(20)
             if not self.page_searched or not rows: 
                 self.make_search(filters)
             self.browser.driver.implicitly_wait(20)
-            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
-            soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
-            if current_page < page:
-                to_click_class = 'ui-icon-seek-next'
-            elif current_page > page:
-                to_click_class = 'ui-icon-seek-prev'
-            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
+            current_page = get_current_page(self.browser)
             if current_page != page:
+                to_click_class = 'ui-icon-seek-next' if current_page < page else 'ui-icon-seek-prev'
                 WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
             self.browser.driver.implicitly_wait(20)
-            soup = bs4.BeautifulSoup(self.browser.page_source(), 'html.parser')
-            current_page = int(re.search(PAGE_PATTERN, soup.find('span', class_='ui-paginator-current').text).group(1))
-            rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
-
-            # self.browser.driver.refresh()
-
-            # print(page,current_page)
-            
-            
-        return soup
+            rows = self.browser.bsoup().find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
+        return self.browser.bsoup()
 
 class TRF1Collector(base.ICollector):
 
@@ -207,9 +196,9 @@ class TRF1Chunk(base.Chunk):
             return links
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
-        soup = self.client.fetch(self.filters, page=self.page)
-        rows = soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
-        for row in rows:
+        page_soup = self.client.fetch(self.filters, page=self.page)
+        rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
+        for n, row in enumerate(rows, 1):
             hash_str = utils.get_content_hash(row, [{'name':'td'}])
             
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
@@ -217,7 +206,7 @@ class TRF1Chunk(base.Chunk):
             process_number = ''.join(char for char in acordao_titulo if char.isdigit())
             
             pub_date = re.search(DATE_PATTERN, row.text)
-            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{process_number}_{hash_str}"
+            base_path = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}/{pub_date.groupdict().get('day')}_{self.page:02}_{n:02}_{process_number}_{hash_str}"
             
             to_download = []
 
@@ -261,7 +250,7 @@ class TRF1Chunk(base.Chunk):
                 # LINK_PATTERN = r'\n*(Visualizar documentos)?(?P<date>\d{2}\/\d{2}\/\d{4}) (?P<time>\d{2}:\d{2}:\d{2}) - (?P<doc>[\s\w]+)(?P<doc_2> \([\s\w]+\)?)'
 
                 success = self.search_trf1_process_documents(browser, title)
-                inteiro_soup = BeautifulSoup(browser.page_source(), 'html.parser') 
+                inteiro_soup = browser.bsoup()
 
                 error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
                 if not success or error_div:
@@ -290,9 +279,8 @@ class TRF1Chunk(base.Chunk):
                     else:
                         browser.get(ls[0]['url'])
                         browser.driver.implicitly_wait(20)
-                        new_soup = BeautifulSoup(browser.page_source(),'html.parser')
                         to_download.append(base.Content(
-                            content=self.download_pdf(browser,new_soup), content_type='application/pdf',
+                            content=self.download_pdf(browser), content_type='application/pdf',
                             dest=f"{base_path}.pdf"))
                 browser.driver.quit()
 
@@ -338,8 +326,7 @@ class TRF1Chunk(base.Chunk):
             WebDriverWait(browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
         except TimeoutException:
             return False
-        page_soup = BeautifulSoup(browser.page_source(), 'html.parser')
-        link = page_soup.find_all('a', attrs={'title':'Ver Detalhes'})
+        link = browser.bsoup().find_all('a', attrs={'title':'Ver Detalhes'})
         if len(link) != 1:
             return False
         link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link[0]['onclick']).group(1)
@@ -348,10 +335,10 @@ class TRF1Chunk(base.Chunk):
         return True
 
     @utils.retryable(max_retries=9, sleeptime=20)
-    def download_pdf(self, browser, soup):
+    def download_pdf(self, browser):
         """Download PDF as bytes when browser is in the page where the "Gerar PDF" button is available"""
         import requests
-        link_container =  soup.find('a',id='j_id47:downloadPDF')
+        link_container =  browser.bsoup().find('a',id='j_id47:downloadPDF')
         DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
         page_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
 
@@ -361,7 +348,7 @@ class TRF1Chunk(base.Chunk):
 
         data = {
             'j_id47': 'j_id47',
-            'javax.faces.ViewState': soup.find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
+            'javax.faces.ViewState': browser.bsoup().find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
             'j_id47:downloadPDF': 'j_id47:downloadPDF',
             'ca': page_data['ca'],
             'idProcDocBin': page_data['idProcDocBin'],
