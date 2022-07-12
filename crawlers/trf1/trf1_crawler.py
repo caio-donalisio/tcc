@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 import re
 import re
 
-DEBUG = True
+DEBUG = False
 SITE_KEY = '6LfkZ24UAAAAAMO1KEF_pP-G3wE0dYN69-SG8NxI' # k value of recaptcha, found inside page
 WEBSITE_URL = 'https://www2.cjf.jus.br/jurisprudencia/trf1/index.xhtml'
 TRF1_DATE_FORMAT = 'DD/MM/YYYY'
