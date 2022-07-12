@@ -31,7 +31,7 @@ class TRF2:
     self.header_generator = utils.HeaderGenerator(
       origin='https://www10.trf2.jus.br', xhr=True)
     self.session = requests.Session()
-    self.browser = browsers.FirefoxBrowser()
+    self.browser = browsers.FirefoxBrowser(headless=True)
 
   def run(self):
     import concurrent.futures
@@ -260,7 +260,10 @@ class SearchPageSelenium:
       self.browser.driver.implicitly_wait(10)      
       self.browser.driver.execute_script("arguments[0].scrollIntoView(true);", link)
       link.click()
-      self.browser.driver.implicitly_wait(10)      
+      self.browser.driver.implicitly_wait(10)
+    self.browser.driver.execute_script("window.scrollTo(0,99999999)");
+
+       
 
 
   @property
@@ -287,8 +290,11 @@ class SearchPageSelenium:
     import urllib.parse as urlparser
 
     # expand filters
-    more_button = self._soup.find(ctype='dynnav.DescOrgaoJulgador.more')
+    MORE_BUTTON_ID = 'more_attr_3'
+    more_button = self._soup.find(id=MORE_BUTTON_ID)
     if more_button:
+      self.browser.driver.execute_script("arguments[0].scrollIntoView(true);",
+        self.browser.driver.find_element(By.ID, MORE_BUTTON_ID))
       self.browser.click(more_button)
       WebDriverWait(self.browser.driver, 60) \
         .until(EC.visibility_of_element_located((By.ID, "less_attr_3")))
