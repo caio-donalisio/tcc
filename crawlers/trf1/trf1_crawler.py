@@ -124,7 +124,7 @@ class TRF1Collector(base.ICollector):
 
         for page in range(1, pages + 1):
             yield TRF1Chunk(
-                keys={**self.filters, **{'page': page}},
+                keys={**self.filters, **{'page': page,'total': total}},
                 prefix='',
                 page=page,
                 total=total,
