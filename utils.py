@@ -268,6 +268,7 @@ def retryable(*, max_retries=3, sleeptime=5,
 
     return wrapper
 
+@retryable()
 def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9', 'ISO-8859-1']):
     for encoding in possible_encodings:
         def outter(func):

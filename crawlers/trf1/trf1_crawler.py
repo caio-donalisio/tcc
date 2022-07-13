@@ -148,7 +148,6 @@ class TRF1Chunk(base.Chunk):
     def rows(self):
         #REFACTOR 
         import browsers
-        import hashlib
 
         def get_nearest_date(items, pivot):
                     pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
@@ -214,6 +213,8 @@ class TRF1Chunk(base.Chunk):
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         page_soup = self.client.fetch(self.filters, page=self.page)
+        current_page = int(re.search(r'.*Página: (\d+)\/.*', page_soup.find('span', class_='ui-paginator-current').text).group(1))
+        assert current_page == self.page
         rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for n, row in enumerate(rows, 1):
             inteiro_page_content, pdf_content = '',''
@@ -222,7 +223,6 @@ class TRF1Chunk(base.Chunk):
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
             title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
             process_number = ''.join(char for char in acordao_titulo if char.isdigit())
-            
             pub_date = re.search(DATE_PATTERN, row.text)
             to_download = []
             process_link = row.find('a',text='Acesse aqui').get('href')
