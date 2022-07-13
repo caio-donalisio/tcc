@@ -268,6 +268,39 @@ def retryable(*, max_retries=3, sleeptime=5,
 
     return wrapper
 
+def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9', 'ISO-8859-1']):
+    for encoding in possible_encodings:
+        def outter(func):
+            def inner(*args, encoding=encoding, **kwargs):
+                try:
+                    return func(*args, encoding=encoding, **kwargs)
+                except UnicodeEncodeError:
+                    pass
+                except Exception as e:
+                    raise PleaseRetryException()
+            return inner
+        return outter
+
+@try_multiple_encodings()
+def get_pdf_hash(pdf_content:bytes, 
+    encoding:str,
+    remove_whitespace=True, 
+    length=10):
+
+    from io import BytesIO
+    import PyPDF2
+
+    try:
+        pdf_content = PyPDF2.PdfReader(BytesIO(pdf_content))
+        pdf_content = ''.join(pdf_content.getPage(i).extract_text() for i in range(pdf_content._get_num_pages()))
+        if remove_whitespace:
+            pdf_content = pdf_content.replace(' ','')
+            pdf_hash = hashlib.sha1(pdf_content.encode(encoding)).hexdigest()[:length]
+    except TypeError:
+        pdf_hash = '0' * length
+    return pdf_hash
+
+
 
 def get_soup_xpath(element):
     """Returns the XPATH for a given bs4 element"""
