@@ -43,7 +43,7 @@ Ajuste o loglevel conforme preferir.
 
 Em outro shell é possível disparar uma task via command line. Exemplo:
 
-    $ python commands.py tjba --start-date 2020-05-01 --end-date 2020-05-30
+    $ python commands.py tjba --start-date 2020-05-01 --end-date 2020-05-30 --output-uri ./data/tjba
 
 Esta é a lista de parâmetros disponíveis para cada tribunal.
 Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros.
