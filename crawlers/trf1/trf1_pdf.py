@@ -35,12 +35,6 @@ class TRF1Downloader:
     import concurrent.futures
     import time
     from bs4 import BeautifulSoup
-    # self._client.signin()
-    # self._client.set_search(
-      # start_date=pendulum.DateTime(2020, 1, 1),
-      # end_date=pendulum.DateTime(2020, 1, 31),
-    # )
-    # self._client.close()
 
     interval = 5
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -57,7 +51,7 @@ class TRF1Downloader:
             time.sleep(sleep_time)
 
         pdf_content, inteiro_page_content = self.download_files(BeautifulSoup(item.content,'html.parser'))
-        # response = self._get_response(item)
+        
         if pbar:
           pbar.update(1)
 
@@ -68,32 +62,6 @@ class TRF1Downloader:
 
       for future in concurrent.futures.as_completed(futures):
         future.result()
-
-  @utils.retryable(max_retries=3)
-  def _get_response(self, content_from_url):
-    logger.debug(f'GET {content_from_url.src}')
-    for cookie in self._client.request_cookies_browser:
-      self._client.session.cookies.set(cookie['name'], cookie['value'])
-
-    if self._output.exists(content_from_url.dest):
-      return None
-
-    response = self._client.session.get(content_from_url.src,
-      headers=self._client.header_generator.generate(),
-      allow_redirects=True,
-      verify=False,
-      timeout=10)
-    if 'application/pdf' in response.headers.get('Content-type'):
-      logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
-      return response
-    elif 'text/html' in response.headers.get('Content-type') and \
-      'Não foi possível exibir a decisão solicitada.' in response.text:
-      logger.warn(f'PDF for {content_from_url.src} not available.')
-    else:
-      logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')
-      logger.warn(
-        f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
-      raise utils.PleaseRetryException()
 
   def _handle_upload(self, item, pdf_content, inteiro_page_content):
     logger.debug(f'GET {item} UPLOAD')
@@ -131,16 +99,18 @@ class TRF1Downloader:
     title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
     # process_number = ''.join(char for char in acordao_titulo if char.isdigit())
     process_link = row.find('a',text='Acesse aqui')
+    PUB_DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
+    pub_date = re.search(PUB_DATE_PATTERN, row.text.encode('latin-1').decode())
     if process_link is not None:
       process_link = process_link.get('href')
     else:
       logger.warn(f'Process link not available for {title}')
-    PUB_DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
-    pub_date = re.search(PUB_DATE_PATTERN, row.text.encode('latin-1').decode())
+      try_pje=True
+    
     # to_download = []
 
 
-    if 'PesquisaMenuArquivo' in process_link:
+    if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
         import requests
         response = requests.get(process_link)
@@ -347,7 +317,7 @@ def trf1_download_task(items, output_uri):
 
   time.sleep(random.uniform(5., 15.))
 
-  output     = utils.get_output_strategy_by_path(path=output_uri)
+  output = utils.get_output_strategy_by_path(path=output_uri)
   downloader = TRF1Downloader(output)
 
   tqdm_out = utils.TqdmToLogger(logger, level=logging.INFO)
@@ -355,8 +325,8 @@ def trf1_download_task(items, output_uri):
 
   with tqdm(total=len(items), file=tqdm_out) as pbar:
     to_download = []
+
     for item in items:
-      
       # pdf_content, inteiro_page_content = TRF1Downloader.download_files(item)
       to_download.append(
         base.Content(
