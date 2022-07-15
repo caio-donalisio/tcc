@@ -46,6 +46,7 @@ class TRF1Client:
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
+        import time
         self.browser.wait_for_element((By.ID, "formulario:ckbAvancada")).click()
         
         #SELECT DATA DE PUBLICAÇÃO
@@ -70,9 +71,11 @@ class TRF1Client:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def count(self, filters):
+        import utils
+
         result = self.fetch(filters)
         div = result.find(id='formulario:j_idt61:0:j_idt65:0:ajax')
-        count = int(''.join(char for char in div.text if char.isdigit()))
+        count = int(utils.extract_digits(div.text))
         return count
 
     @utils.retryable(max_retries=9, sleeptime=20)
@@ -80,8 +83,9 @@ class TRF1Client:
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.common.by import By
+        import time
 
-        def get_current_page(browser):
+        def get_current_page():
             PAGE_PATTERN = r'.*Página: (\d+)\/.*'
             return int(re.search(
                 PAGE_PATTERN, self.browser.bsoup().find('span', class_='ui-paginator-current').text).group(1)
@@ -100,7 +104,8 @@ class TRF1Client:
             current_page = get_current_page(self.browser)
             if current_page != page:
                 to_click_class = 'ui-icon-seek-next' if current_page < page else 'ui-icon-seek-prev'
-                WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click() 
+                WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click()
+                time.sleep(3.5)
             self.browser.driver.implicitly_wait(20)
             rows = self.browser.bsoup().find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         if not get_current_page(self.browser) or not rows:
@@ -148,31 +153,32 @@ class TRF1Chunk(base.Chunk):
     def rows(self):
         #REFACTOR 
         import browsers
+        from trf1_pdf import TRF1Downloader
 
-        def get_nearest_date(items, pivot):
-                    pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
-                    if items and pivot:
-                        return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
-                                key=lambda x: abs(x - pivot))
-                    else:
-                        return ''
+        # def get_nearest_date(items, pivot):
+        #             pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
+        #             if items and pivot:
+        #                 return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
+        #                         key=lambda x: abs(x - pivot))
+        #             else:
+        #                 return ''
         
-        @utils.retryable()
-        def click_next_document_page(browser, slider_id, page):
-            from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
-            try:
-                slider_page_input = browser.driver.find_element_by_id(slider_id)
-                browser.driver.execute_script(f"arguments[0].value =  {page};", slider_page_input);
-                browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
-                browser.driver.implicitly_wait(10)
-            except StaleElementReferenceException:
-                browser.driver.refresh()
-                raise utils.PleaseRetryException()
-            except NoSuchElementException:
-                return
-            except Exception as e:
-                logger.warn(f'Something went wrong clicking slider on {browser.current_url()}, retrying...')
-                raise utils.PleaseRetryException()
+        # @utils.retryable()
+        # def click_next_document_page(browser, slider_id, page):
+        #     from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+        #     try:
+        #         slider_page_input = browser.driver.find_element_by_id(slider_id)
+        #         browser.driver.execute_script(f"arguments[0].value =  {page};", slider_page_input);
+        #         browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
+        #         browser.driver.implicitly_wait(10)
+        #     except StaleElementReferenceException:
+        #         browser.driver.refresh()
+        #         raise utils.PleaseRetryException()
+        #     except NoSuchElementException:
+        #         return
+        #     except Exception as e:
+        #         logger.warn(f'Something went wrong clicking slider on {browser.current_url()}, retrying...')
+        #         raise utils.PleaseRetryException()
             
             # try:
             #     browser.driver.execute_script("arguments[0].value =  Number(arguments[0].value) + 1;", slider_page_input);
@@ -182,34 +188,34 @@ class TRF1Chunk(base.Chunk):
             # except 
 
 
-        def collect_all_links(browser):
-            links = []
-            while True:
-                soup = BeautifulSoup(browser.page_source(),'html.parser')
-                table = soup.find(id=re.compile(r'j_id\d+:processoDocumentoGridTabPanel_body'))
-                hypers = table.find_all('a')
-                links.extend(hypers)
-                last_page = table.find('td', class_='rich-inslider-right-num')
-                if not last_page:
-                    break
-                last_page = int(last_page.text)
-                current_page = table.find('input',attrs={'class':"rich-inslider-field-right rich-inslider-field"})
-                current_page = int(current_page['value'])
+        # def collect_all_links(browser):
+        #     links = []
+        #     while True:
+        #         soup = BeautifulSoup(browser.page_source(),'html.parser')
+        #         table = soup.find(id=re.compile(r'j_id\d+:processoDocumentoGridTabPanel_body'))
+        #         hypers = table.find_all('a')
+        #         links.extend(hypers)
+        #         last_page = table.find('td', class_='rich-inslider-right-num')
+        #         if not last_page:
+        #             break
+        #         last_page = int(last_page.text)
+        #         current_page = table.find('input',attrs={'class':"rich-inslider-field-right rich-inslider-field"})
+        #         current_page = int(current_page['value'])
                 
-                if last_page and not last_page < current_page + 1:
-                    click_next_document_page(browser=browser, 
-                        slider_id='j_id141:j_id633:j_id634Input', page=current_page+1)
-                    browser.driver.implicitly_wait(20)
-                else:
-                    break
+        #         if last_page and not last_page < current_page + 1:
+        #             click_next_document_page(browser=browser, 
+        #                 slider_id='j_id141:j_id633:j_id634Input', page=current_page+1)
+        #             browser.driver.implicitly_wait(20)
+        #         else:
+        #             break
             
-            return links
+        #     return links
 
-        def filter_links(links):
-            links = [link for link in links if re.search(r'\d{2}',link.text)]
-            links = [link for link in links if re.search('Acórdão', link.text, re.IGNORECASE + re.UNICODE)]
-            links = list(set(links))
-            return links
+        # def filter_links(links):
+        #     links = [link for link in links if re.search(r'\d{2}',link.text)]
+        #     links = [link for link in links if re.search('Acórdão', link.text, re.IGNORECASE + re.UNICODE)]
+        #     links = list(set(links))
+        #     return links
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         page_soup = self.client.fetch(self.filters, page=self.page)
@@ -217,75 +223,77 @@ class TRF1Chunk(base.Chunk):
         assert current_page == self.page
         rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for n, row in enumerate(rows, 1):
-            inteiro_page_content, pdf_content = '',''
+            pdf_content, inteiro_page_content = TRF1Downloader.download_files(row) 
+            # inteiro_page_content, pdf_content = '',''
+            
             meta_hash = utils.get_content_hash(row, [{'name':'td'}])
             
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
-            title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
-            process_number = ''.join(char for char in acordao_titulo if char.isdigit())
+            # title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
+            process_number = utils.extract_digits(acordao_titulo)
             pub_date = re.search(DATE_PATTERN, row.text)
             to_download = []
-            process_link = row.find('a',text='Acesse aqui').get('href')
+            # process_link = row.find('a',text='Acesse aqui').get('href')
             
-            MAXIMUM_TIME_DISTANCE = 150
-            try_pje = False
+            # MAXIMUM_TIME_DISTANCE = 150
+            # try_pje = False
 
-            if 'PesquisaMenuArquivo' in process_link:
+            # if 'PesquisaMenuArquivo' in process_link:
 
-                import requests
-                response = requests.get(process_link)
-                soup = BeautifulSoup(response.text, 'html.parser')
-                date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
-                pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
-                dates = [link.text for link in date_links]
-                nearest_date = get_nearest_date(dates, pub_date_string)
+            #     import requests
+            #     response = requests.get(process_link)
+            #     soup = BeautifulSoup(response.text, 'html.parser')
+            #     date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
+            #     pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
+            #     dates = [link.text for link in date_links]
+            #     nearest_date = get_nearest_date(dates, pub_date_string)
                     
-                if nearest_date:
-                    time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
-                if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
-                    date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
-                    pdf_content = self.merge_pdfs_from_links(date_links, is_doc=True)
-                else:
-                    logger.info(f"Trying to fetch {title} on PJE...")
-                    try_pje=True
+            #     if nearest_date:
+            #         time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
+            #     if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
+            #         date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
+            #         pdf_content = self.merge_pdfs_from_links(date_links, is_doc=True)
+            #     else:
+            #         logger.info(f"Trying to fetch {title} on PJE...")
+            #         try_pje=True
 
-            if try_pje or 'ConsultaPublica/listView.seam' in process_link:
-                browser = browsers.FirefoxBrowser(headless=not DEBUG)
-                success = self.search_trf1_process_documents(browser, title)
-                inteiro_soup = browser.bsoup()
+            # if try_pje or 'ConsultaPublica/listView.seam' in process_link:
+            #     browser = browsers.FirefoxBrowser(headless=not DEBUG)
+            #     success = self.search_trf1_process_documents(browser, title)
+            #     inteiro_soup = browser.bsoup()
 
-                error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
-                if not success or error_div:
-                    logger.warn(f'Document not available for: {title}')
+            #     error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
+            #     if not success or error_div:
+            #         logger.warn(f'Document not available for: {title}')
                 
-                else:
-                    inteiro_page_content = browser.page_source()
-                    links = collect_all_links(browser)
-                    ls = []
-                    for link in filter_links(links):
-                        D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
-                        U = r".*\'(?P<pdf_link>http.*?)\'.*"
-                        if re.search(U, link['onclick']) and re.search(D, link.text).group(1):
-                            ls.append({
-                                'date':re.search(D, link.text).group(1), 
-                                'url': re.search(U, link['onclick']).group(1)
-                                })
+            #     else:
+            #         inteiro_page_content = browser.page_source()
+            #         links = collect_all_links(browser)
+            #         ls = []
+            #         for link in filter_links(links):
+            #             D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
+            #             U = r".*\'(?P<pdf_link>http.*?)\'.*"
+            #             if re.search(U, link['onclick']) and re.search(D, link.text).group(1):
+            #                 ls.append({
+            #                     'date':re.search(D, link.text).group(1), 
+            #                     'url': re.search(U, link['onclick']).group(1)
+            #                     })
                     
-                    nearest_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
-                    ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
-                    if not ls or abs(pendulum.from_format(pub_date.groupdict().get('date'), TRF1_DATE_FORMAT) - nearest_date).days > MAXIMUM_TIME_DISTANCE:
-                        logger.info(f'Document not available for: {title}')
-                        # continue
-                    else:
-                        browser.get(ls[0]['url'])
-                        browser.driver.implicitly_wait(20)
-                        pdf_content = self.download_pdf(browser)
-                browser.driver.quit()
+            #         nearest_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
+            #         ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
+            #         if not ls or abs(pendulum.from_format(pub_date.groupdict().get('date'), TRF1_DATE_FORMAT) - nearest_date).days > MAXIMUM_TIME_DISTANCE:
+            #             logger.info(f'Document not available for: {title}')
+            #             # continue
+            #         else:
+            #             browser.get(ls[0]['url'])
+            #             browser.driver.implicitly_wait(20)
+            #             pdf_content = self.download_pdf(browser)
+            #     browser.driver.quit()
 
 
 
             base_dir = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}"
-            filename = f"{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}_{utils.get_pdf_hash(pdf_content)}"
+            filename = f"{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}"#_{utils.get_pdf_hash(pdf_content)}"
             base_path = f"{base_dir}/{filename}"
 
             to_download.append(
