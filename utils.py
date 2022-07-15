@@ -158,6 +158,22 @@ def get_filepath(date, filename, extension):
     _, month, year = date.split('/')
     return f'{year}/{month}/{filename}.{extension}'
 
+def extract_digits(text:str):
+    """Extracts digits only from a given string
+
+    Args:
+        text (str): Input text
+
+    Returns:
+        str: String containing digits only
+    """    
+
+    import re
+
+    return re.sub(r'[^\d]', '',  text)
+    
+    
+
 def get_content_hash(
     soup: bs4.BeautifulSoup, 
     tag_descriptions: List[Dict],

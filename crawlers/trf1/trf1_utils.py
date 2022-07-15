@@ -25,8 +25,8 @@ def list_pending_pdfs(bucket_name, prefix):
       pdfs[path.stem] = path.parent
 
   for name, parent in htmls.items():
-    if name not in pdfs and name not in b_files:
-      with open(f'{parent}/{name}.html',encoding='latin-1') as f:
+    if name not in pdfs: # name not in b_files:
+      with open(f'{parent}/{bool(prefix) * (prefix + "/")}{name}.html',encoding='latin-1') as f:
         row = f.read()
       yield {'row':row,
          'dest': f'{parent}/{name[:name.find("_A")]}'

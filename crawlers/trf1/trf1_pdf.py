@@ -101,19 +101,19 @@ class TRF1Downloader:
     # if len(response.content) > 0:
     if pdf_content and len(pdf_content) > 100:
       self._output.save_from_contents(
-          filepath=f"{item['dest']}.pdf",#content_from_url.dest,
+          filepath=f"{item.dest}.pdf",#content_from_url.dest,
           contents=pdf_content,
           content_type='application/pdf')#content_from_url.content_type)
+    else:
+      logger.warn(f"Got empty document for {item.dest}.pdf")
     
     if inteiro_page_content and len(inteiro_page_content) > 100:
       self._output.save_from_contents(
-        filepath=f"{item['dest']}_B.html",#content_from_url.dest,
+        filepath=f"{item.dest}_B.html",#content_from_url.dest,
         contents=inteiro_page_content,
         content_type='text/html')#content_from_url.content_type)
 
-    # else:
-    #   logger.warn(
-    #     f"Got 0 bytes for {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
+    
 
   def download_files(self, row):
     
