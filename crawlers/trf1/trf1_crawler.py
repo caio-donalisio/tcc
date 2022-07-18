@@ -96,19 +96,19 @@ class TRF1Client:
             self.make_search(filters)
         
         rows = True     
-        while get_current_page(self.browser) != page:
+        while get_current_page() != page:
             self.browser.driver.implicitly_wait(20)
             if not self.page_searched or not rows: 
                 self.make_search(filters)
             self.browser.driver.implicitly_wait(20)
-            current_page = get_current_page(self.browser)
+            current_page = get_current_page()
             if current_page != page:
                 to_click_class = 'ui-icon-seek-next' if current_page < page else 'ui-icon-seek-prev'
                 WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click()
                 time.sleep(3.5)
             self.browser.driver.implicitly_wait(20)
             rows = self.browser.bsoup().find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
-        if not get_current_page(self.browser) or not rows:
+        if not get_current_page() or not rows:
             raise utils.PleaseRetryException()
         return self.browser.bsoup()
 
@@ -152,70 +152,8 @@ class TRF1Chunk(base.Chunk):
     @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
         #REFACTOR 
-        import browsers
-        from trf1_pdf import TRF1Downloader
+        from crawlers.trf1 import trf1_pdf 
 
-        # def get_nearest_date(items, pivot):
-        #             pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
-        #             if items and pivot:
-        #                 return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
-        #                         key=lambda x: abs(x - pivot))
-        #             else:
-        #                 return ''
-        
-        # @utils.retryable()
-        # def click_next_document_page(browser, slider_id, page):
-        #     from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
-        #     try:
-        #         slider_page_input = browser.driver.find_element_by_id(slider_id)
-        #         browser.driver.execute_script(f"arguments[0].value =  {page};", slider_page_input);
-        #         browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
-        #         browser.driver.implicitly_wait(10)
-        #     except StaleElementReferenceException:
-        #         browser.driver.refresh()
-        #         raise utils.PleaseRetryException()
-        #     except NoSuchElementException:
-        #         return
-        #     except Exception as e:
-        #         logger.warn(f'Something went wrong clicking slider on {browser.current_url()}, retrying...')
-        #         raise utils.PleaseRetryException()
-            
-            # try:
-            #     browser.driver.execute_script("arguments[0].value =  Number(arguments[0].value) + 1;", slider_page_input);
-            #     # slider_page = int(slider_page_input.get_attribute('value'));
-            #     browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
-            #     browser.driver.implicitly_wait(10)
-            # except 
-
-
-        # def collect_all_links(browser):
-        #     links = []
-        #     while True:
-        #         soup = BeautifulSoup(browser.page_source(),'html.parser')
-        #         table = soup.find(id=re.compile(r'j_id\d+:processoDocumentoGridTabPanel_body'))
-        #         hypers = table.find_all('a')
-        #         links.extend(hypers)
-        #         last_page = table.find('td', class_='rich-inslider-right-num')
-        #         if not last_page:
-        #             break
-        #         last_page = int(last_page.text)
-        #         current_page = table.find('input',attrs={'class':"rich-inslider-field-right rich-inslider-field"})
-        #         current_page = int(current_page['value'])
-                
-        #         if last_page and not last_page < current_page + 1:
-        #             click_next_document_page(browser=browser, 
-        #                 slider_id='j_id141:j_id633:j_id634Input', page=current_page+1)
-        #             browser.driver.implicitly_wait(20)
-        #         else:
-        #             break
-            
-        #     return links
-
-        # def filter_links(links):
-        #     links = [link for link in links if re.search(r'\d{2}',link.text)]
-        #     links = [link for link in links if re.search('Acórdão', link.text, re.IGNORECASE + re.UNICODE)]
-        #     links = list(set(links))
-        #     return links
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
         page_soup = self.client.fetch(self.filters, page=self.page)
@@ -223,74 +161,12 @@ class TRF1Chunk(base.Chunk):
         assert current_page == self.page
         rows = page_soup.find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
         for n, row in enumerate(rows, 1):
-            pdf_content, inteiro_page_content = TRF1Downloader.download_files(row) 
-            # inteiro_page_content, pdf_content = '',''
-            
+            pdf_content, inteiro_page_content = trf1_pdf.TRF1Downloader('').download_files(row) if not self.filters.get('skip_pdf') else '',''
             meta_hash = utils.get_content_hash(row, [{'name':'td'}])
-            
             acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
-            # title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
             process_number = utils.extract_digits(acordao_titulo)
             pub_date = re.search(DATE_PATTERN, row.text)
             to_download = []
-            # process_link = row.find('a',text='Acesse aqui').get('href')
-            
-            # MAXIMUM_TIME_DISTANCE = 150
-            # try_pje = False
-
-            # if 'PesquisaMenuArquivo' in process_link:
-
-            #     import requests
-            #     response = requests.get(process_link)
-            #     soup = BeautifulSoup(response.text, 'html.parser')
-            #     date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
-            #     pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
-            #     dates = [link.text for link in date_links]
-            #     nearest_date = get_nearest_date(dates, pub_date_string)
-                    
-            #     if nearest_date:
-            #         time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
-            #     if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
-            #         date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
-            #         pdf_content = self.merge_pdfs_from_links(date_links, is_doc=True)
-            #     else:
-            #         logger.info(f"Trying to fetch {title} on PJE...")
-            #         try_pje=True
-
-            # if try_pje or 'ConsultaPublica/listView.seam' in process_link:
-            #     browser = browsers.FirefoxBrowser(headless=not DEBUG)
-            #     success = self.search_trf1_process_documents(browser, title)
-            #     inteiro_soup = browser.bsoup()
-
-            #     error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
-            #     if not success or error_div:
-            #         logger.warn(f'Document not available for: {title}')
-                
-            #     else:
-            #         inteiro_page_content = browser.page_source()
-            #         links = collect_all_links(browser)
-            #         ls = []
-            #         for link in filter_links(links):
-            #             D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
-            #             U = r".*\'(?P<pdf_link>http.*?)\'.*"
-            #             if re.search(U, link['onclick']) and re.search(D, link.text).group(1):
-            #                 ls.append({
-            #                     'date':re.search(D, link.text).group(1), 
-            #                     'url': re.search(U, link['onclick']).group(1)
-            #                     })
-                    
-            #         nearest_date = get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
-            #         ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
-            #         if not ls or abs(pendulum.from_format(pub_date.groupdict().get('date'), TRF1_DATE_FORMAT) - nearest_date).days > MAXIMUM_TIME_DISTANCE:
-            #             logger.info(f'Document not available for: {title}')
-            #             # continue
-            #         else:
-            #             browser.get(ls[0]['url'])
-            #             browser.driver.implicitly_wait(20)
-            #             pdf_content = self.download_pdf(browser)
-            #     browser.driver.quit()
-
-
 
             base_dir = f"{pub_date.groupdict()['year']}/{pub_date.groupdict()['month']}"
             filename = f"{pub_date.groupdict().get('day')}_{process_number}_{meta_hash}"#_{utils.get_pdf_hash(pdf_content)}"
@@ -315,94 +191,6 @@ class TRF1Chunk(base.Chunk):
 
             yield to_download
 
-    @utils.retryable()
-    def merge_pdfs_from_links(self, document_links, is_doc=False):
-        import PyPDF2 
-        from io import BytesIO
-        TRF1_ARCHIVE = 'https://arquivo.trf1.jus.br'
-        merger = PyPDF2.PdfFileMerger()
-        for link in document_links:
-            
-            file = requests.get(f"{TRF1_ARCHIVE}{link['href']}")
-            if file.status_code == 200:
-                if is_doc:
-                    bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
-                bytes = BytesIO(bytes)
-            else:
-                raise utils.PleaseRetryException()
-            try:
-                merger.append(bytes)
-            except PyPDF2.errors.PdfReadError:
-                raise utils.PleaseRetryException()
-
-        pdf_bytes = BytesIO()
-        merger.write(pdf_bytes)
-        return pdf_bytes.getvalue()
-
-
-    @utils.retryable(max_retries=9, sleeptime=20)
-    def search_trf1_process_documents(self, browser, title):
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.common.by import By
-        from selenium.common.exceptions import TimeoutException
-
-        browser.get(TRF1_SEARCH_LINK)
-        browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
-        browser.driver.implicitly_wait(20)
-        WebDriverWait(browser.driver, 20).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
-        try:
-            WebDriverWait(browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
-        except TimeoutException:
-            return False
-        link = browser.bsoup().find_all('a', attrs={'title':'Ver Detalhes'})
-        if len(link) != 1:
-            return False
-        link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link[0]['onclick']).group(1)
-        browser.get(f'https://pje2g.trf1.jus.br{link}')
-        browser.driver.implicitly_wait(20)
-        return True
-
-    @utils.retryable(max_retries=9, sleeptime=20)
-    def download_pdf(self, browser):
-        """Download PDF as bytes when browser is in the page where the "Gerar PDF" button is available"""
-        import requests
-        link_container =  browser.bsoup().find('a',id='j_id47:downloadPDF')
-        DATA_PATTERN = r".*\'ca\'\:\'(?P<ca>.*)\',\'idProcDocBin\'\:\'(?P<idProcDocBin>\d+)\'.*"
-        page_data = re.search(DATA_PATTERN, link_container['onclick']).groupdict()
-
-        cookies = {
-            'JSESSIONID': browser.get_cookie('JSESSIONID')
-        }
-
-        data = {
-            'j_id47': 'j_id47',
-            'javax.faces.ViewState': browser.bsoup().find("input", {"type": "hidden", "name":"javax.faces.ViewState"})['value'],
-            'j_id47:downloadPDF': 'j_id47:downloadPDF',
-            'ca': page_data['ca'],
-            'idProcDocBin': page_data['idProcDocBin'],
-        }
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            # 'Accept-Encoding': 'gzip, deflate, br',
-            'Origin': 'https://pje2g.trf1.jus.br',
-            'Connection': 'keep-alive',
-            'Referer': f'https://pje2g.trf1.jus.br/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/documentoSemLoginHTML.seam?ca={page_data["ca"]}&idProcessoDoc={page_data["idProcDocBin"]}',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
-            'Sec-Fetch-User': '?1',
-        }
-        response = requests.post(PDF_URL, cookies=cookies, headers=headers, data=data)
-        if response.status_code == 200 and len(response.text) > 50:
-            return response.content
-        else:
-            raise utils.PleaseRetryException()
-
 @celery.task(queue='crawlers.trf1', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def trf1_task(**kwargs):
@@ -418,7 +206,8 @@ def trf1_task(**kwargs):
 
         query_params = {
             'start_date': kwargs.get('start_date'),
-            'end_date': kwargs.get('end_date')
+            'end_date': kwargs.get('end_date'),
+            'skip_pdf': kwargs.get('skip_pdf'),
         }
 
         collector = TRF1Collector(client=TRF1Client(), filters=query_params)
@@ -441,6 +230,7 @@ def trf1_task(**kwargs):
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+@click.option('--skip-pdf', default=False, help='Skips pdf collection, collects only metadata', is_flag=True)
 def trf1_command(**kwargs):
     if kwargs.get('enqueue'):
         if kwargs.get('split_tasks'):

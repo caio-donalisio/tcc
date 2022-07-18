@@ -37,7 +37,7 @@ class TRF1Downloader:
     from bs4 import BeautifulSoup
 
     interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
       futures  = []
       last_run = None
       for item in items:
@@ -82,7 +82,7 @@ class TRF1Downloader:
         content_type='text/html')#content_from_url.content_type)
 
     
-
+  @utils.retryable()
   def download_files(self, row):
     
     from bs4 import BeautifulSoup
@@ -100,7 +100,10 @@ class TRF1Downloader:
     # process_number = ''.join(char for char in acordao_titulo if char.isdigit())
     process_link = row.find('a',text='Acesse aqui')
     PUB_DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
-    pub_date = re.search(PUB_DATE_PATTERN, row.text.encode('latin-1').decode())
+    try:
+      pub_date = re.search(PUB_DATE_PATTERN, row.text.encode('latin-1').decode())
+    except UnicodeDecodeError:
+      pub_date = re.search(PUB_DATE_PATTERN, row.text)
     if process_link is not None:
       process_link = process_link.get('href')
     else:
@@ -113,7 +116,10 @@ class TRF1Downloader:
     if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
         import requests
-        response = requests.get(process_link)
+        try:
+          response = requests.get(process_link)
+        except requests.exceptions.ConnectionError:
+          raise utils.PleaseRetryException()
         soup = BeautifulSoup(response.text, 'html.parser')
         date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
         pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
@@ -252,7 +258,7 @@ class TRF1Downloader:
       from selenium.webdriver.support.ui import WebDriverWait
       from selenium.webdriver.support import expected_conditions as EC
       from selenium.webdriver.common.by import By
-      from selenium.common.exceptions import TimeoutException
+      from selenium.common.exceptions import TimeoutException, WebDriverException
 
       browser.get(TRF1_SEARCH_LINK)
       browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
@@ -266,7 +272,10 @@ class TRF1Downloader:
       if len(link) != 1:
           return False
       link = re.search(r".*\(\'Consulta pública\','(.*?)\'\)",link[0]['onclick']).group(1)
-      browser.get(f'https://pje2g.trf1.jus.br{link}')
+      try:
+        browser.get(f'https://pje2g.trf1.jus.br{link}')
+      except WebDriverException:
+        raise utils.PleaseRetryException()
       browser.driver.implicitly_wait(20)
       return True
 
@@ -403,7 +412,7 @@ def trf1_pdf_command(input_uri, prefix, dry_run, local, count):
       pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+      executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
       futures  = []
       for pending in pendings:
         if not dry_run:
