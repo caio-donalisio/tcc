@@ -33,9 +33,7 @@ def list_pending_pdfs(input_uri, prefix):
       
       with open(f'{parent}/{name}.json',encoding='latin-1') as f:
         row = json.loads(f.read())
-      
-      print(row)
       yield {
-        **row,
-        **{'dest': f'{parent}/{name}.pdf'}
+        'row':row,
+        'dest': f'{parent}/{name}.pdf'
       }
