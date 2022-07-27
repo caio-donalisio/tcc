@@ -8,6 +8,7 @@ from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 from crawlers.scrfb.scrfb_crawler import scrfb_task
+from crawlers.trf1.trf1_crawler import trf1_task
 from crawlers.trf2.trf2_crawler import trf2_task
 from crawlers.trf3.trf3_crawler import trf3_task
 from crawlers.trf4.trf4_crawler import trf4_task

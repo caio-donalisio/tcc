@@ -31,7 +31,7 @@ class TRF2:
     self.header_generator = utils.HeaderGenerator(
       origin='https://www10.trf2.jus.br', xhr=True)
     self.session = requests.Session()
-    self.browser = browsers.FirefoxBrowser()
+    self.browser = browsers.FirefoxBrowser(headless=True)
 
   def run(self):
     import concurrent.futures
@@ -139,7 +139,7 @@ class TRF2:
     offset = 0
     while True:
       page = self._get_search_page_for_query({**query, 'offset': offset})
-
+      # browser = page.browser
       if not page.has_results():
         break
 
@@ -237,6 +237,7 @@ class SearchPageSelenium:
   @utils.retryable(max_retries=3)   # type: ignore
   def _perform_query(self, query):
     import urllib.parse
+
     q_string = '+inmeta%3Agsaentity_BASE%3DInteiro%2520Teor'
     if query.get('extra_query_params'):
       param = query['extra_query_params'][0]
@@ -249,7 +250,21 @@ class SearchPageSelenium:
     self.browser.get(query_url)
     WebDriverWait(self.browser.driver, 60) \
       .until(EC.presence_of_element_located((By.ID, 'resultados')))
+    self.click_to_show_ementas()
     return self.browser.page_source()
+
+  @utils.retryable()
+  def click_to_show_ementas(self):
+    select_objects = self.browser.driver.find_elements(By.XPATH,'//*[text()="Ver texto completo"]')
+    for n, link in enumerate(select_objects):
+      self.browser.driver.implicitly_wait(10)      
+      self.browser.driver.execute_script("arguments[0].scrollIntoView(true);", link)
+      link.click()
+      self.browser.driver.implicitly_wait(10)
+    self.browser.driver.execute_script("window.scrollTo(0,99999999)");
+
+       
+
 
   @property
   def text(self):
@@ -275,8 +290,11 @@ class SearchPageSelenium:
     import urllib.parse as urlparser
 
     # expand filters
-    more_button = self._soup.find(ctype='dynnav.DescOrgaoJulgador.more')
+    MORE_BUTTON_ID = 'more_attr_3'
+    more_button = self._soup.find(id=MORE_BUTTON_ID)
     if more_button:
+      self.browser.driver.execute_script("arguments[0].scrollIntoView(true);",
+        self.browser.driver.find_element(By.ID, MORE_BUTTON_ID))
       self.browser.click(more_button)
       WebDriverWait(self.browser.driver, 60) \
         .until(EC.visibility_of_element_located((By.ID, "less_attr_3")))
