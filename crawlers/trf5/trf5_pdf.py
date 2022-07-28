@@ -123,6 +123,8 @@ class TRF5Downloader:
 
     browser = browsers.FirefoxBrowser(headless=True)
     details_url = self._get_judgment_details_url(browser, doc)
+    if not details_url:
+      return None
     return self._get_judgment_doc_url(details_url, browser, doc)
     
 
@@ -160,9 +162,12 @@ class TRF5Downloader:
         time.sleep(1)
     
         if not browser.is_text_present('Resposta incorreta'):
-            browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
-            doc_link = browser.driver.find_element_by_id('consultaPublicaList2:0:j_id315:j_id318')                                            
-            return self._extract_judgment_detail_url(doc_link)
+          if self.browser.is_text_present('Foram encontrados: 0 resultados'):
+            logger.warn(f'Not results for {judgment_id}')
+            return None
+          browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
+          doc_link = browser.driver.find_element_by_id('consultaPublicaList2:0:j_id315:j_id318')                                            
+          return self._extract_judgment_detail_url(doc_link)
         else:
             logger.warn(f'Incorrect Captcha!!! Trying again...')
 
