@@ -14,6 +14,8 @@ from logconfig import logger_factory
 
 logger = logger_factory('trf5-pdf')
 
+MAX_WORKERS = 8
+
 
 class TRF5Downloader:
 
@@ -32,7 +34,7 @@ class TRF5Downloader:
     # self._client.close()
 
     interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
       last_run = None
       for item in items:
@@ -162,7 +164,7 @@ class TRF5Downloader:
         time.sleep(1)
     
         if not browser.is_text_present('Resposta incorreta'):
-          if self.browser.is_text_present('Foram encontrados: 0 resultados'):
+          if browser.is_text_present('Foram encontrados: 0 resultados'):
             logger.warn(f'Not results for {judgment_id}')
             return None
           browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
@@ -407,7 +409,7 @@ def trf5_pdf_command(input_uri, prefix, dry_run, local, count):
       pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+      executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
       futures  = []
       for pending in pendings:
         if not dry_run:
