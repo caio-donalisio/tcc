@@ -65,9 +65,9 @@ class TRF5Downloader:
         future.result()
 
 
-  def _get_report_url(self, record):
+  def _get_report_url(self, record: dict):
     import re
-    
+
     report_url = None
     content_type_report = "text/html"
 
@@ -85,7 +85,7 @@ class TRF5Downloader:
       'content_type':content_type_report
       }
 
-  def _get_report_url_from_trf5(self, doc, digits=0):
+  def _get_report_url_from_trf5(self, doc:dict, digits=0):
     import requests
     import re
     from bs4 import BeautifulSoup
@@ -314,10 +314,14 @@ class TRF5Downloader:
 
   def _handle_upload(self, content_from_url, response):
     # logger.debug(f'GET {content_from_url.src} UPLOAD')
-
+    if 'pdf' in content_from_url.content_type:
+      filepath = f'{content_from_url.dest}.pdf'
+    elif 'html' in content_from_url.content_type:
+      filepath = f'{content_from_url.dest}.html'
+    
     if len(response.content) > 0:
       self._output.save_from_contents(
-          filepath=content_from_url.dest,
+          filepath=filepath,
           contents=response.content,
           content_type=content_from_url.content_type)
     else:

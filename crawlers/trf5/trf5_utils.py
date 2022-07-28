@@ -21,7 +21,7 @@ def list_pending_pdfs(input_uri, prefix):
   pdfs  = {}
 
   for name in list_all(input_uri, prefix):
-    path = pathlib.Path(f'{input_uri}/{bool(prefix) * (prefix)}/{name}')
+    path = pathlib.Path(f'{input_uri}/{bool(prefix) * (prefix + "/")}{name}')
     if name.endswith(".json"):
       jsons[path.stem] = path.parent
     if name.endswith(".html"):
@@ -33,7 +33,8 @@ def list_pending_pdfs(input_uri, prefix):
       
       with open(f'{parent}/{name}.json',encoding='latin-1') as f:
         row = json.loads(f.read())
+      
       yield {
         'row':row,
-        'dest': f'{parent}/{name}.pdf'
+        'dest': f'{bool(prefix) * (prefix + "/")}{name}'
       }

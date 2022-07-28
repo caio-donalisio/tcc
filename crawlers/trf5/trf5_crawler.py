@@ -134,19 +134,15 @@ class TRF5Chunk(base.Chunk):
         for _, record in enumerate(result['data']):
 
             session_at = pendulum.parse(record['dataJulgamento'])
-            base_path   = f'{session_at.year}/{session_at.month:02d}'
-
             codigo = re.sub("\:", "-", record['codigoDocumento'])
             numero = record['numeroProcesso']
 
-            dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
-            dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
-
+            base_path   = f'{session_at.year}/{session_at.month:02d}'
+            doc_base_path = f"{base_path}/doc_{numero}_{codigo}"
+            
+            dest_record = f"{doc_base_path}.json"
             to_download = []
             
-            # report_url = None
-            # content_type_report = "text/html"
-
             to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json'))
 
@@ -157,11 +153,16 @@ class TRF5Chunk(base.Chunk):
                     logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
                 
                 if report.get('url'):
-                    dest_report = f"{base_path}/doc_{numero}_{codigo}.pdf"
-                    to_download.append(base.ContentFromURL(src=report['url'],dest=dest_report,
-                        content_type=report['content_type']))
+                    if 'html' in report.get('content_type'):
+                        dest_report = f"{doc_base_path}.html"
+                    elif 'pdf' in report.get('content_type'):
+                        dest_report = f"{doc_base_path}.pdf"
+
+                to_download.append(base.ContentFromURL(src=report['url'],dest=dest_report,
+                    content_type=report['content_type']))
             
             yield to_download
+            
                 # def _get_report_url(record):
                 #     report_url = None
                 #     if re.search('www4.trf5.jus.br\/processo', record['url']):
