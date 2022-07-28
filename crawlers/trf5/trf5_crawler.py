@@ -32,7 +32,7 @@ DEFAULT_HEADERS = {
     'X-Requested-With': 'XMLHttpRequest',
 }                        
 
-def merged_with_default_filters(start_date, end_date):
+def merged_with_default_filters(start_date, end_date, skip_full):
     return {
         'draw': '1',
         'columns[0][data]': 'codigoDocumento',
@@ -127,6 +127,9 @@ class TRF5Chunk(base.Chunk):
         self.browser = browser
 
     def rows(self):
+
+        from crawlers.trf5 import trf5_pdf
+
         result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
         for _, record in enumerate(result['data']):
 
@@ -138,34 +141,53 @@ class TRF5Chunk(base.Chunk):
 
             dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
             dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
-            report_url = None
-            content_type_report = "text/html"
 
-            if re.search('www4.trf5.jus.br\/processo', record['url']):
-                if not self.filters('skip_full'):
-                    report_url = self._get_report_url_from_trf5(record)
-                if report_url is None:
-                    report_url = self._get_report_url_from_trf5(record, digits=2)
+            to_download = []
+            
+            # report_url = None
+            # content_type_report = "text/html"
 
-                if report_url is not None:
+            to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
+                        content_type='application/json'))
+
+            if not self.filters.get('skip_full'):
+                report = trf5_pdf.TRF5Downloader()._get_report_url(record)
+                
+                if report.get('url') is None:
+                    logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
+                
+                if report.get('url'):
                     dest_report = f"{base_path}/doc_{numero}_{codigo}.pdf"
-                    content_type_report = "application/pdf"
-            else:
-                report_url = self._get_report_url(record)
-
-            if report_url is None:
-                logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
-                yield [
-                    base.Content(content=json.dumps(record),dest=dest_record,
-                        content_type='application/json'),
-                ]                    
-            else:            
-                yield [
-                    base.Content(content=json.dumps(record),dest=dest_record,
-                        content_type='application/json'),
-                    base.ContentFromURL(src=report_url,dest=dest_report,
-                        content_type=content_type_report)
-                ]
+                    to_download.append(base.ContentFromURL(src=report['url'],dest=dest_report,
+                        content_type=report['content_type']))
+            
+            yield to_download
+                # def _get_report_url(record):
+                #     report_url = None
+                #     if re.search('www4.trf5.jus.br\/processo', record['url']):
+                #         if not self.filters('skip_full'):
+                #             report_url = self._get_report_url_from_trf5(record)
+                #         if report_url is None:
+                #             report_url = self._get_report_url_from_trf5(record, digits=2)
+                #         if report_url is not None:
+                #             content_type_report = "application/pdf"
+                #     else:
+                #         report_url = self._get_report_url(record)
+                #     return report_url
+                
+                # dest_report = f"{base_path}/doc_{numero}_{codigo}.pdf"
+                
+            #         yield [
+            #             base.Content(content=json.dumps(record),dest=dest_record,
+            #                 content_type='application/json'),
+            #         ]                    
+            # else:            
+            #     yield [
+            #         base.Content(content=json.dumps(record),dest=dest_record,
+            #             content_type='application/json'),
+                   
+            #     ]
+            
 
     
     # def _get_report_url_from_trf5(self, doc, digits=0):
@@ -361,6 +383,7 @@ def trf5_task(**kwargs):
         filters = {
             'start_date' :start_date,
             'end_date': end_date,
+            'skip_full': kwargs.get('skip_full'),
         }
 
         collector = TRF5Collector(

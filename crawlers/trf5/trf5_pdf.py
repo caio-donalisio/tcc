@@ -17,15 +17,13 @@ logger = logger_factory('trf5-pdf')
 
 class TRF5Downloader:
 
-  def __init__(self, client, output):
+  def __init__(self, client=None, output=None):
     self._client = client
     self._output = output
 
   def download(self, items, pbar=None):
     import concurrent.futures
     import time
-    import re
-    
     # self._client.signin()
     # self._client.set_search(
     #   start_date=pendulum.DateTime(2020, 1, 1),
@@ -47,12 +45,13 @@ class TRF5Downloader:
         #     sleep_time = (interval - since) + jitter
         #     time.sleep(sleep_time)
         
-
-        if re.search('www4.trf5.jus.br\/processo', item.row['url'])
-
+      
+        report = self._get_report_url(item.content)
         response = self._get_response(base.ContentFromURL(
-              src=self._get_report_url(item.content),
-              dest=item.dest
+              src=report.get('url'),
+              dest=item.dest,
+              content_type=report.get('content_type'),
+
               ))
         if pbar:
           pbar.update(1)
@@ -64,6 +63,27 @@ class TRF5Downloader:
 
       for future in concurrent.futures.as_completed(futures):
         future.result()
+
+
+  def _get_report_url(self, record):
+    import re
+    
+    report_url = None
+    content_type_report = "text/html"
+
+    if re.search('www4.trf5.jus.br\/processo', record['url']):
+        if not self.filters('skip_full'):
+            report_url = self._get_report_url_from_trf5(record)
+        if report_url is None:
+            report_url = self._get_report_url_from_trf5(record, digits=2)
+        if report_url is not None:
+            content_type_report = "application/pdf"
+    else:
+        report_url = self._get_report_url_from_pje(record)
+    return {
+      'url':report_url,
+      'content_type':content_type_report
+      }
 
   def _get_report_url_from_trf5(self, doc, digits=0):
     import requests
@@ -98,7 +118,7 @@ class TRF5Downloader:
     return self._get_judgment_doc_url_by_closest_date(links)
 
     
-  def _get_report_url(self, doc):
+  def _get_report_url_from_pje(self, doc):
     import browsers
 
     browser = browsers.FirefoxBrowser(headless=True)
