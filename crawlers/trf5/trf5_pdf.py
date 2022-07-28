@@ -49,12 +49,13 @@ class TRF5Downloader:
         
       
         report = self._get_report_url(item.content)
-        response = self._get_response(base.ContentFromURL(
-              src=report.get('url'),
-              dest=item.dest,
-              content_type=report.get('content_type'),
+        if report.get('url'):
+          response = self._get_response(base.ContentFromURL(
+                src=report.get('url'),
+                dest=item.dest,
+                content_type=report.get('content_type'),
 
-              ))
+                ))
         if pbar:
           pbar.update(1)
 
