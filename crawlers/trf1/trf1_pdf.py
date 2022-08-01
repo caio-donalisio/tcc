@@ -178,7 +178,7 @@ class TRF1Downloader:
     else:
         return ''
 
-  @utils.retryable()
+  @utils.retryable(max_retries=9)
   def merge_pdfs_from_links(self, document_links, is_doc=False):
       import PyPDF2 
       from io import BytesIO
