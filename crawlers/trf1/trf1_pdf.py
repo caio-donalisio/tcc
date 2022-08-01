@@ -95,7 +95,7 @@ class TRF1Downloader:
     pdf_content, inteiro_page_content = '',''
     # meta_hash = utils.get_content_hash(row, [{'name':'td'}])
     
-    acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text
+    acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text if row.find(attrs={'class':"titulo_doc"}) else ''
     title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
     # process_number = ''.join(char for char in acordao_titulo if char.isdigit())
     process_link = row.find('a',text='Acesse aqui')
