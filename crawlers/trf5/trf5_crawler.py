@@ -39,7 +39,7 @@ def merged_with_default_filters(start_date, end_date):
         'columns[0][name]': '',
         'columns[0][searchable]': 'true',
         'columns[0][orderable]': 'false',
-        'columns[0][search][value]': '',
+        'columns[0][search][value]': '',    
         'columns[0][search][regex]': 'false',
         'start': '0',
         'length': '10',
@@ -57,7 +57,7 @@ def merged_with_default_filters(start_date, end_date):
 class TRF5Client:
 
     def __init__(self):
-        self.url = 'https://julia-pesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
+        self.url = 'https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
 
     @utils.retryable(max_retries=3)
     def count(self, filters):
@@ -80,6 +80,10 @@ class TRF5Client:
             filters['start'] = (page * per_page) - per_page
             filters['length'] = per_page
 
+            response = requests.get(self.url,
+                                params=filters,
+                                headers=DEFAULT_HEADERS
+                                )
             return requests.get(self.url,
                                 params=filters,
                                 headers=DEFAULT_HEADERS
