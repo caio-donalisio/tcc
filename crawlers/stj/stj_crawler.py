@@ -82,7 +82,6 @@ class STJClient:
     return self._response_or_retry(self.requester.post(
       f'{self.base_url}/SCON/pesquisar.jsp',
       headers=DEFAULT_HEADERS,
-      # headers={'ContentType': 'application/X-www-form-urlencoded'},
       data={**filters, 'i': offset}))
 
   @utils.retryable(max_retries=3)
@@ -99,12 +98,6 @@ class STJClient:
       self.reset_session()
       raise utils.PleaseRetryException()
 
-    # if soup \
-    #     .find('div', {'id': 'infopesquisa'}) is None:
-    #   logger.warn('Got something else -- reseting session and retrying.')
-    #   self.reset_session()
-    #   raise utils.PleaseRetryException()
-
     return response
 
   def _count_by_content(self, content):
@@ -114,9 +107,6 @@ class STJClient:
     
     if not info:
       assert info is not None
-      # logger.warn('reseting session.')
-      # self.reset_session()
-      # raise utils.PleaseRetryException()
     
     elif info.get_text() == 'Nenhum documento encontrado!':
       count = 0
