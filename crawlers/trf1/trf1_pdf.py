@@ -37,7 +37,7 @@ class TRF1Downloader:
     from bs4 import BeautifulSoup
 
     interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
       futures  = []
       last_run = None
       for item in items:
@@ -115,25 +115,51 @@ class TRF1Downloader:
 
     if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
-        import requests
-        try:
-          response = requests.get(process_link)
-        except requests.exceptions.ConnectionError:
-          raise utils.PleaseRetryException()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
+      def order_candidate(candidate):
+        ordering = {'ementa':1,'relatório':2,'voto':3}
+        for key in ordering:
+          if key in candidate['name'].lower(): 
+            return ordering[key]
+        else:
+          return max(ordering.values()) + 1
+
+
+      import requests
+      try:
+        response = requests.get(process_link)
+      except requests.exceptions.ConnectionError:
+        raise utils.PleaseRetryException()
+      soup = BeautifulSoup(response.text, 'html.parser')
+      table = soup.find('table')
+      if table:
+        rows = soup.find_all('tr')
+        # for row in rows:
+        candidates = [
+          {
+            'name':row.find_all('td')[0].text,
+            'date':row.find_all('td')[1].text,
+            'url': row.find_all('td')[0].find('a').get('href')
+            } for row in rows[1:]
+        ]
+        candidates = [candidate for candidate in candidates if any(not char.isspace() for char in candidate['date'])]
+        # date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
         pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
-        dates = [link.text for link in date_links]
+        dates = [link['date'] for link in candidates if re.search(DATE_PATTERN, link['date'])]
         nearest_date = self.get_nearest_date(dates, pub_date_string)
-            
+          
         if nearest_date:
             time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
         if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
-            date_links = [link for link in date_links if pendulum.from_format(link.text,TRF1_DATE_FORMAT) == nearest_date]
-            pdf_content = self.merge_pdfs_from_links(date_links, is_doc=True)
+            candidates = [link for link in candidates if pendulum.from_format(link['date'],TRF1_DATE_FORMAT) == nearest_date]
+            candidates = sorted(candidates, key=order_candidate)
+            links = [candidate['url'] for candidate in candidates]
+            pdf_content = self.merge_pdfs_from_links(links, is_doc=True)
         else:
             logger.info(f"Trying to fetch {title} on PJE...")
             try_pje=True
+      else:
+        logger.info(f"Trying to fetch {title} on PJE...")
+        try_pje=True
 
     if try_pje or 'ConsultaPublica/listView.seam' in process_link:
         browser = browsers.FirefoxBrowser(headless=not DEBUG)
@@ -149,12 +175,12 @@ class TRF1Downloader:
             links = self.collect_all_links(browser)
             ls = []
             for link in self.filter_links(links):
-                D = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
-                U = r".*\'(?P<pdf_link>http.*?)\'.*"
-                if re.search(U, link['onclick']) and re.search(D, link.text).group(1):
+                DATE_PATTERN_2 = r'.*(?P<date>\d{2}\/\d{2}\/\d{4}).*'
+                LINK_PATTERN = r".*\'(?P<pdf_link>http.*?)\'.*"
+                if re.search(LINK_PATTERN, link['onclick']) and re.search(DATE_PATTERN_2, link.text).group(1):
                     ls.append({
-                        'date':re.search(D, link.text).group(1), 
-                        'url': re.search(U, link['onclick']).group(1)
+                        'date':re.search(DATE_PATTERN_2, link.text).group(1), 
+                        'url': re.search(LINK_PATTERN, link['onclick']).group(1)
                         })
             
             nearest_date = self.get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
@@ -188,7 +214,7 @@ class TRF1Downloader:
       merger = PyPDF2.PdfFileMerger()
       for link in document_links:
           
-          file = requests.get(f"{TRF1_ARCHIVE}{link['href']}")
+          file = requests.get(f"{TRF1_ARCHIVE}{link}")
           if file.status_code == 200:
               if is_doc:
                   bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
@@ -412,12 +438,12 @@ def trf1_pdf_command(input_uri, prefix, dry_run, local, count):
       pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+      executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
       futures  = []
       for pending in pendings:
         if not dry_run:
           batch.append(pending)
-          if len(batch) >= 10:
+          if len(batch) >= 10:    
             futures.append(executor.submit(trf1_download, batch, input_uri, pbar))
             # time.sleep(random.uniform(5., 8.))
             batch = []
