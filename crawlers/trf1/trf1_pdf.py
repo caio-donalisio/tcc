@@ -217,12 +217,12 @@ class TRF1Downloader:
           file = requests.get(f"{TRF1_ARCHIVE}{link}")
           if file.status_code == 200 and len(file.content) > 1:
               if is_doc:
-                  bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
-              bytes = BytesIO(bytes)
+                  pdf_bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
+              pdf_bytes_io = BytesIO(pdf_bytes)
           else:
               raise utils.PleaseRetryException()
           try:
-              merger.append(bytes)
+              merger.append(pdf_bytes_io)
           except PyPDF2.errors.PdfReadError:
               raise utils.PleaseRetryException()
 
