@@ -215,7 +215,7 @@ class TRF1Downloader:
       for link in document_links:
           
           file = requests.get(f"{TRF1_ARCHIVE}{link}")
-          if file.status_code == 200:
+          if file.status_code == 200 and len(file.content) > 1:
               if is_doc:
                   bytes = utils.convert_doc_to_pdf(file.content, container_url=DOC_TO_PDF_CONTAINER_URL)
               bytes = BytesIO(bytes)
