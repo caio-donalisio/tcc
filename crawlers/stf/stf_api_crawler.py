@@ -126,16 +126,22 @@ class STF:
     return result['total']['value']
 
   def get_doc(self, row):
+    import re
+    NUMBER_PATTERN = re.compile(r'http.*idDocumento=(\d+)')
+
     doc      = row['_source']
     doc_id   = doc['id']
     pdf_url  = doc['inteiro_teor_url']
+
+    doc_number = re.search(NUMBER_PATTERN, pdf_url).group(1)
+    actual_pdf_url = f"https://portal.stf.jus.br/jurisprudencia/obterInteiroTeor.asp?idDocumento={doc_number}"
     pub_date = pendulum.parse(doc['publicacao_data'])
     month    = '{:02d}'.format(pub_date.month)
     return {
       'source': doc,
       'dest'  : f'{pub_date.year}/{month}/{doc_id}.json',
     }, {
-      'url'   : pdf_url,
+      'url'   : actual_pdf_url,
       'dest'  : f'{pub_date.year}/{month}/{doc_id}.pdf'
     }
 
