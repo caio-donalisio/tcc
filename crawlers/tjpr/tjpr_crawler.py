@@ -214,7 +214,6 @@ class TJPRChunk(base.Chunk):
                 act_id = self.get_act_id(act)
                 publication_date = self.get_publication_date(act)
                 ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
-
                 pdf_bytes, pdf_hash = self.download_pdf(act)
                 base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{ementa_hash}_{pdf_hash}'
 
@@ -230,7 +229,8 @@ class TJPRChunk(base.Chunk):
                     content=str(act),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
-
+                
+                
                 yield to_download
 
     @utils.retryable()
@@ -242,6 +242,7 @@ class TJPRChunk(base.Chunk):
 
         is_zip = lambda text: 'Carregar documento' in text
         is_single_file = lambda text: 'PDF assinado' in text
+        NULL_VALUE = b'', 0 * hash_len
 
         pdf_link = [link for link in act.find_all('a') if link.next.next in ['Carregar documento','PDF assinado']]
 
@@ -254,18 +255,19 @@ class TJPRChunk(base.Chunk):
             
             if is_zip(pdf_link):
                 try:
-                    zipfile = zipfile.ZipFile(BytesIO(response.content))
+                    zip_obj = zipfile.ZipFile(BytesIO(response.content))
+                    merger = PdfFileMerger()
+                    for file in sorted(zip_obj.namelist()):
+                        bytes = zip_obj.open(file)
+                        if file.endswith('.doc'):
+                            bytes = utils.convert_doc_to_pdf(bytes, container_url=DOC_TO_PDF_CONTAINER_URL)
+                            bytes = BytesIO(bytes)
+                        merger.append(bytes)
+
                 except zipfile.BadZipFile:
-                    logger.warn(f'Could not download ZIP from {self.get_act_id(act)}, retrying...')
-                    raise utils.PleaseRetryException()
-                merger = PdfFileMerger()
-                for file in sorted(zipfile.namelist()):
-                    bytes = zipfile.open(file)
-                    if file.endswith('.doc'):
-                        bytes = utils.convert_doc_to_pdf(bytes, container_url=DOC_TO_PDF_CONTAINER_URL)
-                        bytes = BytesIO(bytes)
-                    merger.append(bytes)
-                    
+                    logger.warn(f'Could not download ZIP from {self.get_act_id(act)}')
+                    return NULL_VALUE
+
                 pdf_bytes = BytesIO()
                 merger.write(pdf_bytes)
                 bytes_value = pdf_bytes.getvalue()
@@ -279,8 +281,7 @@ class TJPRChunk(base.Chunk):
                 raise utils.PleaseRetryException()
 
         elif not pdf_link:
-            bytes_value = b''
-            pdf_hash = '0' * hash_len
+            return NULL_VALUE
 
         return bytes_value, pdf_hash
 
