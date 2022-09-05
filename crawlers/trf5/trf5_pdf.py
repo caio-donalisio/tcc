@@ -75,8 +75,8 @@ class TRF5Downloader:
     content_type_report = "text/html"
 
     if re.search('www4.trf5.jus.br\/processo', record['url']):
-        if not self.filters('skip_full'):
-            report_url = self._get_report_url_from_trf5(record)
+        # if not self.filters('skip_full'):
+        report_url = self._get_report_url_from_trf5(record)
         if report_url is None:
             report_url = self._get_report_url_from_trf5(record, digits=2)
         if report_url is not None:
@@ -188,7 +188,7 @@ class TRF5Downloader:
     import requests
     import os
 
-    api_key = os.getenv('CAPTCHA_API_KEY')
+    api_key = "4CAY5SBFO1GLCR3HMPS8PHGJXF7PW1TV7E2KOTLB"
 
     post_data = {
         'action':'upload',
@@ -356,7 +356,7 @@ def trf5_download_task(items, output_uri):
         base.ContentFromURL(
           row=item['url'],
           dest=item['dest'],
-          content_type='application/doc'
+          content_type='application/pdf'
         )
         for item in items
       ],

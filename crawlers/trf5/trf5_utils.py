@@ -24,7 +24,7 @@ def list_pending_pdfs(input_uri, prefix):
     path = pathlib.Path(f'{input_uri}/{bool(prefix) * (prefix + "/")}{name}')
     if name.endswith(".json"):
       jsons[path.stem] = path.parent
-    if name.endswith(".html"):
+    if name.endswith(".html") or name.endswith(".pdf"):
       pdfs[path.stem] = path.parent
 
   for name, parent in jsons.items():

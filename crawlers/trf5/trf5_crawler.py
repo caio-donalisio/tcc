@@ -19,18 +19,21 @@ logger = logger_factory('trf5')
 
 SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
-    'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-                        ' AppleWebKit/537.36 (KHTML, like Gecko)'
-                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67'),
     'Accept': 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Language': 'en-US,en;q=0.9,pt;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
     'Connection': 'keep-alive',
-    'Referer': 'https://julia-pesquisa.trf5.jus.br/julia-pesquisa/',
+    # Requests sorts cookies= alphabetically
+    # 'Cookie': '_ga=GA1.1.1066051638.1658924752; _ga_R55DNGGL90=GS1.1.1661798142.4.0.1661799185.0.0.0; 5a292a765166d38b90f5e9ce17f2d2c3=54598a02fcdfe5708f06c0b18a3ea24c; trf501e84bc9=01aa396bb16debe85417de9d25c154491ec88b4f7f3d70cbd506d2e8efb81380e7a4a1c5d3de987448cb8df426b172d0e4b5d7d1a32bf3286b6a1527b86e2774613a95904e; trf5361cd1e2027=08e38928b9ab2000decbaabcb5dd40ceb2083b78cd2ed287f13c37916de8a45302bd7db4093c90ac083e1db553113000b5912f217d7b598b5c0c509dceefbc7931e80196e8aa15cbc85ba20dbb520a5a1970cf377819db894b65ee9e137417e4',
+    'Referer': 'https://juliapesquisa.trf5.jus.br/julia-pesquisa/',
     'Sec-Fetch-Dest': 'empty',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Site': 'same-origin',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edg/105.0.1343.27',
     'X-Requested-With': 'XMLHttpRequest',
-}                        
+    'sec-ch-ua': '"Microsoft Edge";v="105", " Not;A Brand";v="99", "Chromium";v="105"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+}              
 
 def merged_with_default_filters(start_date, end_date, skip_full):
     return {
@@ -57,7 +60,7 @@ def merged_with_default_filters(start_date, end_date, skip_full):
 class TRF5Client:
 
     def __init__(self):
-        self.url = 'https://julia-pesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
+        self.url = 'https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
 
     @utils.retryable(max_retries=3)
     def count(self, filters):
@@ -84,7 +87,7 @@ class TRF5Client:
                                 params=filters,
                                 headers=DEFAULT_HEADERS
                                 ).json()
-
+# https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
             raise e
