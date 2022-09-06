@@ -14,7 +14,7 @@ from logconfig import logger_factory
 
 logger = logger_factory('trf5-pdf')
 
-MAX_WORKERS = 8
+MAX_WORKERS = 3
 
 
 class TRF5Downloader:
@@ -33,7 +33,7 @@ class TRF5Downloader:
     # )
     # self._client.close()
 
-    interval = 5
+    interval = 20
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
       last_run = None
@@ -56,6 +56,8 @@ class TRF5Downloader:
                 content_type=report.get('content_type'),
 
                 ))
+          item.content_type = report.get('content_type')
+        
         if pbar:
           pbar.update(1)
 
@@ -307,7 +309,7 @@ class TRF5Downloader:
       timeout=10)
     if 'application/pdf' in response.headers.get('Content-type'):
       logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
-      # return response
+      return response
     elif 'text/html' in response.headers.get('Content-type') and \
       not response.content:
       logger.warn(f'HTML for {content_from_url.src} not available.')
@@ -415,7 +417,7 @@ def trf5_pdf_command(input_uri, prefix, dry_run, local, count):
       for pending in pendings:
         if not dry_run:
           batch.append(pending)
-          if len(batch) >= 5:
+          if len(batch) >= 25:
             futures.append(executor.submit(trf5_download, batch, input_uri, pbar))
             # time.sleep(random.uniform(5., 8.))
             batch = []
