@@ -62,7 +62,7 @@ class TRF5Downloader:
           pbar.update(1)
 
         # up async
-        if response:
+        if report.get('url') and response:
           # last_run = time.time()
           futures.append(executor.submit(self._handle_upload, item, response))
 
@@ -292,7 +292,7 @@ class TRF5Downloader:
     return None
 
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=6)
   def _get_response(self, content_from_url):
     import requests
     logger.debug(f'GET {content_from_url.src}')
@@ -340,7 +340,7 @@ class TRF5Downloader:
 
 
 @celery.task(queue='trf5.pdf', autoretry_for=(Exception,),
-             default_retry_delay=60, max_retries=3)
+             default_retry_delay=60, max_retries=6)
 def trf5_download_task(items, output_uri):
   from tqdm import tqdm
 

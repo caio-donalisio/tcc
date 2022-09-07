@@ -62,7 +62,7 @@ class TRF5Client:
     def __init__(self):
         self.url = 'https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=6)
     def count(self, filters):
         result = self.fetch(filters, page=1)
         return result['recordsTotal']
@@ -77,7 +77,7 @@ class TRF5Client:
             raise Exception(f'Cookie not found: {cookie_name}')
         return value
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=6)
     def fetch(self, filters, page=1, per_page=10):
         try:
             filters['start'] = (page * per_page) - per_page
