@@ -39,7 +39,7 @@ def merged_with_default_filters(start_date, end_date):
         'columns[0][name]': '',
         'columns[0][searchable]': 'true',
         'columns[0][orderable]': 'false',
-        'columns[0][search][value]': '',
+        'columns[0][search][value]': '',    
         'columns[0][search][regex]': 'false',
         'start': '0',
         'length': '10',
@@ -57,7 +57,7 @@ def merged_with_default_filters(start_date, end_date):
 class TRF5Client:
 
     def __init__(self):
-        self.url = 'https://julia-pesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
+        self.url = 'https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt'
 
     @utils.retryable(max_retries=3)
     def count(self, filters):
@@ -80,6 +80,10 @@ class TRF5Client:
             filters['start'] = (page * per_page) - per_page
             filters['length'] = per_page
 
+            response = requests.get(self.url,
+                                params=filters,
+                                headers=DEFAULT_HEADERS
+                                )
             return requests.get(self.url,
                                 params=filters,
                                 headers=DEFAULT_HEADERS
@@ -198,6 +202,8 @@ class TRF5Chunk(base.Chunk):
     
     def _get_report_url(self, doc):
         details_url = self._get_judgment_details_url(doc)
+        if not details_url:
+            return None
         return self._get_judgment_doc_url(details_url, doc)
     
 
@@ -233,6 +239,9 @@ class TRF5Chunk(base.Chunk):
             time.sleep(1)
         
             if not self.browser.is_text_present('Resposta incorreta'):
+                if self.browser.is_text_present('Foram encontrados: 0 resultados'):
+                    logger.warn(f'Not results for {judgment_id}')
+                    return None
                 self.browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
                 doc_link = self.browser.driver.find_element_by_id('consultaPublicaList2:0:j_id315:j_id318')                                            
                 return self._extract_judgment_detail_url(doc_link)
