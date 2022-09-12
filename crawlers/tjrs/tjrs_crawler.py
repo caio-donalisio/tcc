@@ -15,10 +15,23 @@ logger = logger_factory('tjrs')
 
 SOURCE_DATE_FORMAT='DD/MM/YYYY'
 DEFAULT_HEADERS = {
-  'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-                        ' AppleWebKit/537.36 (KHTML, like Gecko)'
-                        ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
-                        }
+    'Accept': '*/*',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    # Requests sorts cookies= alphabetically
+    # 'Cookie': 'cookielawinfo-checkbox-necessary=yes; cookielawinfo-checkbox-functional=no; cookielawinfo-checkbox-performance=no; cookielawinfo-checkbox-analytics=no; cookielawinfo-checkbox-advertisement=no; cookielawinfo-checkbox-others=no; _ga=GA1.3.1443902835.1662056751; _gid=GA1.3.908257160.1662665679; _gat=1; WORDPRESS=.wordpress-dmz-1; PHPSESSID=hdalperd0oo8jrgkedt8tgh3dk; PHPINTER-PROD=.phpinter-prod-01',
+    'Origin': 'https://www.tjrs.jus.br',
+    'Referer': 'https://www.tjrs.jus.br/buscas/jurisprudencia/?conteudo_busca=&q_palavra_chave=&aba=jurisprudencia',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edg/105.0.1343.27',
+    'X-Requested-With': 'XMLHttpRequest',
+    'sec-ch-ua': '"Microsoft Edge";v="105", " Not;A Brand";v="99", "Chromium";v="105"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+}
 
 def merged_with_default_filters(start_date, end_date):
     return {
@@ -55,7 +68,6 @@ def merged_with_default_filters(start_date, end_date):
         }
     }
 
-
 class TJRSClient:
 
     def __init__(self):
@@ -79,13 +91,14 @@ class TJRSClient:
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
         try:
-            filters['parametros']['pagina_atual'] = page
-            filters['parametros'] = urllib.parse.urlencode(filters['parametros'],quote_via=urllib.parse.quote)
-
-            return requests.post(self.url,
-                                data=filters,
-                                headers=DEFAULT_HEADERS
-                                ).json()
+            if not isinstance(filters['parametros'], str):
+                filters['parametros']['pagina_atual'] = page
+                filters['parametros'] = urllib.parse.urlencode(filters['parametros'],quote_via=urllib.parse.quote)
+                return requests.post(self.url,
+                                    data=filters,
+                                    headers=DEFAULT_HEADERS,
+                                    verify=False
+                                    ).json()
 
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
@@ -127,53 +140,56 @@ class TJRSChunk(base.Chunk):
 
     def rows(self):
         result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
-        for n,record in enumerate(result['response']['docs']):
+        if result is None:
+            print("ERRO",  self.filters)
+        else:
+            for n,record in enumerate(result['response']['docs']):
 
-            session_at = pendulum.parse(record['data_julgamento'])
-            base_path   = f'{session_at.year}/{session_at.month:02d}'
+                session_at = pendulum.parse(record['data_julgamento'])
+                base_path   = f'{session_at.year}/{session_at.month:02d}'
 
-            if 'cod_documento' in record:
-                codigo = record['cod_documento']
-                ano = record['ano_criacao']
-                numero = record['numero_processo']
+                if 'cod_documento' in record:
+                    codigo = record['cod_documento']
+                    ano = record['ano_criacao']
+                    numero = record['numero_processo']
 
-                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+                    dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
 
-                report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
-                dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
-            
-                yield [
-                    base.Content(content=json.dumps(record),dest=dest_record,
-                        content_type='application/json'),
-                    base.ContentFromURL(src=report_url,dest=dest_report,
-                        content_type='application/doc')
-                ]
+                    report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
+                    dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
+                
+                    yield [
+                        base.Content(content=json.dumps(record),dest=dest_record,
+                            content_type='application/json'),
+                        base.ContentFromURL(src=report_url,dest=dest_report,
+                            content_type='application/doc')
+                    ]
 
-            else:
-                numero = record['numero_processo']
-                codigo = record['cod_ementa']
-
-                dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
-                dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
-
-                extra_contents = []
-
-                if 'documento_text_aspas' in record:
-                    record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
-                if 'documento_text' in record:
-                    logger.warn(f'File {dest_record} has no full document text')
-                    record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
-                    extra_contents.append(base.Content(content=record['documento_text'],dest=dest_report,
-                        content_type='text/html')
-                    )
                 else:
-                    logger.warn(f'File {dest_record} has no document text as well')
+                    numero = record['numero_processo']
+                    codigo = record['cod_ementa']
 
-                yield [
-                    base.Content(content=json.dumps(record),dest=dest_record,
-                        content_type='application/json'),
-                    *extra_contents                    
-                ]
+                    dest_record = f"{base_path}/doc_{numero}_{codigo}.json"
+                    dest_report = f"{base_path}/doc_{numero}_{codigo}.html"
+
+                    extra_contents = []
+
+                    if 'documento_text_aspas' in record:
+                        record['documento_text_aspas'] = base64.b64decode(record['documento_text_aspas']).decode('latin-1')
+                    if 'documento_text' in record:
+                        logger.warn(f'File {dest_record} has no full document text')
+                        record['documento_text'] = base64.b64decode(record['documento_text']).decode('latin-1')
+                        extra_contents.append(base.Content(content=record['documento_text'],dest=dest_report,
+                            content_type='text/html')
+                        )
+                    else:
+                        logger.warn(f'File {dest_record} has no document text as well')
+
+                    yield [
+                        base.Content(content=json.dumps(record),dest=dest_record,
+                            content_type='application/json'),
+                        *extra_contents                    
+                    ]
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
