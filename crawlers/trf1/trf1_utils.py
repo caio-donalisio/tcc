@@ -1,14 +1,15 @@
 import pathlib
 
 import utils
+from google.cloud import storage
+client = storage.Client()
+
+
 
 def list_all(bucket_name, prefix):
-
-  import os
-  folder = bucket_name
-  for file in os.listdir(folder + bool(prefix) * f'/{prefix}'):
-    yield file
-
+  bucket = utils.get_bucket_ref(bucket_name)
+  for blob in bucket.list_blobs(prefix=prefix):
+    yield blob.name
 
 def list_pending_pdfs(bucket_name, prefix):
   htmls = {}
@@ -16,7 +17,7 @@ def list_pending_pdfs(bucket_name, prefix):
   b_files = {}
 
   for name in list_all(bucket_name, prefix):
-    path = pathlib.Path(f'{bucket_name}/{name}')
+    path = pathlib.Path(name)
     if name.endswith("A.html"):
       htmls[path.stem] = path.parent
     if name.endswith("B.html"):
@@ -24,11 +25,12 @@ def list_pending_pdfs(bucket_name, prefix):
     if name.endswith(".pdf"):
       pdfs[path.stem] = path.parent
 
+  client = storage.Client()
+  bucket = client.get_bucket(bucket_name)
+
   for name, parent in htmls.items():
-    if name[:name.find("_A")] not in pdfs: # name not in b_files:
-      with open(f'{parent}/{bool(prefix) * (prefix + "/")}{name}.html',encoding='latin-1') as f:
-        row = f.read()
-      yield {'row':row,
-          'dest': f'/{bool(prefix) * (prefix + "/")}{name[:name.find("_A")]}'
-            # 'dest': f'{parent}/{bool(prefix) * (prefix + "/")}{name[:name.find("_A")]}'
+    if name[:name.find("_A")] not in pdfs:
+      
+      yield {'row':bucket.get_blob(f'{parent}/{name}.html').download_as_string(),
+          'dest': f'{parent}/{name[:name.find("_A")]}'
       }
