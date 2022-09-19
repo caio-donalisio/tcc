@@ -1,40 +1,32 @@
 import pathlib
-
 import utils
+from google.cloud import storage
 
-def list_all(input_uri, prefix):
-  import os
+def list_all(bucket_name, prefix):
+  bucket = utils.get_bucket_ref(bucket_name)
+  for blob in bucket.list_blobs(prefix=prefix):
+    yield blob.name
 
-  if input_uri.startswith('gs://'):
-    bucket = utils.get_bucket_ref(input_uri)
-    for blob in bucket.list_blobs(prefix=prefix):
-      yield blob.name
-  else:
-    for file in os.listdir(f'{input_uri}/{bool(prefix) * (prefix)}'):
-      yield file
-
-
-def list_pending_pdfs(input_uri, prefix):
+def list_pending_pdfs(bucket_name, prefix):
   import json
 
   jsons = {}
-  pdfs  = {}
+  inteiros  = {}
 
-  for name in list_all(input_uri, prefix):
-    path = pathlib.Path(f'{input_uri}/{bool(prefix) * (prefix + "/")}{name}')
-    if name.endswith(".json"):
-      jsons[path.stem] = path.parent
-    if name.endswith(".html") or name.endswith(".pdf"):
-      pdfs[path.stem] = path.parent
+  for name in list_all(bucket_name, prefix):
+      path = pathlib.Path(name)
+      if name.endswith(".json"):
+        jsons[path.stem] = path.parent
+      if name.endswith(".pdf") or name.endswith(".html"):
+        inteiros[path.stem] = path.parent
+
+  client = storage.Client()
+  bucket = client.get_bucket(bucket_name)
 
   for name, parent in jsons.items():
-    
-    if name not in pdfs:
-      
-      with open(f'{parent}/{name}.json',encoding='latin-1') as f:
-        row = json.loads(f.read())
+    if name not in inteiros:
       
       yield {
-        'row':row,
-        'dest': f'{bool(prefix) * (prefix + "/")}{name}'
+        'row':json.loads(bucket.get_blob(f'{parent}/{name}.json').download_as_string()),
+       'dest': f'{parent}/{name}'
       }

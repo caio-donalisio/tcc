@@ -408,7 +408,7 @@ def trf5_pdf_command(input_uri, prefix, dry_run, local, count):
 
     # just to count
     pendings = []
-    for pending in list_pending_pdfs(output._output_folder, prefix):
+    for pending in list_pending_pdfs(output._bucket_name, prefix):
       pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
