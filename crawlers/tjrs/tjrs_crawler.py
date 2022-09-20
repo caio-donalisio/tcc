@@ -19,8 +19,6 @@ DEFAULT_HEADERS = {
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
     'Connection': 'keep-alive',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    # Requests sorts cookies= alphabetically
-    # 'Cookie': 'cookielawinfo-checkbox-necessary=yes; cookielawinfo-checkbox-functional=no; cookielawinfo-checkbox-performance=no; cookielawinfo-checkbox-analytics=no; cookielawinfo-checkbox-advertisement=no; cookielawinfo-checkbox-others=no; _ga=GA1.3.1443902835.1662056751; _gid=GA1.3.908257160.1662665679; _gat=1; WORDPRESS=.wordpress-dmz-1; PHPSESSID=hdalperd0oo8jrgkedt8tgh3dk; PHPINTER-PROD=.phpinter-prod-01',
     'Origin': 'https://www.tjrs.jus.br',
     'Referer': 'https://www.tjrs.jus.br/buscas/jurisprudencia/?conteudo_busca=&q_palavra_chave=&aba=jurisprudencia',
     'Sec-Fetch-Dest': 'empty',
@@ -141,7 +139,7 @@ class TJRSChunk(base.Chunk):
     def rows(self):
         result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
         if result is None:
-            print("ERRO",  self.filters)
+            logger.error("ERROR - could not collect for {self.filters} - page {self.page}")
         else:
             for n,record in enumerate(result['response']['docs']):
 
