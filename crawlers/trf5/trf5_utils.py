@@ -25,9 +25,10 @@ def list_pending_pdfs(bucket_name, prefix):
 
   counter = 0 
   for name, parent in jsons.items():
-    counter += 1
+    
     
     if name not in inteiros and counter <= 250:
+      counter += 1
       
       yield {
         'row':json.loads(bucket.get_blob(f'{parent}/{name}.json').download_as_string()),
