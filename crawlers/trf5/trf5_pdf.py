@@ -129,8 +129,11 @@ class TRF5Downloader:
     browser = browsers.FirefoxBrowser(headless=True)
     details_url = self._get_judgment_details_url(browser, doc)
     if not details_url:
+      browser.quit()
       return None
-    return self._get_judgment_doc_url(details_url, browser, doc)
+    doc_url = self._get_judgment_doc_url(details_url, browser, doc)
+    browser.quit()
+    return doc_url
     
 
   def _get_judgment_details_url(self, browser, doc):
