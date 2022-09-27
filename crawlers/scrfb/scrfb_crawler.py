@@ -8,7 +8,7 @@ import click
 from app import cli, celery
 import requests
 from urllib.parse import parse_qsl, urlsplit
-
+import time
 
 logger = logger_factory('scrfb')
 
@@ -38,6 +38,9 @@ RESULTS_PER_PAGE = 100  # DEFINED BY THEIR SERVER
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
+PAUSE_TIME = 0.4
+                
+
 
 class SCRFBClient:
 
@@ -105,6 +108,7 @@ class SCRFBCollector(base.ICollector):
             total = self.count({'start_date':start,'end_date':end})
             pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
             for page in pages:
+                
                 yield SCRFBChunk(
                     keys={
                         'start_date':start.to_date_string(),
@@ -147,7 +151,9 @@ class SCRFBChunk(base.Chunk):
             soup = utils.soup_by_content(result.text)
             acts = soup.find_all('tr', class_='linhaResultados')
             to_download = []
+            
             for act in acts:
+                time.sleep(PAUSE_TIME)
                 if not act.a:
                     continue
                 act_id = self.act_id_from_url(act.a['href'])
