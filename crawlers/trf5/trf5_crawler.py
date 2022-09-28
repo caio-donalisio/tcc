@@ -42,7 +42,7 @@ def merged_with_default_filters(start_date, end_date, skip_full):
         'columns[0][name]': '',
         'columns[0][searchable]': 'true',
         'columns[0][orderable]': 'false',
-        'columns[0][search][value]': '',
+        'columns[0][search][value]': '',    
         'columns[0][search][regex]': 'false',
         'start': '0',
         'length': '10',
@@ -83,6 +83,10 @@ class TRF5Client:
             filters['start'] = (page * per_page) - per_page
             filters['length'] = per_page
 
+            response = requests.get(self.url,
+                                params=filters,
+                                headers=DEFAULT_HEADERS
+                                )
             return requests.get(self.url,
                                 params=filters,
                                 headers=DEFAULT_HEADERS

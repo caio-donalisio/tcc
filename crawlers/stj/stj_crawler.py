@@ -14,6 +14,21 @@ logger = logger_factory('stj')
 NOW = pendulum.now().to_datetime_string()
 DATE_FORMAT_1 = 'YYYYMMDD'
 DATE_FORMAT_2 = 'DD/MM/YYYY'
+DEFAULT_HEADERS = {
+    'Accept': '*/*',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Connection': 'keep-alive',
+    # Requests sorts cookies= alphabetically
+    # 'Cookie': 'f5_cspm=1234; JSESSIONID=M68oQ4MRNooLU5mtmFT7sufU9q9p_x_NrpA4zKtM.svlp-jboss-01; TS01603393=016a5b3833b6deadb7303487d001db690ceda463c66cdfea251a48d9ef1e16efbd346eb5a247ded3c2d656fc81314481b822eaf2785251c22078f999ecc4f9fcd1521c483f; _ga=GA1.3.922156914.1655814167; _hjSessionUser_2631084=eyJpZCI6IjlkODdmNDJmLWZkZWUtNTgwYS1hNTU2LTQ3NDBkMjdiNTg4NCIsImNyZWF0ZWQiOjE2NTg0MjM0OTkyODMsImV4aXN0aW5nIjpmYWxzZX0=; BIGipServerpool_svlp-jboss_scon=1057204416.36895.0000; _gid=GA1.3.587150248.1660567534; TS0136de9a=016a5b3833b378f1b7adab4428037fcb6fabc787e401dcbb96ffee844656a5242a4df28d71578f195ed6a437f7897ef39fd4a3d01995c107ec83e61b66392295553039b2344a51ffe3496699965d1a60c80c8025ea; _gat_UA-179972319-1=1',
+    'Referer': 'https://scon.stj.jus.br/SCON/pesquisar.jsp',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.81 Safari/537.36 Edg/104.0.1293.54',
+    'sec-ch-ua': '"Chromium";v="104", " Not A;Brand";v="99", "Microsoft Edge";v="104"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+}
 
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= {start_date.format(DATE_FORMAT_1)} E @DTPB <= {end_date.format(DATE_FORMAT_1)}'
@@ -66,7 +81,7 @@ class STJClient:
   def fetch(self, filters, offset):
     return self._response_or_retry(self.requester.post(
       f'{self.base_url}/SCON/pesquisar.jsp',
-      headers={'ContentType': 'application/X-www-form-urlencoded'},
+      headers=DEFAULT_HEADERS,
       data={**filters, 'i': offset}))
 
   @utils.retryable(max_retries=3)
@@ -83,12 +98,6 @@ class STJClient:
       self.reset_session()
       raise utils.PleaseRetryException()
 
-    # if soup \
-    #     .find('div', {'id': 'infopesquisa'}) is None:
-    #   logger.warn('Got something else -- reseting session and retrying.')
-    #   self.reset_session()
-    #   raise utils.PleaseRetryException()
-
     return response
 
   def _count_by_content(self, content):
@@ -98,9 +107,6 @@ class STJClient:
     
     if not info:
       assert info is not None
-      # logger.warn('reseting session.')
-      # self.reset_session()
-      # raise utils.PleaseRetryException()
     
     elif info.get_text() == 'Nenhum documento encontrado!':
       count = 0
