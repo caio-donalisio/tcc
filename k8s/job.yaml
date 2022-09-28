@@ -38,6 +38,8 @@ spec:
             value: "1"
           - name: LOG_FILE
             value: "false"
+          - name: ENV
+            value: "production"
         resources:
           requests:
             cpu: "2"
