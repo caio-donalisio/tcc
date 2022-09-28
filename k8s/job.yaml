@@ -32,6 +32,10 @@ spec:
             value: "${CELERY_BACKEND_URL}"
           - name: CELERY_QUEUES
             value: "${CELERY_QUEUES}"
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          - name: LOG_FILE
+            value: "false"
         resources:
           requests:
             cpu: "2"
