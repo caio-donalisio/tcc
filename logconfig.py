@@ -25,9 +25,10 @@ class ContextFilter(logging.Filter):
 def setup_logger(logger, level=logging.INFO, cloud=True):
   formatter = logging.Formatter(DEFAULT_FORMATTER)
 
-  file_handler = logging.FileHandler(f'logs/app.log')
-  file_handler.setFormatter(formatter)
-  logger.addHandler(file_handler)
+  if os.environ.get('LOG_FILE', 'true') == 'true':
+    file_handler = logging.FileHandler(f'logs/app.log')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
   stream_handler = logging.StreamHandler()
   stream_handler.setFormatter(formatter)
