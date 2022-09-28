@@ -28,8 +28,9 @@ build:
   script:
     - gcloud auth configure-docker us-docker.pkg.dev
     - docker pull ${DOCKER_IMAGE}:latest || true
-    - docker build -t ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} .
+    - docker build -t ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG} .
     - docker push ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG}
 
 retag:
   stage: deploy
