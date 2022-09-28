@@ -193,7 +193,7 @@ class TRF5Downloader:
     import requests
     import os
 
-    api_key = "4CAY5SBFO1GLCR3HMPS8PHGJXF7PW1TV7E2KOTLB"
+    api_key = os.getenv('CAPTCHA_API_KEY')
 
     post_data = {
         'action':'upload',
