@@ -5,6 +5,7 @@ metadata:
   namespace: crawlers
 spec:
   ttlSecondsAfterFinished: 300
+  backoffLimit: 0
   template:
     spec:
       affinity:
@@ -44,3 +45,5 @@ spec:
             cpu: "4"
             memory: "8Gi"
       restartPolicy: Never
+
+
