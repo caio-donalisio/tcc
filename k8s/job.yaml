@@ -40,6 +40,8 @@ spec:
             value: "false"
           - name: ENV
             value: "production"
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: "/etc/gcloud/credential.json"
         resources:
           requests:
             cpu: "2"
@@ -47,6 +49,13 @@ spec:
           limits:
             cpu: "4"
             memory: "8Gi"
+        volumeMounts:
+          - mountPath: "/etc/gcloud"
+            name: gcp-credentials
+      volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: crawlers-credentials
       restartPolicy: Never
 
 
