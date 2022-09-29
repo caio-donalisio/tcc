@@ -17,24 +17,16 @@ loadEnv ../.env.dist # loads default env
 loadEnv ../.env
 
 deploy() {
-    export COURT_ID=$1
+    export K8S_JOB_NAME=${1//_/-}
     export JOB_NAME=$2
     export IMAGE_TAG=$3
     shift 3
     export PARAMS=$*
 
-    if [ -z "${COURT_ID}" ]; then
-        echo "Missing required first parameter: court_id"
+    if [ -z "${PARAMS}" ]; then
+        echo "Missing required params for job"
         exit 2
     fi
-
-    if [ -z "${JOB_NAME}" ]; then
-        echo "Missing required second parameter: job_name"
-        exit 2
-    fi
-
-
-    export K8S_JOB_NAME="${COURT_ID}-${JOB_NAME//_/-}"
 
     echo "Applying file job.yaml"
     envsubst < job.yaml | kubectl apply -f -
