@@ -66,20 +66,19 @@ class TRF1Downloader:
   def _handle_upload(self, item, pdf_content, inteiro_page_content):
     logger.debug(f'GET {item} UPLOAD')
 
-    # if len(response.content) > 0:
     if pdf_content and len(pdf_content) > 100:
       self._output.save_from_contents(
-          filepath=f"{item.dest}.pdf",#content_from_url.dest,
+          filepath=f"{item.dest}.pdf",
           contents=pdf_content,
-          content_type='application/pdf')#content_from_url.content_type)
+          content_type='application/pdf')
     else:
       logger.warn(f"Got empty document for {item.dest}.pdf")
     
     if inteiro_page_content and len(inteiro_page_content) > 100:
       self._output.save_from_contents(
-        filepath=f"{item.dest}_B.html",#content_from_url.dest,
+        filepath=f"{item.dest}_B.html",
         contents=inteiro_page_content,
-        content_type='text/html')#content_from_url.content_type)
+        content_type='text/html')
 
     
   @utils.retryable()
@@ -93,11 +92,9 @@ class TRF1Downloader:
     try_pje = False
     
     pdf_content, inteiro_page_content = '',''
-    # meta_hash = utils.get_content_hash(row, [{'name':'td'}])
     
     acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text if row.find(attrs={'class':"titulo_doc"}) else ''
     title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
-    # process_number = ''.join(char for char in acordao_titulo if char.isdigit())
     process_link = row.find('a',text='Acesse aqui')
     PUB_DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
     try:
@@ -110,9 +107,7 @@ class TRF1Downloader:
       logger.warn(f'Process link not available for {title}')
       try_pje=True
     
-    # to_download = []
-
-
+    #ARQUIVO TRF1
     if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
       def order_candidate(candidate):
@@ -133,7 +128,6 @@ class TRF1Downloader:
       table = soup.find('table')
       if table:
         rows = soup.find_all('tr')
-        # for row in rows:
         candidates = [
           {
             'name':row.find_all('td')[0].text,
@@ -142,7 +136,6 @@ class TRF1Downloader:
             } for row in rows[1:]
         ]
         candidates = [candidate for candidate in candidates if any(not char.isspace() for char in candidate['date'])]
-        # date_links = soup.find_all(href=re.compile(r'.*\.doc'),text=re.compile(r'\d{2}\/\d{2}\/\d{4}'))
         pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
         dates = [link['date'] for link in candidates if re.search(DATE_PATTERN, link['date'])]
         nearest_date = self.get_nearest_date(dates, pub_date_string)
@@ -161,6 +154,7 @@ class TRF1Downloader:
         logger.info(f"Trying to fetch {title} on PJE...")
         try_pje=True
 
+    # PJE
     if try_pje or 'ConsultaPublica/listView.seam' in process_link:
         browser = browsers.FirefoxBrowser(headless=not DEBUG)
         success = self.search_trf1_process_documents(browser, title)
@@ -362,30 +356,16 @@ def trf1_download_task(items, output_uri):
     to_download = []
 
     for item in items:
-      # pdf_content, inteiro_page_content = TRF1Downloader.download_files(item)
       to_download.append(
         base.Content(
           content=item['row'], 
           dest=item['dest'])
         )
-  
-      # if inteiro_page_content:
-      #   to_download.append(
-      #         base.Content(content=inteiro_page_content, 
-      #         dest=f"{item['dest']}_B.html",
-      #       content_type='text/html'))
-
-      # if pdf_content:
-      #     to_download.append(
-      #         base.Content(content=pdf_content,  
-      #         dest=f"{item['dest']}.pdf",
-      #         content_type ='application/pdf'))
       downloader.download(to_download, pbar)
 
 
 def trf1_download(items, output_uri, pbar):
   output     = utils.get_output_strategy_by_path(path=output_uri)
-  # client     = TRF1Client()
   downloader = TRF1Downloader(output=output)
   to_download = []
   for n, item in enumerate(items):
@@ -395,18 +375,6 @@ def trf1_download(items, output_uri, pbar):
           dest=item['dest'],
           content_type='text/html')
         )
-    # pdf_content, inteiro_page_content = TRF1Downloader.download_files(item['row'])
-    # if inteiro_page_content:
-    #   to_download.append(
-    #         base.Content(content=inteiro_page_content, 
-    #         dest=f"{item['dest']}_B.html",
-    #       content_type='text/html'))
-
-    # if pdf_content:
-    #     to_download.append(
-    #         base.Content(content=pdf_content,  
-    #         dest=f"{item['dest']}.pdf",
-    #         content_type ='application/pdf'))
   downloader.download(to_download, pbar)
 
 @cli.command(name='trf1-pdf')
@@ -454,25 +422,3 @@ def trf1_pdf_command(input_uri, prefix, dry_run, local, count):
     executor.shutdown()
     if len(batch):
       trf1_download(batch, input_uri, pbar)
-
-  # else:
-  #   total = 0
-  #   for pending in list_pending_pdfs(output._bucket_name, prefix):
-  #     total += 1
-  #     batch.append(pending)
-  #     if len(batch) >= 100:
-  #       print("Task", trf1_download_task.delay(batch, input_uri))
-  #       batch = []
-  #   if len(batch):
-  #     print("Task", trf1_download_task.delay(batch, input_uri))
-  #   print('Total files to download', total)
-
-
-# def get_nearest_date(items, pivot):
-#           pivot = pendulum.from_format(pivot, TRF1_DATE_FORMAT)
-#           if items and pivot:
-#               return min([pendulum.from_format(item, TRF1_DATE_FORMAT) for item in items],
-#                       key=lambda x: abs(x - pivot))
-#           else:
-#               return ''
-
