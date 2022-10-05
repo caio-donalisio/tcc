@@ -1,30 +1,64 @@
-######
-image: docker:git
+default:
+  tags:
+    - docker
 
 variables:
-  IMAGE: inspira-crawlers  
-  GCR_IMAGE: gcr.io/inspira-development/inspira-crawlers
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_IMAGE: "us-docker.pkg.dev/inspira-registry/docker/data/crawlers"
 
-services:
-  - docker:dind
+stages:
+  - build
+  - deploy
+  - release
+
+.configure-gcloud: &configure-gcloud
+  - echo $GCP_SERVICE_KEY > gcloud-service-key.json # Google Cloud service accounts
+  - gcloud auth activate-service-account --key-file gcloud-service-key.json
 
 build:
+  image: google/cloud-sdk
+  services:
+    - docker:19.03.8-dind
   stage: build
-  before_script:
-    - echo $GOOGLE_CLOUD_ACCOUNT | docker login -u _json_key --password-stdin https://gcr.io
-  script:
-    - |
-      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
-        tag=":latest"
-        echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = 'latest'"
-      else
-        tag=":$CI_COMMIT_REF_SLUG"
-        echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
-      fi
-    - docker build -t "$IMAGE${tag}" .
-    - docker tag "$IMAGE${tag}" $GCR_IMAGE${tag}
-    - docker push $GCR_IMAGE${tag}
   rules:
-    - if: $CI_COMMIT_BRANCH
-      exists:
-        - Dockerfile
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+  before_script:
+    - *configure-gcloud
+  script:
+    - gcloud auth configure-docker us-docker.pkg.dev
+    - docker pull ${DOCKER_IMAGE}:latest || true
+    - docker build -t ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG} .
+    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG}
+
+retag:
+  stage: deploy
+  image: google/cloud-sdk
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        CR_DOCKER_FROM_TAG: $CI_COMMIT_SHORT_SHA
+        CR_DOCKER_TAG: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      variables:
+        CR_DOCKER_FROM_TAG: $CI_COMMIT_SHORT_SHA
+        CR_DOCKER_TAG: latest
+  before_script:
+    - *configure-gcloud
+  script:
+    - gcloud container images add-tag ${DOCKER_IMAGE}:${CR_DOCKER_FROM_TAG} ${DOCKER_IMAGE}:${CR_DOCKER_TAG}
+
+# ------------------
+# RELEASE
+# ------------------
+release:
+  image: node:16-buster-slim
+  stage: release
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates
+    - npm install -g semantic-release @semantic-release/gitlab semantic-release-slack-bot
+  script:
+    - semantic-release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
