@@ -12,6 +12,8 @@ from crawlers.trf1.trf1_crawler import trf1_task
 from crawlers.trf2.trf2_crawler import trf2_task
 from crawlers.trf3.trf3_crawler import trf3_task
 from crawlers.trf4.trf4_crawler import trf4_task
+from crawlers.trf5.trf5_crawler import trf5_task
+from crawlers.trf5.trf5_pdf import trf5_download_task
 from crawlers.stf.stf_api_crawler import stf_task
 from crawlers.tjsp.tjsp_crawler import tjsp_task
 from crawlers.tjsp.tjsp_pdf import tjsp_download_task
