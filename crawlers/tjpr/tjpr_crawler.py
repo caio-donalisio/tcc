@@ -213,9 +213,10 @@ class TJPRChunk(base.Chunk):
             for act in self.get_acts():
                 act_id = self.get_act_id(act)
                 publication_date = self.get_publication_date(act)
-                ementa_hash = utils.get_content_hash(act, [{'name':'div','id':re.compile(r'ementa.*')}])
-                pdf_bytes, pdf_hash = self.download_pdf(act)
-                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{ementa_hash}_{pdf_hash}'
+                pdf_bytes, _ = self.download_pdf(act)
+                system_code = act.find(id=re.compile(r'integra_\d{7,}')) or act.find(id=re.compile(r'ementa\d{7,}'))
+                system_code = ''.join(char  for char in system_code['id'] if char.isdigit())
+                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{system_code}'
 
                 if pdf_bytes:
                     to_download.append(base.Content(
