@@ -28,6 +28,10 @@ spec:
         env:
           - name: CAPTCHA_API_KEY
             value: "${CAPTCHA_API_KEY}"
+          - name: TJSP_USERNAME
+            value: "${TJSP_USERNAME}"
+          - name: TJSP_PASSWORD
+            value: "${TJSP_PASSWORD}"
           - name: CELERY_BROKER_URL
             value: "${CELERY_BROKER_URL}"
           - name: CELERY_BACKEND_URL
