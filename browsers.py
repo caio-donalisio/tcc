@@ -59,6 +59,10 @@ class FirefoxBrowser:
   def page_source(self):
     return self.driver.page_source
 
+  def bsoup(self, parser='html.parser'):
+    from bs4 import BeautifulSoup
+    return BeautifulSoup(self.page_source(), parser)
+
   def click(self, element, wait_for=(By.TAG_NAME, 'body')):
     xpath = get_soup_xpath(element)
     self.driver.find_element(By.XPATH, xpath).click()

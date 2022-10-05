@@ -1,5 +1,5 @@
 import click
-# from app import cli
+# Quick CLI to trigger crawlers indefinitely
 
 @click.group()
 def cli():
@@ -22,3 +22,5 @@ def repeat(court,start_date,end_date, local):
         sleep(15)
 
 cli()
+
+#python repeater.py repeat --court tjmg --start-date 2019-05-01 --end-date 2019-05-31
