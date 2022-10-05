@@ -3,7 +3,7 @@ import pendulum
 import requests
 import os
 
-API_KEY = '4CAY5SBFO1GLCR3HMPS8PHGJXF7PW1TV7E2KOTLB'#######
+API_KEY = os.getenv('CAPTCHA_API_KEY')
 
 
 @utils.retryable(max_retries=9, sleeptime=20)
