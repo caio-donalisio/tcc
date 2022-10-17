@@ -11,7 +11,7 @@ import requests
 from random import random
 from time import sleep
 from mimetypes import guess_extension
-
+import datetime
 
 
 DEFAULT_HEADERS = {
@@ -89,7 +89,7 @@ class TSTCollector(base.ICollector):
         self.filters = filters
 
     def count(self,filter_=None):
-        if filter_: 
+        if filter_:
             return self.client.count(filter_)
         else:
             return self.client.count(self.filters)
@@ -113,7 +113,7 @@ class TSTCollector(base.ICollector):
             )
         else:
             self.filters = [self.filters]
-        
+
         for filter_ in self.filters:
             total = self.count(filter_)
             pages = math.ceil(total/filter_.get('rows'))
@@ -269,8 +269,16 @@ def tst_task(**kwargs):
             .run(snapshot=snapshot)
 
 @cli.command(name='tst')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
