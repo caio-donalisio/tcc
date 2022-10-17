@@ -152,4 +152,5 @@ operadriver.exe
 *.wav
 .celerybeat-schedule
 
-/.idea
+.idea
+credential.json

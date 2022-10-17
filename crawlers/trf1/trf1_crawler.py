@@ -6,8 +6,7 @@ import utils
 from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
-import requests
-from bs4 import BeautifulSoup
+import datetime
 import re
 import re
 
@@ -48,17 +47,17 @@ class TRF1Client:
         from selenium.webdriver.support.ui import WebDriverWait
         import time
         self.browser.wait_for_element((By.ID, "formulario:ckbAvancada")).click()
-        
+
         #SELECT DATA DE PUBLICAÇÃO
-        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'ui-icon-triangle-1-s'))).click() 
+        WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME,'ui-icon-triangle-1-s'))).click()
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID,'formulario:combo_tipo_data_1'))).click()
-        
+
         #INSERT DATE RANGE
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:j_idt37_input"))).send_keys(pendulum.parse(filters.get('start_date')).format(TRF1_DATE_FORMAT))
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, "formulario:j_idt39_input"))).send_keys(pendulum.parse(filters.get('end_date')).format(TRF1_DATE_FORMAT))
-       
+
         captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-        
+
         #CLICK 'PESQUISAR'
         self.browser.driver.find_element_by_id('formulario:actPesquisar').click()
         self.browser.driver.implicitly_wait(10)
@@ -66,7 +65,7 @@ class TRF1Client:
         #SELECT NUMBER OF PROCESS PER PAGE
         WebDriverWait(self.browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'formulario:tabelaDocumentos:j_id23')))
         self.browser.select_by_id(field_id='formulario:tabelaDocumentos:j_id23', option=FILES_PER_PAGE)
-        
+
         self.browser.driver.implicitly_wait(10)
 
     @utils.retryable(max_retries=9, sleeptime=20)
@@ -94,11 +93,11 @@ class TRF1Client:
         while not self.page_searched:
             self.setup()
             self.make_search(filters)
-        
-        rows = True     
+
+        rows = True
         while get_current_page() != page:
             self.browser.driver.implicitly_wait(20)
-            if not self.page_searched or not rows: 
+            if not self.page_searched or not rows:
                 self.make_search(filters)
             self.browser.driver.implicitly_wait(20)
             current_page = get_current_page()
@@ -151,8 +150,8 @@ class TRF1Chunk(base.Chunk):
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def rows(self):
-        #REFACTOR 
-        from crawlers.trf1 import trf1_pdf 
+        #REFACTOR
+        from crawlers.trf1 import trf1_pdf
 
 
         DATE_PATTERN = r'Data da publicação[^\d]*(?P<date>(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4}))'
@@ -173,20 +172,20 @@ class TRF1Chunk(base.Chunk):
             base_path = f"{base_dir}/{filename}"
 
             to_download.append(
-                base.Content(content=str(row), 
+                base.Content(content=str(row),
                 dest=f"{base_path}_A.html",
                 content_type='text/html'))
-            
+
             if inteiro_page_content:
                 to_download.append(
-                     base.Content(content=inteiro_page_content, 
+                     base.Content(content=inteiro_page_content,
                      dest=f"{base_path}_B.html",
                     content_type='text/html'))
 
             if pdf_content:
                 to_download.append(
-                    base.Content(content=pdf_content,  
-                    dest=f"{base_path}.pdf", 
+                    base.Content(content=pdf_content,
+                    dest=f"{base_path}.pdf",
                     content_type ='application/pdf'))
 
             yield to_download
@@ -224,8 +223,16 @@ def trf1_task(**kwargs):
 
 
 @cli.command(name='trf1')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date',    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',

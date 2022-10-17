@@ -6,7 +6,7 @@ import pendulum
 import click
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
-
+import datetime
 from app import cli, celery
 
 from logconfig import logger_factory, setup_cloud_logger
@@ -174,8 +174,16 @@ def tjba_task(start_date, end_date, output_uri):
 
 
 @cli.command(name='tjba')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

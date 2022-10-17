@@ -5,6 +5,8 @@ import pendulum
 import utils
 import logging
 import random
+import datetime
+
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
@@ -176,8 +178,16 @@ def stf_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 
 
 @cli.command(name='stf')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)

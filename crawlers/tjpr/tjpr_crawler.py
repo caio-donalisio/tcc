@@ -8,6 +8,7 @@ import click
 from app import cli, celery
 import requests
 from urllib.parse import parse_qsl, urlsplit
+import datetime
 
 
 logger = logger_factory('tjpr')
@@ -91,7 +92,7 @@ class TJPRClient:
                 count = 0
             counts.append(count)
         return max(counts, key=lambda n: counts.count(n))
-    
+
     def count_periods(self,filters,unit='months'):
         return sum(1 for _ in utils.timely(
                     filters.get('start_date'),
@@ -174,12 +175,12 @@ class TJPRChunk(base.Chunk):
         self.page = page
         self.client = client
         self.count_only = count_only
-    
+
     def get_act_id(self, soup):
                 act_id = soup.find('b',text=re.compile(r'.*Processo.*')).next.next
                 act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
                 return act_id
-        
+
     def get_publication_date(self, soup):
         publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
         publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
@@ -230,8 +231,8 @@ class TJPRChunk(base.Chunk):
                     content=str(act),
                     dest=f'{base_path}.html',
                     content_type='text/html'))
-                
-                
+
+
                 yield to_download
 
     @utils.retryable()
@@ -248,12 +249,12 @@ class TJPRChunk(base.Chunk):
         pdf_link = [link for link in act.find_all('a') if link.next.next in ['Carregar documento','PDF assinado']]
 
         if pdf_link:
-            pdf_link = pdf_link.pop()    
+            pdf_link = pdf_link.pop()
             PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
             relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
             url = f"{BASE_URL}{relative_pdf_url}"
             response = requests.get(url)
-            
+
             if is_zip(pdf_link):
                 try:
                     zip_obj = zipfile.ZipFile(BytesIO(response.content))
@@ -323,13 +324,21 @@ def tjpr_task(**kwargs):
             .run(snapshot=snapshot)
 
 @cli.command(name=COURT_NAME)
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
     default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--count-only', 
+@click.option('--count-only',
     default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def tjpr_command(**kwargs):
   # VALIDATE URI

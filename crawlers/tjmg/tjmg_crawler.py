@@ -8,7 +8,7 @@ import requests
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
-
+import datetime
 import time
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -347,9 +347,9 @@ class TJMGChunk(base.Chunk):
             pub_date = date_label.find_next_sibling('div').text
             pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
-            
+
             onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})
-            if onclick_attr: 
+            if onclick_attr:
                 onclick_attr = onclick_attr['onclick']
                 pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
                 pdf_url = f'{BASE_URL}/{pdf_url}'
@@ -464,8 +464,16 @@ def tjmg_task(**kwargs):
 
 
 @cli.command(name='tjmg')
-@click.option('--start-date', prompt=True,   help='Format YYYY-mm-dd')
-@click.option('--end-date', prompt=True,   help='Format YYYY-mm-dd')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--split-tasks',
                 default='days', help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')

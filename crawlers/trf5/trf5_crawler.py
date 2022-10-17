@@ -4,8 +4,7 @@ import json
 import pendulum
 import celery
 import utils
-import time
-import os
+import datetime
 from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
@@ -13,7 +12,6 @@ import requests
 import re
 import browsers
 from selenium.webdriver.common.by import By
-from bs4 import BeautifulSoup
 
 logger = logger_factory('trf5')
 
@@ -33,7 +31,7 @@ DEFAULT_HEADERS = {
     'sec-ch-ua': '"Microsoft Edge";v="105", " Not;A Brand";v="99", "Chromium";v="105"',
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"Windows"',
-}              
+}
 
 def merged_with_default_filters(start_date, end_date, skip_full):
     return {
@@ -42,7 +40,7 @@ def merged_with_default_filters(start_date, end_date, skip_full):
         'columns[0][name]': '',
         'columns[0][searchable]': 'true',
         'columns[0][orderable]': 'false',
-        'columns[0][search][value]': '',    
+        'columns[0][search][value]': '',
         'columns[0][search][regex]': 'false',
         'start': '0',
         'length': '10',
@@ -146,19 +144,19 @@ class TRF5Chunk(base.Chunk):
 
             base_path   = f'{session_at.year}/{session_at.month:02d}'
             doc_base_path = f"{base_path}/doc_{numero}_{codigo}"
-            
+
             dest_record = f"{doc_base_path}.json"
             to_download = []
-            
+
             to_download.append(base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json'))
 
             if not self.filters.get('skip_full'):
                 report = trf5_pdf.TRF5Downloader()._get_report_url(record)
-                
+
                 if report.get('url') is None:
                     logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
-                
+
                 if report.get('url'):
                     if 'html' in report.get('content_type'):
                         dest_report = f"{doc_base_path}.html"
@@ -167,7 +165,7 @@ class TRF5Chunk(base.Chunk):
 
                 to_download.append(base.ContentFromURL(src=report['url'],dest=dest_report,
                     content_type=report['content_type']))
-            
+
             yield to_download
 
 @celery.task(queue='crawlers.trf5', default_retry_delay=5 * 60,
@@ -192,7 +190,7 @@ def trf5_task(**kwargs):
         }
 
         collector = TRF5Collector(
-            client=TRF5Client(), 
+            client=TRF5Client(),
             filters=filters,
             browser=browsers.FirefoxBrowser(headless=True)
         )
@@ -209,8 +207,16 @@ def trf5_task(**kwargs):
 
 
 @cli.command(name='trf5')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

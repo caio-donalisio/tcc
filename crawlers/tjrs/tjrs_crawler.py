@@ -10,6 +10,7 @@ from app import cli, celery
 import requests
 import urllib
 import base64
+import datetime
 
 logger = logger_factory('tjrs')
 
@@ -155,7 +156,7 @@ class TJRSChunk(base.Chunk):
 
                     report_url=f'https://www.tjrs.jus.br/site_php/consulta/download/exibe_documento_att.php?numero_processo={numero}&ano={ano}&codigo={codigo}'
                     dest_report = f"{base_path}/doc_{numero}_{codigo}.doc"
-                
+
                     yield [
                         base.Content(content=json.dumps(record),dest=dest_record,
                             content_type='application/json'),
@@ -186,7 +187,7 @@ class TJRSChunk(base.Chunk):
                     yield [
                         base.Content(content=json.dumps(record),dest=dest_record,
                             content_type='application/json'),
-                        *extra_contents                    
+                        *extra_contents
                     ]
 
 @celery.task(queue='crawlers.tjrs', default_retry_delay=5 * 60,
@@ -223,8 +224,16 @@ def tjrs_task(**kwargs):
 
 
 @cli.command(name='tjrs')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
+@click.option('--end-date'  ,
+  default=str(datetime.date.today()),
+  help='Format YYYY-MM-DD.',
+  type=click.DateTime(formats=["%Y-%m-%d"])
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

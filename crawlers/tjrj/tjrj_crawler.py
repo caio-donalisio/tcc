@@ -321,8 +321,16 @@ def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
 
 
 @cli.command(name='tjrj')
-@click.option('--start-year', prompt=True,   help='Format YYYY.')
-@click.option('--end-year'  , prompt=True,   help='Format YYYY.')
+@click.option('--start-year',
+  default=str((datetime.date.today() - datetime.timedelta(weeks=1)).year),
+  help='Format YYYY.',
+  type=click.DateTime(formats=["%Y"])
+)
+@click.option('--end-year'  ,
+  default=str(datetime.date.today().year),
+  help='Format YYYY.',
+  type=click.DateTime(formats=["%Y"])
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
