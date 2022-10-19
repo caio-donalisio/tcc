@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trf4-crawler
+spec:
+  schedule: "10 3 */2 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: crawler
+            image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:latest
+            imagePullPolicy: Always
+            command: [ "/bin/bash", "-c" ]
+            args:
+            - python commands.py trf4 --output-uri gs://inspira-production-buckets-trf4
+            envFrom:
+            - secretRef:
+                name: crawler-env
+            volumeMounts:
+            - mountPath: "/etc/gcloud"
+              name: gcp-credentials
+          restartPolicy: Never
+          volumes:
+          - name: gcp-credentials
+            secret:
+              secretName: crawlers-credentials
