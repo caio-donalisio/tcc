@@ -237,7 +237,7 @@ class TRF3Handler(base.ContentHandler):
         super(TRF3Handler, self).__init__(output)
         self.headers = headers
 
-    @utils.retryable(max_retries=9, sleeptime=20)
+    @utils.retryable(max_retries=9, sleeptime=10)
     def _handle_url_event(self, event):
 
         if self.output.exists(event.dest):

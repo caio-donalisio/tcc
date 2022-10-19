@@ -321,7 +321,7 @@ def get_pdf_hash(pdf_content:bytes,
         pdf_hash = '0' * length
     return pdf_hash
 
-@retryable()
+@retryable(max_retries=9)
 def get_response(logger, session, url, headers):
     """Gets response and checks if response object has status code 200, throws Retry exception if not"""
     response = session.get(
