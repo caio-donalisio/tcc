@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: trf3-crawler
+  namespace: crawlers
 spec:
   schedule: "10 3 */2 * *"
   jobTemplate:
@@ -10,8 +11,8 @@ spec:
         spec:
           containers:
           - name: crawler
-            image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:latest
-            imagePullPolicy: Always
+            image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
+            imagePullPolicy: IfNotPresent
             command: [ "/bin/bash", "-c" ]
             args:
             - python commands.py trf3 --output-uri gs://inspira-production-buckets-trf3
