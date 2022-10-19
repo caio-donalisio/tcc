@@ -33,6 +33,44 @@ from fake_useragent import UserAgent
 from logconfig import logger
 
 
+class PleaseRetryException(Exception):
+    pass
+
+
+def retryable(*, max_retries=3, sleeptime=5,
+              ignore_if_exceeds=False,
+              retryable_exceptions=(
+                  requests.exceptions.ConnectionError,
+                  requests.exceptions.ReadTimeout,
+                  requests.exceptions.ChunkedEncodingError,
+                  http.client.HTTPException,
+                  TimeoutException,
+                  PleaseRetryException)):
+    assert max_retries > 0 and sleeptime > 0
+
+    @wrapt.decorator
+    def wrapper(wrapped, instance, args, kwargs):
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                val = wrapped(*args, **kwargs)
+                if retry_count > 0:
+                    logger.info(f'Succeed after {retry_count} retries.')
+                return val
+            except retryable_exceptions as ex:
+                retry_count = retry_count + 1
+                if retry_count > max_retries:
+                    logger.fatal(
+                        f'Retry count exceeded (>{max_retries})')
+                    raise ex
+                logger.warn(
+                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
+                time.sleep(sleeptime * retry_count)
+        if not ignore_if_exceeds:
+            raise Exception(f'Retry count exceeded (>{max_retries})')
+
+    return wrapper
+
 class GSOutput:
     def __init__(self, bucket_name, prefix=''):
         self._bucket_name = bucket_name
@@ -50,6 +88,7 @@ class GSOutput:
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         return blob.exists()
 
+    @retryable()
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         blob.upload_from_string(contents,
@@ -246,43 +285,9 @@ def pdf_content_file_by_url(pdf_url):
             f'Got {response.status_code} fetching {pdf_url} -- expected `200`.')
 
 
-class PleaseRetryException(Exception):
-    pass
 
 
-def retryable(*, max_retries=3, sleeptime=5,
-              ignore_if_exceeds=False,
-              retryable_exceptions=(
-                  requests.exceptions.ConnectionError,
-                  requests.exceptions.ReadTimeout,
-                  requests.exceptions.ChunkedEncodingError,
-                  http.client.HTTPException,
-                  TimeoutException,
-                  PleaseRetryException)):
-    assert max_retries > 0 and sleeptime > 0
 
-    @wrapt.decorator
-    def wrapper(wrapped, instance, args, kwargs):
-        retry_count = 0
-        while retry_count < max_retries:
-            try:
-                val = wrapped(*args, **kwargs)
-                if retry_count > 0:
-                    logger.info(f'Succeed after {retry_count} retries.')
-                return val
-            except retryable_exceptions as ex:
-                retry_count = retry_count + 1
-                if retry_count > max_retries:
-                    logger.fatal(
-                        f'Retry count exceeded (>{max_retries})')
-                    raise ex
-                logger.warn(
-                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
-                time.sleep(sleeptime * retry_count)
-        if not ignore_if_exceeds:
-            raise Exception(f'Retry count exceeded (>{max_retries})')
-
-    return wrapper
 
 def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9', 'ISO-8859-1']):
     for encoding in possible_encodings:
