@@ -139,7 +139,7 @@ class TRF3Chunk(base.Chunk):
         self.filters = filters
         self.client = client
 
-    @utils.retryable(max_retries=9, sleeptime=20)
+    @utils.retryable(max_retries=9, sleeptime=10)
     def rows(self):
         self.client.fetch(self.filters)
         for proc_number in range(
@@ -147,14 +147,13 @@ class TRF3Chunk(base.Chunk):
             1 + min(self.total, ((self.page) * FILES_PER_PAGE))
         ):
             to_download = []
-
-            response = self.client.session.get(
-                f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
+          
+            response = utils.get_response(
+                logger=logger, 
+                url=f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', 
+                headers=DEFAULT_HEADERS, 
+                session=self.client.session)
             
-            if response.status_code != 200:
-                logger.warn(f"Response <{response.status_code}> - {response.url}")
-                raise utils.PleaseRetryException()
-
             soup = BeautifulSoup(response.text, features='html5lib')
 
             #THIS CHECK REQUIRES FURTHER TESTING
@@ -198,6 +197,7 @@ class TRF3Chunk(base.Chunk):
             length=40)
 
             dest_path = f'{session_at.year}/{session_at.month:02d}/{session_at.day:02d}_{processo_num}_{content_hash}.html'
+
 
             to_download.append(base.Content(
                 content=BeautifulSoup(
@@ -258,8 +258,8 @@ class TRF3Handler(base.ContentHandler):
                     contents=response.content,
                     content_type=content_type)
             else:
-                logger.warn(
-                    f"Response <{response.status_code}> - {response.url}")
+                logger.warn(f"Response <{response.status_code}> - {response.url}")
+                raise utils.PleaseRetryException()
         except requests.exceptions.Timeout as e:
             logger.error(f"Timeout Error: {e} - {event.src}")
         except requests.exceptions.ConnectionError as e:

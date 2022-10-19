@@ -284,7 +284,6 @@ def retryable(*, max_retries=3, sleeptime=5,
 
     return wrapper
 
-@retryable()
 def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9', 'ISO-8859-1']):
     for encoding in possible_encodings:
         def outter(func):
@@ -317,7 +316,16 @@ def get_pdf_hash(pdf_content:bytes,
         pdf_hash = '0' * length
     return pdf_hash
 
-
+@retryable()
+def get_response(logger, session, url, headers):
+    """Gets response and checks if response object has status code 200, throws Retry exception if not"""
+    response = session.get(
+        url=url, headers=headers)
+    if response.status_code != 200:               
+        logger.warn(f"Response <{response.status_code}> - {response.url}")
+        raise PleaseRetryException()    
+    else:
+        return response
 
 def get_soup_xpath(element):
     """Returns the XPATH for a given bs4 element"""
