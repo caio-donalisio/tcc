@@ -21,7 +21,7 @@ from functools import wraps
 import wrapt
 from urllib.parse import parse_qsl, urlencode, urlsplit
 from selenium.common.exceptions import TimeoutException
-import base    
+import base
 import bs4
 from itertools import chain
 from typing import List,Dict
@@ -32,6 +32,17 @@ from fake_useragent import UserAgent
 
 from logconfig import logger
 
+CURRENT_TIME = pendulum.now()
+class DefaultDates:
+    NOW = CURRENT_TIME
+    TWO_YEARS_BACK = CURRENT_TIME.subtract(days=365 * 2)
+    BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK = min(pendulum.datetime(year=CURRENT_TIME.year, month=1, day=1), CURRENT_TIME.subtract(days=30 * 6))
+    THREE_MONTHS_BACK = CURRENT_TIME.subtract(days=30 * 3)
+    TWO_MONTHS_BACK = CURRENT_TIME.subtract(days=30 * 2)
+    BEGINNING_OF_MONTH = CURRENT_TIME.set(day=1)
+    LAST_YEAR = CURRENT_TIME.subtract(days=365).set(month=1, day=1)
+    LAST_WEEK = CURRENT_TIME.subtract(days=7)
+    BEGINNING_OF_MONTH_OR_LAST_WEEK = min(CURRENT_TIME.subtract(days=7), CURRENT_TIME.set(day=1))
 
 class GSOutput:
     def __init__(self, bucket_name, prefix=''):
@@ -148,7 +159,7 @@ def convert_doc_to_pdf(bytes, container_url):
         return response.content
     else:
         logger.warn('Could not convert doc to pdf')
-        
+
 
 def soup_by_content(content):
     return BeautifulSoup(content, features='html.parser')
@@ -166,16 +177,16 @@ def extract_digits(text:str):
 
     Returns:
         str: String containing digits only
-    """    
+    """
 
     import re
 
     return re.sub(r'[^\d]', '',  text)
-    
-    
+
+
 
 def get_content_hash(
-    soup: bs4.BeautifulSoup, 
+    soup: bs4.BeautifulSoup,
     tag_descriptions: List[Dict],
     length=10):
     '''
@@ -190,7 +201,7 @@ def get_content_hash(
     return hashlib.sha1(content_string.encode('utf-8')).hexdigest()[:length]
 
 def get_count_filepath(
-    court_name:str, 
+    court_name:str,
     start_date: pendulum.datetime,
     end_date: pendulum.datetime,
     filepath=None):
@@ -299,9 +310,9 @@ def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9',
         return outter
 
 @try_multiple_encodings()
-def get_pdf_hash(pdf_content:bytes, 
+def get_pdf_hash(pdf_content:bytes,
     encoding:str,
-    remove_whitespace=True, 
+    remove_whitespace=True,
     length=10):
 
     from io import BytesIO

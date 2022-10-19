@@ -11,7 +11,6 @@ from bs4 import BeautifulSoup
 import re
 import hashlib
 from itertools import chain
-import re
 
 DEFAULT_HEADERS = {
     'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',
@@ -150,7 +149,7 @@ class TRF3Chunk(base.Chunk):
 
             response = self.client.session.get(
                 f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}', headers=DEFAULT_HEADERS)
-            
+
             if response.status_code != 200:
                 logger.warn(f"Response <{response.status_code}> - {response.url}")
                 raise utils.PleaseRetryException()
@@ -171,7 +170,7 @@ class TRF3Chunk(base.Chunk):
 
             if file_is_error(soup):
                 logger.warn(
-                (f"Server responded error file - status_code={response.status_code} " 
+                (f"Server responded error file - status_code={response.status_code} "
                 f"hash={self.hash} page={self.page} number={proc_number}" ))
                 raise utils.PleaseRetryException()
 
@@ -300,8 +299,14 @@ def trf3_task(**kwargs):
 
 
 @cli.command(name='trf3')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date',    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',

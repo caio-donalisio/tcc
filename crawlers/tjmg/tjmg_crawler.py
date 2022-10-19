@@ -8,7 +8,6 @@ import requests
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
-
 import time
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -335,7 +334,7 @@ class TJMGChunk(base.Chunk):
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
             error_message = soup.find('p',id='localizacao')
             if error_message and error_message.text == 'Sistema Indisponível':
-                logger.warn(f'Error page for {url=}')
+                logger.warn(f'Error page for {url}')
                 continue
 
             date_label = soup.find('div', text='Data da publicação da súmula')
@@ -347,9 +346,9 @@ class TJMGChunk(base.Chunk):
             pub_date = date_label.find_next_sibling('div').text
             pub_date = pendulum.from_format(pub_date, TJMG_DATE_FORMAT)
 
-            
+
             onclick_attr = soup.find('input', {"name": "inteiroTeorPDF"})
-            if onclick_attr: 
+            if onclick_attr:
                 onclick_attr = onclick_attr['onclick']
                 pdf_url = '='.join(onclick_attr.split('=')[1:]).strip("/'")
                 pdf_url = f'{BASE_URL}/{pdf_url}'
@@ -464,8 +463,14 @@ def tjmg_task(**kwargs):
 
 
 @cli.command(name='tjmg')
-@click.option('--start-date', prompt=True,   help='Format YYYY-mm-dd')
-@click.option('--end-date', prompt=True,   help='Format YYYY-mm-dd')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--split-tasks',
                 default='days', help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')

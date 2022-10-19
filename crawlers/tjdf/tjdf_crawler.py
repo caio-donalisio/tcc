@@ -29,7 +29,7 @@ DEFAULT_HEADERS = {
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
                         ' Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67'),
 
-}              
+}
 
 RESULTS_PER_PAGE = 20
 
@@ -135,7 +135,7 @@ class TJDFClient:
                     **get_filters(**filters),
                     'numeroDaPaginaAtual': str(page),
                     'quantidadeDeRegistros': str(RESULTS_PER_PAGE)
-                } 
+                }
             )
 
         except Exception as e:
@@ -181,7 +181,7 @@ class TJDFChunk(base.Chunk):
         self.page = page
         self.client = client
 
-    
+
     def rows(self):
         result = self.client.fetch(self.filters, self.page)
         JUDGMENTS_SELECTOR = "#tabelaResultado > thead ~ tr"
@@ -212,8 +212,8 @@ class TJDFChunk(base.Chunk):
                 yield [
                     base.Content(content=json.dumps(record),dest=dest_record,
                         content_type='application/json'),
-                ]                    
-            else:            
+                ]
+            else:
               yield [
                   base.Content(content=json.dumps(record),dest=dest_record,
                       content_type='application/json'),
@@ -221,7 +221,7 @@ class TJDFChunk(base.Chunk):
                       content_type='application/pdf')
               ]
 
-    
+
 
     def _extract_numero_processo(self, tag):
       for child in tag.find_all('b'):
@@ -261,13 +261,13 @@ class TJDFChunk(base.Chunk):
           field = self._normalize(label.text.strip())
           if field in fields_mappper:
             metadata[f'{fields_mappper.get(field)}'] = value.text.strip()
-      
+
       return metadata
 
 
     def _normalize(self, label):
       return unidecode.unidecode(label.lower().replace(':', '').replace(' ', '_'))
-    
+
 
     def _get_judgment_document_url(self, judgment_id):
       data = {
@@ -283,7 +283,7 @@ class TJDFChunk(base.Chunk):
         match = pattern.search(script.string)
         if match:
           return f'{BASE_URL}/{match.group(1)}'
-      
+
       return None
 
 @celery.task(queue='crawlers.tjdf', default_retry_delay=5 * 60,
@@ -307,7 +307,7 @@ def tjdf_task(**kwargs):
         }
 
         collector = TJDFCollector(
-            client=TJDFClient(), 
+            client=TJDFClient(),
             filters=filters
         )
         handler   = base.ContentHandler(output=output)
@@ -323,8 +323,14 @@ def tjdf_task(**kwargs):
 
 
 @cli.command(name='tjdf')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
