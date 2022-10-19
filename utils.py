@@ -88,7 +88,7 @@ class GSOutput:
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         return blob.exists()
 
-    @retryable()
+    @retryable(max_retries=9)
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         blob.upload_from_string(contents,
