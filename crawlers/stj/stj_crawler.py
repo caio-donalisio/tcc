@@ -4,7 +4,6 @@ import utils
 import pendulum
 import click
 import requests
-
 from app import cli, celery
 
 from logconfig import logger_factory, setup_cloud_logger
@@ -104,20 +103,20 @@ class STJClient:
     soup = utils.soup_by_content(content)
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
-    
+
     if not info:
       assert info is not None
-    
+
     elif info.get_text() == 'Nenhum documento encontrado!':
       count = 0
-    
+
     else:
       match = re.match(r'(\d+\.?\d+)', info.get_text())
       if match:
         count = int(match.group(0).replace('.', ''))
       else:
         count = 0
-    
+
     return count
 
 
@@ -263,8 +262,14 @@ def stj_task(start_date, end_date, output_uri):
 
 
 @cli.command(name='stj')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

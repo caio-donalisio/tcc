@@ -1,9 +1,8 @@
 import json
 import math
 import os
-import random
 import re
-import time
+import datetime
 
 import base
 import pendulum
@@ -545,8 +544,14 @@ def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cac
 
 
 @cli.command(name='tjsp-validate')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--count-pending-pdfs', default=False, help='Count pending pdfs', is_flag=True)
 def tjsp_validate(start_date, end_date, output_uri, count_pending_pdfs):
