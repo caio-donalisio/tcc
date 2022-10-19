@@ -4,7 +4,6 @@ import utils
 import pendulum
 import click
 import requests
-import datetime
 from app import cli, celery
 
 from logconfig import logger_factory, setup_cloud_logger
@@ -264,14 +263,12 @@ def stj_task(start_date, end_date, output_uri):
 
 @cli.command(name='stj')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)

@@ -7,9 +7,6 @@ from logconfig import logger_factory, setup_cloud_logger
 import click
 from app import cli, celery
 import requests
-from urllib.parse import parse_qsl, urlsplit
-import datetime
-
 
 logger = logger_factory('tjpr')
 
@@ -325,14 +322,12 @@ def tjpr_task(**kwargs):
 
 @cli.command(name=COURT_NAME)
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)

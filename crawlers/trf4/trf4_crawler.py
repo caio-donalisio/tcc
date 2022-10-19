@@ -525,15 +525,13 @@ def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
 
 
 @cli.command(name='trf4-seq')
-@click.option('--start',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+@click.option('--start-date',
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
-@click.option('--end'  ,
-  default=str(datetime.date.today()),
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 def trf4_seq_command(start, end, output_uri):

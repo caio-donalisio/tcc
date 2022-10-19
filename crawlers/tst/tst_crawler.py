@@ -11,8 +11,6 @@ import requests
 from random import random
 from time import sleep
 from mimetypes import guess_extension
-import datetime
-
 
 DEFAULT_HEADERS = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
@@ -21,9 +19,7 @@ DEFAULT_HEADERS = {
 }
 DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 
-
 logger = logger_factory('tst')
-
 
 class TSTClient:
 
@@ -270,14 +266,12 @@ def tst_task(**kwargs):
 
 @cli.command(name='tst')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)

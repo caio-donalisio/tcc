@@ -4,14 +4,11 @@ import utils
 import pendulum
 import click
 import requests
-import datetime
 
 from app import cli, celery
 
 from logconfig import logger_factory, setup_cloud_logger
 logger = logger_factory('titsp')
-
-
 
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   return {'__EVENTTARGET': 'ctl00$ConteudoPagina$gdvEntidade',
@@ -178,14 +175,12 @@ def titsp_task(start_date, end_date, output_uri):
 
 @cli.command(name='titsp')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)

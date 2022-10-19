@@ -2,7 +2,6 @@ import base
 import math
 import json
 import pendulum
-import datetime
 import celery
 import utils
 from logconfig import logger_factory, setup_cloud_logger
@@ -142,14 +141,12 @@ def carf_task(**kwargs):
 
 @cli.command(name='carf')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(months=6)),
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)

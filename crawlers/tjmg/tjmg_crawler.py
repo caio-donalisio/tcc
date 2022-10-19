@@ -8,7 +8,6 @@ import requests
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
-import datetime
 import time
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -335,7 +334,7 @@ class TJMGChunk(base.Chunk):
             soup = BeautifulSoup(browser.page_source(), features="html5lib")
             error_message = soup.find('p',id='localizacao')
             if error_message and error_message.text == 'Sistema Indisponível':
-                logger.warn(f'Error page for {url=}')
+                logger.warn(f'Error page for {url}')
                 continue
 
             date_label = soup.find('div', text='Data da publicação da súmula')
@@ -465,14 +464,12 @@ def tjmg_task(**kwargs):
 
 @cli.command(name='tjmg')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--split-tasks',
