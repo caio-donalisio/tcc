@@ -493,14 +493,12 @@ def trf4_task(start_date, end_date, output_uri):
 
 @cli.command(name='trf4')
 @click.option('--start-date',
-  default=str(datetime.date.today() - datetime.timedelta(weeks=1)),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--end-date'  ,
-  default=str(datetime.date.today()),
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
-  type=click.DateTime(formats=["%Y-%m-%d"])
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
@@ -525,11 +523,11 @@ def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
 
 
 @cli.command(name='trf4-seq')
-@click.option('--start-date',
+@click.option('--start',
   default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
 )
-@click.option('--end-date'  ,
+@click.option('--end'  ,
   default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
 )

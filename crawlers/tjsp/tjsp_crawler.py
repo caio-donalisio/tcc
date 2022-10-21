@@ -508,8 +508,14 @@ def tjsp_task_download_from_prev_days(output_uri, max_prev_days=1):
 
 
 @cli.command(name='tjsp')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
