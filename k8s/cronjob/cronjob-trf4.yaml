@@ -5,6 +5,9 @@ metadata:
   namespace: crawlers
 spec:
   schedule: "10 3 */2 * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
   jobTemplate:
     spec:
       template:
@@ -13,9 +16,7 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "/bin/bash", "-c" ]
-            args:
-            - python commands.py trf4 --output-uri gs://inspira-production-buckets-trf4
+            command: [ "python", "commands.py", "trf4", "--output-uri", "gs://inspira-production-buckets-trf4" ]
             envFrom:
             - secretRef:
                 name: crawler-env
