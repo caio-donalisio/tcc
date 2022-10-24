@@ -184,7 +184,7 @@ class TRF3Chunk(base.Chunk):
 
             to_download.append(base.Content(
                 content=BeautifulSoup(
-                    response.text, features='html5lib').encode('latin-1'),
+                    str(soup), features='html5lib').encode('latin-1'),
                 dest=dest_path,
                 content_type='text/html'))
 
