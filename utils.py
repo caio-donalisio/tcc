@@ -44,6 +44,44 @@ class DefaultDates:
     LAST_WEEK = CURRENT_TIME.subtract(days=7)
     BEGINNING_OF_MONTH_OR_LAST_WEEK = min(CURRENT_TIME.subtract(days=7), CURRENT_TIME.set(day=1))
 
+class PleaseRetryException(Exception):
+    pass
+
+
+def retryable(*, max_retries=3, sleeptime=5,
+              ignore_if_exceeds=False,
+              retryable_exceptions=(
+                  requests.exceptions.ConnectionError,
+                  requests.exceptions.ReadTimeout,
+                  requests.exceptions.ChunkedEncodingError,
+                  http.client.HTTPException,
+                  TimeoutException,
+                  PleaseRetryException)):
+    assert max_retries > 0 and sleeptime > 0
+
+    @wrapt.decorator
+    def wrapper(wrapped, instance, args, kwargs):
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                val = wrapped(*args, **kwargs)
+                if retry_count > 0:
+                    logger.info(f'Succeed after {retry_count} retries.')
+                return val
+            except retryable_exceptions as ex:
+                retry_count = retry_count + 1
+                if retry_count > max_retries:
+                    logger.fatal(
+                        f'Retry count exceeded (>{max_retries})')
+                    raise ex
+                logger.warn(
+                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
+                time.sleep(sleeptime * retry_count)
+        if not ignore_if_exceeds:
+            raise Exception(f'Retry count exceeded (>{max_retries})')
+
+    return wrapper
+
 class GSOutput:
     def __init__(self, bucket_name, prefix=''):
         self._bucket_name = bucket_name
@@ -61,6 +99,7 @@ class GSOutput:
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         return blob.exists()
 
+    @retryable(max_retries=9)
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         blob.upload_from_string(contents,
@@ -257,45 +296,10 @@ def pdf_content_file_by_url(pdf_url):
             f'Got {response.status_code} fetching {pdf_url} -- expected `200`.')
 
 
-class PleaseRetryException(Exception):
-    pass
 
 
-def retryable(*, max_retries=3, sleeptime=5,
-              ignore_if_exceeds=False,
-              retryable_exceptions=(
-                  requests.exceptions.ConnectionError,
-                  requests.exceptions.ReadTimeout,
-                  requests.exceptions.ChunkedEncodingError,
-                  http.client.HTTPException,
-                  TimeoutException,
-                  PleaseRetryException)):
-    assert max_retries > 0 and sleeptime > 0
 
-    @wrapt.decorator
-    def wrapper(wrapped, instance, args, kwargs):
-        retry_count = 0
-        while retry_count < max_retries:
-            try:
-                val = wrapped(*args, **kwargs)
-                if retry_count > 0:
-                    logger.info(f'Succeed after {retry_count} retries.')
-                return val
-            except retryable_exceptions as ex:
-                retry_count = retry_count + 1
-                if retry_count > max_retries:
-                    logger.fatal(
-                        f'Retry count exceeded (>{max_retries})')
-                    raise ex
-                logger.warn(
-                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
-                time.sleep(sleeptime * retry_count)
-        if not ignore_if_exceeds:
-            raise Exception(f'Retry count exceeded (>{max_retries})')
 
-    return wrapper
-
-@retryable()
 def try_multiple_encodings(possible_encodings=['utf-8', 'latin-1', 'ISO-8859-9', 'ISO-8859-1']):
     for encoding in possible_encodings:
         def outter(func):
@@ -328,7 +332,16 @@ def get_pdf_hash(pdf_content:bytes,
         pdf_hash = '0' * length
     return pdf_hash
 
-
+@retryable(max_retries=9)
+def get_response(logger, session, url, headers):
+    """Gets response and checks if response object has status code 200, throws Retry exception if not"""
+    response = session.get(
+        url=url, headers=headers)
+    if response.status_code != 200:               
+        logger.warn(f"Response <{response.status_code}> - {response.url}")
+        raise PleaseRetryException()    
+    else:
+        return response
 
 def get_soup_xpath(element):
     """Returns the XPATH for a given bs4 element"""
