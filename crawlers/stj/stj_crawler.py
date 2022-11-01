@@ -105,7 +105,8 @@ class STJClient:
       soup.find('div', {'class':'erroMensagem'})
 
     if not info:
-      assert info is not None
+      logger.warn(f"Missing info on: {content}")
+      raise utils.PleaseRetryException()
 
     elif info.get_text() == 'Nenhum documento encontrado!':
       count = 0
