@@ -138,7 +138,7 @@ class TRF3Chunk(base.Chunk):
         self.filters = filters
         self.client = client
 
-    
+
     @utils.retryable(max_retries=9, sleeptime=10)
     def rows(self):
         self.client.fetch(self.filters)
@@ -147,9 +147,9 @@ class TRF3Chunk(base.Chunk):
             1 + min(self.total, ((self.page) * FILES_PER_PAGE))
         ):
             to_download = []
-          
+
             soup = self.get_page_soup(
-                logger, 
+                logger,
                 url=f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',
                 headers=DEFAULT_HEADERS
                 )
@@ -168,7 +168,7 @@ class TRF3Chunk(base.Chunk):
             session_at = data_julg_div.next_sibling.next_sibling.text.strip()
             session_at = pendulum.from_format(session_at, TRF3_DATE_FORMAT)
 
-            processo_text = self.get_processo_text(soup)  
+            processo_text = self.get_processo_text(soup)
             processo_num = ''.join(char for char in processo_text if char.isdigit())
 
             content_hash = utils.get_content_hash(soup,
@@ -190,11 +190,11 @@ class TRF3Chunk(base.Chunk):
 
             url_page_acordao = soup.find(
                 'a', {'title': 'Exibir a íntegra do acórdão.'}).get('href')
-          
+
             page_acordao_soup = self.get_page_soup(
                 logger, url= url_page_acordao, headers=DEFAULT_HEADERS, processo_text=processo_text
             )
-     
+
             link_date = nearest_date(page_acordao_soup.find_all(
                 'a', text=re.compile('\d{2}/\d{2}/\d{4}')), pivot=pub_date)
 
@@ -214,16 +214,16 @@ class TRF3Chunk(base.Chunk):
                     f'Link not available for full document of: {processo_text}')
 
             yield to_download
-        
+
     def get_processo_text(self, soup):
         return soup.find('h4', text='Processo').next_sibling.next_sibling.text.strip()
 
     @utils.retryable(max_retries=9, sleeptime=10, ignore_if_exceeds=True)
     def get_page_soup(self, logger,url, headers, processo_text=''):
         page_response = utils.get_response(
-            logger=logger, 
-            url=url, 
-            headers=headers, 
+            logger=logger,
+            url=url,
+            headers=headers,
             session=self.client.session)
         page_acordao_soup = BeautifulSoup(page_response.text, features='html5lib')
         self.page_is_error(logger, page_acordao_soup, processo_text)
@@ -307,7 +307,7 @@ def trf3_task(**kwargs):
 
 @cli.command(name='trf3')
 @click.option('--start-date',
-  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
 )
 @click.option('--end-date'  ,
