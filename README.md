@@ -57,7 +57,7 @@ TRF3Chunk(
             )
 ~~~
 
-Um cuidado deve ser tomado para tribunais que inserem processos em datas antigas. Numa data futura, o crawler pode dar como já coletada uma data antiga na qual posteriormente foi inserido um novo processo, conforme o diagrama:
+Um cuidado deve ser tomado para tribunais que inserem processos em datas antigas (tipicamente, quando filtramos por data de julgamento e não de publicação, embora também ocorra para filtros com data de publicação). Numa data futura, o crawler pode dar como já coletada uma data antiga na qual posteriormente foi inserido um novo processo, conforme o diagrama:
 
 ![image-1.png](./image-1.png)
 
