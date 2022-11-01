@@ -37,7 +37,7 @@ Há algumas questões que variam conforme cada tribunal:
     (WIP)
 
 #### Rastreio de progresso
-O rastreio de quais páginas já foram coletadas depende dos arquivos contidos nas pastas `.state` e `.snapshot`, geradas e preenchidas no decorrer da coleta
+O rastreio de quais páginas já foram coletadas depende dos arquivos contidos nas pastas `.state` e `.snapshot`, geradas e preenchidas no decorrer da coleta.
 
 `.state` contém os arquivos que representam uma fração da coleta, os `chunks`. Tipicamente um `chunk` representa uma página.
 
@@ -45,6 +45,7 @@ O rastreio de quais páginas já foram coletadas depende dos arquivos contidos n
 
 Ao coletar um `chunk` (página), o crawler verifica se já existe um `chunk` com os mesmos parâmetros em `.state`. Se houver, a coleta daquela página é dada como ok e pulada.
 
+Exemplo de instanciação de um chunk para o TRF3:
 ~~~
 TRF3Chunk(
                 keys={**self.filters, **{'page': page}},
@@ -55,6 +56,15 @@ TRF3Chunk(
                 client=self.client,
             )
 ~~~
+
+Um cuidado deve ser tomado para tribunais que inserem processos em datas antigas. Numa data futura, o crawler pode dar como já coletada uma data antiga na qual posteriormente foi inserido um novo processo, conforme o diagrama:
+
+![image-1.png](./image-1.png)
+
+Isso pode ser contornado refazendo a coleta do zero.
+
+No futuro idealmente teríamos o controle arquivo a arquivo de quais temos nos nossos buckets e quais não.
+
 
 #### Montando um crawler
     (WIP)
