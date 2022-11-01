@@ -37,7 +37,24 @@ Há algumas questões que variam conforme cada tribunal:
     (WIP)
 
 #### Rastreio de progresso
-    (WIP)
+O rastreio de quais páginas já foram coletadas depende dos arquivos contidos nas pastas `.state` e `.snapshot`, geradas e preenchidas no decorrer da coleta
+
+`.state` contém os arquivos que representam uma fração da coleta, os `chunks`. Tipicamente um `chunk` representa uma página.
+
+`.snapshot` contém os arquivos que representam uma coleta inteira e são gerados após o término da coleta.
+
+Ao coletar um `chunk` (página), o crawler verifica se já existe um `chunk` com os mesmos parâmetros em `.state`. Se houver, a coleta daquela página é dada como ok e pulada.
+
+~~~
+TRF3Chunk(
+                keys={**self.filters, **{'page': page}},
+                prefix='',
+                page=page,
+                total=total,
+                filters=self.filters,
+                client=self.client,
+            )
+~~~
 
 #### Montando um crawler
     (WIP)
