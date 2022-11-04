@@ -10,6 +10,32 @@ Estes arquivos podem vir em formato JSON, PDF, DOC, HTML ou RTF.
 
 Alguns detalhes sobre cada tribunal podem ser encontrados em: https://docs.google.com/spreadsheets/d/1-J6Ll5PYYfwXSCybjXZi-oxL8LlrhTzVCKMWDMKaLUM/edit#gid=177139189
 
+
+
+<hr>
+
+
+
+#### Estrutura dos Crawlers
+
+Os crawlers são ligeiramente diferentes entre si. Uma tarefa para o futuro é padronizá-los.
+
+De modo geral, são compostos pelos seguintes componentes:
+
+- **Client:** Define as páginas a serem acessadas inicialmente, a forma de contagem de processos existentes (função _count_) e monta a paginação e a busca inicial (função _fetch_).
+- **Handler:** Define como o conteúdo encontrado será baixado e salvo.
+- **Chunk:** Representa um pedaço da coleta (uma página, tipicamente) e define como navegar dentro da busca inicial a forma de separar e coletar os processos individualmente (função _rows_).
+- **Collector:** Recebe o client e os filtros da busca específica para realizar a coleta com os itens definidos pelo Client, define o conjunto de chunks a serem coletados (função _chunks_).
+- **Logger:** Registra eventos do crawler
+
+- **Snapshot:** Representa o registro de uma coleta feita.
+
+
+<hr>
+
+#### Montando um crawler
+    (WIP)
+
 Há algumas questões que variam conforme cada tribunal:
 - Como é feita a paginação?
 - Como coletar a contagem de processos existentes? (e.g. não existe para o TIT-SP)
@@ -33,15 +59,14 @@ Há algumas questões que variam conforme cada tribunal:
 - Existe alguma API de onde podemos coletar os dados diretamente sem navegar pelo site?
 
 
-#### Estrutura dos Crawlers
 
-Os crawlers são ligeiramente diferentes entre si. Uma tarefa para o futuro é padronizá-los.
+Para montar um novo crawler, há três passos principais:
 
-De modo geral, são compostos pelos seguintes componentes:
-
-    (WIP)
+<hr>
 
 #### Rastreio de progresso
+
+
 O rastreio de quais páginas já foram coletadas depende dos arquivos contidos nas pastas `.state` e `.snapshot`, geradas e preenchidas no decorrer da coleta.
 
 `.state` contém os arquivos que representam uma fração da coleta, os `chunks`. Tipicamente um `chunk` representa uma página.
@@ -70,10 +95,8 @@ Isso pode ser contornado refazendo a coleta do zero.
 
 No futuro idealmente teríamos o controle arquivo a arquivo de quais temos nos nossos buckets e quais não.
 
+<hr>
 
-#### Montando um crawler
-    (WIP)
-Para montar um novo crawler, há três passos principais:
 
 #### Lidando com Captchas
 
@@ -83,6 +106,9 @@ Alguns tribunais utilizam captchas para restringir o acesso aos processos. Atual
 - Uso de APIs de resolução manual de Captchas, hoje utilizamos o `www.humancoder.com` - pode ser usado tanto para captchas de reconhecimento de texto quanto para o reCaptcha, de clicar. (e.g. TRF1 e TRF5)
 
 A primeira opção é preferível quando for possível, pois é grátis e não requer serviços de terceiros. Ocasionalmente o serviço de captcha que utilizamos atualmente (2022-11-01) fica fora de ar.
+
+<hr>
+<hr>
 
 ## Setup
 
@@ -94,9 +120,14 @@ Para gestão de dependências usamos o poetry (https://python-poetry.org/). Uso 
 
 E assim por diante.
 
+<hr>
+<hr>
+
 ## Dependências
 
 Além das listadas no `pyproject.toml`, para o celery precisaremos do `redis` instalado localmente.
+
+<hr>
 
 ### Virtualenv
 
@@ -107,15 +138,22 @@ Para ativar o virtualenv com as deps instaladas, use o poetry. Recomendado.
 
 A partir desse ponto você tem um ambiente python com as deps instaladas e isoladas, sem conflitos com outros projetos.
 
+<hr>
+<hr>
+
 ## Docker
 
 WIP
+
+<hr>
 
 ## Rodando
 
 ### Env vars
 
 Antes, configure seu `.env`. Há um `.env.dist` que serve de exemplo.
+
+<hr>
 
 ### Comandos
 
@@ -152,6 +190,8 @@ Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implem
 | **TST** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
 
 <br>
+
+<hr>
 
 ### Parâmetros:
 <br>
