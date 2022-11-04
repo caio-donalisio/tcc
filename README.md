@@ -168,8 +168,8 @@ Em outro shell é possível disparar uma task via command line. Exemplo:
     $ python commands.py tjba --start-date 2020-05-01 --end-date 2020-05-30 --output-uri ./data/tjba
 
 Esta é a lista de parâmetros disponíveis para cada tribunal.
-Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implementação de alguns parâmetros secundários (e.g. skip-cache) precism de revisão.
-|  | *start-date* | *end-date* | *start-year* | *end-year* | *output-uri* | *pdf-async* | *skip-pdf* | *skip-cache* | *enqueue* |  *split-tasks* | *browser* |
+Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implementação de alguns parâmetros secundários (e.g. skip-cache) precisam de revisão.
+|  | *start-date* | *end-date* | *start-year* | *end-year* | *output-uri* | *pdf-async* | *skip-pdf ou skip-full* | *skip-cache* | *enqueue* |  *split-tasks* | *browser* |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **CARF** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
 | **SCRFB** | :avocado: | :avocado: |  |  | :avocado: |  |  | | :avocado:  |  :avocado: |  |
@@ -209,7 +209,7 @@ Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implem
 
  &emsp;**pdf-async:** &emsp; Baixa os PDFs asincronamente (flag)
 
- &emsp;**skip-pdf:**  &emsp;Ignora a coleta dos pdfs (flag)
+ &emsp;**skip-pdf ou skip-full:**  &emsp;Ignora a coleta dos pdfs (flag)
 
  &emsp;**skip-cache:**  &emsp;Ignora os arquivos de progresso e inicia a coleta do zero (flag)
 
