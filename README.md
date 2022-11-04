@@ -34,6 +34,11 @@ Há algumas questões que variam conforme cada tribunal:
 
 
 #### Estrutura dos Crawlers
+
+Os crawlers são ligeiramente diferentes entre si. Uma tarefa para o futuro é padronizá-los.
+
+De modo geral, são compostos pelos seguintes componentes:
+
     (WIP)
 
 #### Rastreio de progresso
@@ -126,25 +131,25 @@ Em outro shell é possível disparar uma task via command line. Exemplo:
 
 Esta é a lista de parâmetros disponíveis para cada tribunal.
 Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implementação de alguns parâmetros secundários (e.g. skip-cache) precism de revisão.
-|  | *start-date* | *end-date* | *start-year* | *end-year* | *output-uri* | *pdf-async* | *skip-pdf* | *skip-cache* | *enqueue* |  *split-tasks* | *browser* | *count-only* |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **CARF** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **SCRFB** | :avocado: | :avocado: |  |  | :avocado: |  |  | | :avocado:  |  :avocado: |  | :avocado: |
-| **STF** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |  |
-| **STJ** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TITSP** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TJBA** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TJMG** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TJPR** | :avocado: | :avocado: |  |  | :avocado: |  |  | | :avocado:  |  :avocado: |  | :avocado: |
-| **TJRJ** | |  | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |  |
-| **TJRS** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TJSP** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: |  |
-| **TRF1** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TRF2** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |  |
-| **TRF3** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TRF4** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TRF5** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
-| **TST** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |  |
+|  | *start-date* | *end-date* | *start-year* | *end-year* | *output-uri* | *pdf-async* | *skip-pdf* | *skip-cache* | *enqueue* |  *split-tasks* | *browser* |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **CARF** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **SCRFB** | :avocado: | :avocado: |  |  | :avocado: |  |  | | :avocado:  |  :avocado: |  |
+| **STF** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |
+| **STJ** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TITSP** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TJBA** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TJMG** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TJPR** | :avocado: | :avocado: |  |  | :avocado: |  |  | | :avocado:  |  :avocado: |  |
+| **TJRJ** | |  | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |
+| **TJRS** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TJSP** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: | :avocado: |
+| **TRF1** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TRF2** | :avocado: | :avocado: |  |  | :avocado: | :avocado: | :avocado: |  |  :avocado: |  :avocado: |  |
+| **TRF3** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TRF4** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TRF5** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
+| **TST** | :avocado: | :avocado: |  |  | :avocado: |  |  |  |  :avocado: |  :avocado: |  |
 
 <br>
 
@@ -173,8 +178,6 @@ Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implem
  &emsp;**browser:** &emsp; Mostra o browser no processo de coleta (flag)
 
  &emsp;**split-tasks:**  &emsp;Para ser usado junto ao *enqueue*, divide as tasks em sub-períodos (e.g. --split-tasks months)
-
- &emsp;**count-only:**  &emsp;Crawler irá apenas coletar as contagens de processos do dado período (flag)
 
  <br>
  <hr>
