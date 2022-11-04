@@ -6,6 +6,8 @@ Há um crawler para cada tribunal.
 
 Geralmente há dois arquivos associados a um dado processo, um contendo os metadados e outro o inteiro teor. Às vezes há apenas um arquivo (e.g. alguns do SCRFB), às vezes há mais de dois (e.g. TJRJ), a depender do tribunal e do processo específico.
 
+Coletamos e salvamos os dados crus, o processamento destes é atribuição do pipeline.
+
 Estes arquivos podem vir em formato JSON, PDF, DOC, HTML ou RTF.
 
 Alguns detalhes sobre cada tribunal podem ser encontrados em: https://docs.google.com/spreadsheets/d/1-J6Ll5PYYfwXSCybjXZi-oxL8LlrhTzVCKMWDMKaLUM/edit#gid=177139189
