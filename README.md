@@ -36,9 +36,8 @@ De modo geral, são compostos pelos seguintes componentes:
 <hr>
 
 #### Montando um crawler
-    (WIP)
-
-Há algumas questões que variam conforme cada tribunal:
+    
+**Há algumas questões que variam conforme cada tribunal:**
 - Como é feita a paginação?
 - Como coletar a contagem de processos existentes? (e.g. não existe para o TIT-SP)
 - Como navegar na página para obter tanto os metadados quanto os inteiros teores?
@@ -62,7 +61,14 @@ Há algumas questões que variam conforme cada tribunal:
 
 
 
-Para montar um novo crawler, há três passos principais:
+**Para montar um novo crawler, há quatro passos principais:**
+
+- Definir como sabemos quantos processos existem (função _count_)
+- Definir como é feita a busca (função _fetch_)
+- Definir quais são as páginas que serão buscadas ao longo da coleta (função _chunks_)
+- Definir como navegar na página buscada para extrair os processos individualmente (função _rows_)
+
+Os outros elementos precisarão ser customizados apenas em casos específicos
 
 <hr>
 
