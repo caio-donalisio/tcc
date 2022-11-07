@@ -5,6 +5,9 @@ metadata:
   namespace: crawlers
 spec:
   schedule: "10 6 */2 * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
   jobTemplate:
     spec:
       template:

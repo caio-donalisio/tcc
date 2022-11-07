@@ -207,7 +207,7 @@ def trf5_task(**kwargs):
 
 @cli.command(name='trf5')
 @click.option('--start-date',
-  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
 )
 @click.option('--end-date'  ,

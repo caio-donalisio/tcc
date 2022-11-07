@@ -524,7 +524,7 @@ def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
 
 @cli.command(name='trf4-seq')
 @click.option('--start',
-  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
   help='Format YYYY-MM-DD.',
 )
 @click.option('--end'  ,
