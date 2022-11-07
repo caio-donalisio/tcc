@@ -72,23 +72,23 @@ class STJClient:
 
   @utils.retryable(max_retries=3)
   def count(self, filters):
-    response = self._response_or_retry(
-      self.fetch(filters, offset=0))
+    response = self.fetch(filters, offset=0)
     return self._count_by_content(response.content)
 
   @utils.retryable(max_retries=3)
   def fetch(self, filters, offset):
-    return self._response_or_retry(self.requester.post(
-      f'{self.base_url}/SCON/pesquisar.jsp',
-      headers=DEFAULT_HEADERS,
-      data={**filters, 'i': offset}))
+    return self._response_or_retry(data={**filters, 'i': offset})
 
   @utils.retryable(max_retries=3)
   def get(self, path):
     return self.requester.get(f'{self.base_url}/{path}')
 
   @utils.retryable(max_retries=3)
-  def _response_or_retry(self, response):
+  def _response_or_retry(self, data):
+    response = self.requester.post(
+      f'{self.base_url}/SCON/pesquisar.jsp',
+      headers=DEFAULT_HEADERS,
+      data=data)
     soup = utils.soup_by_content(response.content)
 
     if soup \
@@ -111,10 +111,8 @@ class STJClient:
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
 
-    if not info:
-      assert info is not None
-
-    elif info.get_text() == 'Nenhum documento encontrado!':
+    assert info
+    if info.get_text() == 'Nenhum documento encontrado!':
       count = 0
 
     else:
