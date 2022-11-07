@@ -96,6 +96,13 @@ class STJClient:
       logger.warn('Got captcha -- reseting session.')
       self.reset_session()
       raise utils.PleaseRetryException()
+     
+    info = soup.find('span', {'class': 'numDocs'}) or \
+      soup.find('div', {'class':'erroMensagem'})
+    if not info:
+      logger.warn('Got invalid page -- reseting session.')
+      self.reset_session()
+      raise utils.PleaseRetryException()
 
     return response
 
