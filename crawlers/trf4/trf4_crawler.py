@@ -7,7 +7,7 @@ import requests
 import pendulum
 import sentry_sdk
 from collections import defaultdict
-
+import datetime
 from celery_singleton import Singleton
 
 import base
@@ -492,8 +492,14 @@ def trf4_task(start_date, end_date, output_uri):
 
 
 @cli.command(name='trf4')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
@@ -517,8 +523,14 @@ def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
 
 
 @cli.command(name='trf4-seq')
-@click.option('--start', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 def trf4_seq_command(start, end, output_uri):
   output = utils.get_output_strategy_by_path(path=output_uri)

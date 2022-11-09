@@ -4,7 +4,6 @@ import utils
 import pendulum
 import click
 import requests
-
 from app import cli, celery
 
 from logconfig import logger_factory, setup_cloud_logger
@@ -73,28 +72,35 @@ class STJClient:
 
   @utils.retryable(max_retries=3)
   def count(self, filters):
-    response = self._response_or_retry(
-      self.fetch(filters, offset=0))
+    response = self.fetch(filters, offset=0)
     return self._count_by_content(response.content)
 
   @utils.retryable(max_retries=3)
   def fetch(self, filters, offset):
-    return self._response_or_retry(self.requester.post(
-      f'{self.base_url}/SCON/pesquisar.jsp',
-      headers=DEFAULT_HEADERS,
-      data={**filters, 'i': offset}))
+    return self._response_or_retry(data={**filters, 'i': offset})
 
   @utils.retryable(max_retries=3)
   def get(self, path):
     return self.requester.get(f'{self.base_url}/{path}')
 
   @utils.retryable(max_retries=3)
-  def _response_or_retry(self, response):
+  def _response_or_retry(self, data):
+    response = self.requester.post(
+      f'{self.base_url}/SCON/pesquisar.jsp',
+      headers=DEFAULT_HEADERS,
+      data=data)
     soup = utils.soup_by_content(response.content)
 
     if soup \
         .find('div', id='idCaptchaLinha'):
       logger.warn('Got captcha -- reseting session.')
+      self.reset_session()
+      raise utils.PleaseRetryException()
+     
+    info = soup.find('span', {'class': 'numDocs'}) or \
+      soup.find('div', {'class':'erroMensagem'})
+    if not info:
+      logger.warn('Got invalid page -- reseting session.')
       self.reset_session()
       raise utils.PleaseRetryException()
 
@@ -104,20 +110,18 @@ class STJClient:
     soup = utils.soup_by_content(content)
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
-    
-    if not info:
-      assert info is not None
-    
-    elif info.get_text() == 'Nenhum documento encontrado!':
+
+    assert info
+    if info.get_text() == 'Nenhum documento encontrado!':
       count = 0
-    
+
     else:
       match = re.match(r'(\d+\.?\d+)', info.get_text())
       if match:
         count = int(match.group(0).replace('.', ''))
       else:
         count = 0
-    
+
     return count
 
 
@@ -263,8 +267,14 @@ def stj_task(start_date, end_date, output_uri):
 
 
 @cli.command(name='stj')
-@click.option('--start-date', prompt=True,   help='Format YYYY-MM-DD.')
-@click.option('--end-date'  , prompt=True,   help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

@@ -12,8 +12,6 @@ from random import random
 from time import sleep
 from mimetypes import guess_extension
 
-
-
 DEFAULT_HEADERS = {
   'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                         ' AppleWebKit/537.36 (KHTML, like Gecko)'
@@ -21,9 +19,7 @@ DEFAULT_HEADERS = {
 }
 DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 
-
 logger = logger_factory('tst')
-
 
 class TSTClient:
 
@@ -89,7 +85,7 @@ class TSTCollector(base.ICollector):
         self.filters = filters
 
     def count(self,filter_=None):
-        if filter_: 
+        if filter_:
             return self.client.count(filter_)
         else:
             return self.client.count(self.filters)
@@ -113,7 +109,7 @@ class TSTCollector(base.ICollector):
             )
         else:
             self.filters = [self.filters]
-        
+
         for filter_ in self.filters:
             total = self.count(filter_)
             pages = math.ceil(total/filter_.get('rows'))
@@ -269,8 +265,14 @@ def tst_task(**kwargs):
             .run(snapshot=snapshot)
 
 @cli.command(name='tst')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',

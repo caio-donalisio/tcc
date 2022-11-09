@@ -39,7 +39,7 @@ INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
 PAUSE_TIME = 1
-                
+
 
 
 class SCRFBClient:
@@ -58,7 +58,7 @@ class SCRFBClient:
         else:
             count = 0
         return count
-    
+
     def count_periods(self,filters,unit='months'):
         return sum(1 for _ in utils.timely(
                     filters.get('start_date'),
@@ -108,7 +108,7 @@ class SCRFBCollector(base.ICollector):
             total = self.count({'start_date':start,'end_date':end})
             pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
             for page in pages:
-                
+
                 yield SCRFBChunk(
                     keys={
                         'start_date':start.to_date_string(),
@@ -151,7 +151,7 @@ class SCRFBChunk(base.Chunk):
             soup = utils.soup_by_content(result.text)
             acts = soup.find_all('tr', class_='linhaResultados')
             to_download = []
-            
+
             for act in acts:
                 time.sleep(PAUSE_TIME)
                 if not act.a:
@@ -159,11 +159,11 @@ class SCRFBChunk(base.Chunk):
                 act_id = self.act_id_from_url(act.a['href'])
                 publication_date = act.find_all('td')[3].text
                 date_id = ''.join(publication_date.split('/')[::-1]).replace('/','')
-                html_content,pdf_url=self.fetch_act(act_id=act_id)#,publication_date=publication_date)                
+                html_content,pdf_url=self.fetch_act(act_id=act_id)#,publication_date=publication_date)
                 content_id= utils.get_content_hash(
                     soup=utils.soup_by_content(html_content),
                     tag_descriptions=[{'name':'p','class_':'ementa'}])
-                
+
                 to_download.append(base.Content(
                     content=html_content,
                     dest=utils.get_filepath(publication_date, f'{date_id}_{act_id}_{content_id}','html'),
@@ -227,13 +227,19 @@ def scrfb_task(**kwargs):
             .run(snapshot=snapshot)
 
 @cli.command(name=COURT_NAME)
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@click.option('--start-date',
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+  help='Format YYYY-MM-DD.',
+)
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
     default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--count-only', 
+@click.option('--count-only',
     default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def scrfb_command(**kwargs):
   # VALIDATE URI
