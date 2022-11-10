@@ -274,7 +274,7 @@ class CaptchaSolver(TJMG):
 
         try:
             return recognizer.recognize_google(audio, language='pt-BR')
-        except ValueError:
+        except sr.UnknownValueError:
             logger.warn('Could not recognize captcha audio. Retrying...')
             raise utils.PleaseRetryException()
 
