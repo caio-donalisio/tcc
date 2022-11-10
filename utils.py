@@ -49,6 +49,7 @@ class PleaseRetryException(Exception):
 
 
 def retryable(*, max_retries=3, sleeptime=5,
+              message='Got connection issues',
               ignore_if_exceeds=False,
               retryable_exceptions=(
                   requests.exceptions.ConnectionError,
@@ -75,7 +76,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                         f'Retry count exceeded (>{max_retries})')
                     raise ex
                 logger.warn(
-                    f'Got connection issues -- retrying in {retry_count * sleeptime}s.')
+                    f'{message} -- retrying in {retry_count * sleeptime}s.')
                 time.sleep(sleeptime * retry_count)
         if not ignore_if_exceeds:
             raise Exception(f'Retry count exceeded (>{max_retries})')
@@ -90,21 +91,24 @@ class GSOutput:
         self._cache  = {}
         # self._cache  = {b.name: True for b in self.list_by_prefix()}
 
+    @retryable(max_retries=5, message='Could not connect to GCP')
     def list_by_prefix(self, prefix=None):
         return list(self._bucket.list_blobs(prefix=prefix))
 
+    @retryable(max_retries=5, message='Could not connect to GCP')
     def exists(self, filepath):
         if self._cache.get(f'{self._prefix}{filepath}'):
             return True
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         return blob.exists()
 
-    @retryable(max_retries=9)
+    @retryable(max_retries=5, message='Could not connect to GCP')
     def save_from_contents(self, filepath, contents, **kwargs):
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         blob.upload_from_string(contents,
             content_type=kwargs.get('content_type', 'text/plain'))
 
+    @retryable(max_retries=5, message='Could not connect to GCP')
     def load_as_string(self, filepath):
         blob = self._bucket.blob(f'{self._prefix}{filepath}')
         if blob.exists():
