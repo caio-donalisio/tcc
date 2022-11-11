@@ -27,10 +27,9 @@ def get_soup_xpath(element):
   components.reverse()
   return '/%s' % '/'.join(components)
 
-
 class FirefoxBrowser:
-  def __init__(self, headers=None, headless=True,page_load_strategy='normal'):
-    options = self._get_options(headers, headless,page_load_strategy)
+  def __init__(self, headers=None, headless=True, page_load_strategy='normal'):
+    options = self._get_options(headers, headless, page_load_strategy)
 
     env = os.getenv('ENV', 'development')
 
@@ -38,7 +37,7 @@ class FirefoxBrowser:
         self.driver = webdriver.Firefox(options=options)
     else:
         self.driver = webdriver.Remote(
-            command_executor='http://selenium-hub:4444/wd/hub',
+            command_executor=os.getenv('SELENIUM_HUB_URI', 'http://selenium-hub:4444/wd/hub'),
             desired_capabilities=DesiredCapabilities.FIREFOX
         )
 

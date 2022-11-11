@@ -39,15 +39,8 @@ services:
       dockerfile: Dockerfile
     container_name: 'inspira-crawlers-celery'
     command: 'celery -A tasks worker -Q persistence,crawlers,crawlers.tjrj,crawlers.trf3,crawlers.tjmg,crawlers.trf4,crawlers.scrfb,crawlers.stj,crawlers.tst,crawlers.titsp,crawlers.carf,crawlers.tjsp,crawlers.tjrs,crawlers.tjba,downloader --concurrency=2 -E --loglevel=INFO'
-    environment:
-      - SENTRY_DSN=https://ca631cca1ff44e1d8c95e233b603eb0a@o926432.ingest.sentry.io/5880279
-      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcloud/service-account.json
-      - CELERYD_HIJACK_ROOT_LOGGER=false
-      - C_FORCE_ROOT='true'
-      - TJSP_USERNAME
-      - TJSP_PASSWORD
-      - CLOUD_LOGGING_ENABLED
-      - ENV=production
+    env_file:
+      - .env
     depends_on:
       - redis
     volumes:

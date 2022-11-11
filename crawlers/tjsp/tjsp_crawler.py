@@ -222,12 +222,11 @@ class TJSPClient:
       self.driver.implicitly_wait(20)
     else:
       self.driver = webdriver.Remote(
-        command_executor='http://selenium-hub:4444/wd/hub',
+        command_executor=os.getenv('SELENIUM_HUB_URI', 'http://selenium-hub:4444/wd/hub'),
         desired_capabilities=DesiredCapabilities.CHROME
       )
 
   def signin(self):
-    from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
