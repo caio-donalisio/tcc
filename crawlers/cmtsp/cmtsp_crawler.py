@@ -20,6 +20,18 @@ FILES_PER_PAGE = 10
 PDF_URL = ''
 CMTSP_SEARCH_LINK = ''
 
+DEFAULT_HEADERS =  {
+            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:106.0) Gecko/20100101 Firefox/106.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            # 'Accept-Encoding': 'gzip, deflate',
+            'Referer': 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx',
+            'Connection': 'keep-alive',
+            # Requests sorts cookies= alphabetically
+            # 'Cookie': 'ASP.NET_SessionId=pl0zpa11y03mwmshi1inotwv; SWCookieConfig={"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+            'Upgrade-Insecure-Requests': '1',
+        }
+
 
 logger = logger_factory('cmtsp')
 
@@ -58,11 +70,12 @@ class CMTSPClient:
         self.browser.fill_in('txtDtFim',pendulum.parse(filters.get('end_date')).format(CMTSP_DATE_FORMAT))
 
         #RECAPTCHA
-        captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
+        # captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
         
         #CLICK 'PESQUISAR'
         self.browser.driver.find_element_by_id('btnPesquisar').click()
         self.browser.driver.implicitly_wait(10)
+        return bool(self.browser.bsoup().find('td', text='Ementa'))
 
 
     @utils.retryable(max_retries=9, sleeptime=20)
@@ -72,11 +85,6 @@ class CMTSPClient:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def fetch(self, filters, page=1):
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.common.by import By
-        import time
-
         def get_current_page():
             return int(self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$')).text)
 
@@ -99,19 +107,27 @@ class CMTSPClient:
                         self.browser.driver.execute(f"""__doPostBack('grdPesquisaDecisoes$ctl14$ctl00','')""")
                 else:
                     self.browser.driver.find_element_by_xpath(f'//a[text()="{page}"]').click()
-
-
-
-            # if current_page != page:
-                # to_click_class = 'ui-icon-seek-next' if current_page < page else 'ui-icon-seek-prev'
-                # self.browser.driver.execute(f"""__doPostBack('grdPesquisaDecisoes$ctl14$ctl06','')""")
-                # WebDriverWait(self.browser.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, to_click_class))).click()
-                # time.sleep(3.5)
-            # self.browser.driver.implicitly_wait(20)
-            # rows = self.browser.bsoup().find_all(name='div', attrs={'class':"ui-datagrid-column ui-g-12 ui-md-12"})
-        # if not get_current_page() or not rows:
-        #     raise utils.PleaseRetryException()
         return self.browser.bsoup()
+
+    def get_pdf_session_id(self, tr):
+        self.browser.driver.find_element_by_id(tr.a['id']).click()
+        self.browser.driver.implicitly_wait(3)
+        return self.browser.get_cookie('ASP.NET_SessionId')
+        # self.browser.click()
+        ...
+
+    def fetch_pdf(self, session_id):
+        import requests
+        #self.browser.get_cookie('ASP.NET_SessionId')
+        cookies = {
+            'ASP.NET_SessionId': session_id,
+            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+        }
+        headers = DEFAULT_HEADERS
+        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
+        return response.content
+
+
 
 class CMTSPCollector(base.ICollector):
 
@@ -155,51 +171,92 @@ class CMTSPChunk(base.Chunk):
         # self.client._get_cookies()
         page = 1
         self.client.setup()
-        self.client.make_search(self.filters)
-        while not self.client.search_is_over(page):
-            # self.client.setup()
-            # self.client.make_search(self.filters)
-            soup = self.client.fetch(self.filters, page)
-            trs  = self._get_page_trs(soup)
-            page += 1
+        success = self.client.make_search(self.keys)
+        if success:
+            trs = []
+            while True:
+                soup = self.client.fetch(self.filters, page)
+                trs = self._get_page_trs(soup)
+                for tr in trs:
+                    ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
+                    process_code = utils.extract_digits(tr.find('td').text)
+                    filepath = f"{process_code}_{ementa_hash}"
+                    yield self.fetch_act_meta(tr, filepath)
+                    act_session_id = self.client.get_pdf_session_id(tr)
+                    yield self.fetch_act_pdf(act_session_id, filepath)
+                    
 
-        # for tr in trs:
-        #     yield self.fetch_act(tr)
-        #     time.sleep(0.1)
+                    # pdf_content = self.fetch_act_pdf(tr_session_id)
+                    # meta_content = self.fetch_act_meta(tr)
+                    # ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
+                    # process_code = utils.extract_digits(tr.find('td').text)
+                    # file_path = f"{process_code}_{ementa_hash}"
+                    # self.fetch_act(filepath)
+                    # self.fetch_act_pdf(filepath)
+                    # pdf_content = fetch_pdf(tr_session_id)
 
-        # if f'Page${page+1}' in str(soup):
-        #     page += 1
-        # else:
-        #     break
+                    ...
+                # trs.extend(self._get_page_trs(soup))
+                if self.client.search_is_over(page):
+                    break
+                page += 1
+            
+
+            # for tr in trs:
+            #     yield self.fetch_act(tr)
+            #     time.sleep(0.1)
 
     @utils.retryable(max_retries=3)
-    def fetch_act(self, tr):
-        tds = tr.find_all('td')
-        publication_date = tds[0].text
-        act_id = tds[3].text
-        html_filepath = utils.get_filepath(
-            date=publication_date, filename=act_id, extension='html')
-        pdf_href = tds[7].a['href']
+    def fetch_act_meta(self, tr, filepath):
+        
+        # tds = tr.find_all('td')
+        if self.keys['start_date']==self.keys['end_date']:
+            tr.insert_tag('td',text=f"Data de Julgamento: {self.keys['start_date']}")
+            # tds.append(f'<td>Data de Julgamento: {self.keys["start_date"]}<td>')
+        else:
+            logger.info('Skipped session date injection - key is not a single day')
+        # return ''.join(tds)
+
+
+        # pdf_href = tds[7].a['href']
         return [
-            base.Content(content=tr.prettify(), dest=html_filepath,
+            base.Content(content=tr.prettify(), dest=f"{filepath}.html",
             content_type='text/html'),
-            self.fetch_pdf(pdf_href, act_id, publication_date)
+            # self.fetch_pdf(pdf_href, act_id, publication_date)
         ]
 
     @utils.retryable(max_retries=3)
-    def fetch_pdf(self, pdf_href, act_id, publication_date):
-        data = self.client.data
-        data['__EVENTTARGET'] = utils.find_between(
-            pdf_href, start='WebForm_PostBackOptions\("', end='"')
-        data['__EVENTARGUMENT'] = ''
-        pdf_response = self.client.requester.post(self.client.base_url, data=data)
-        pdf_filepath = utils.get_filepath(
-            date=publication_date, filename=act_id, extension='pdf')
-        return base.Content(content=pdf_response.content, dest=pdf_filepath,
-            content_type='application/pdf')
+    def fetch_act_pdf(self, session_id, filepath):
+        import requests
+        #self.browser.get_cookie('ASP.NET_SessionId')
+        cookies = {
+            'ASP.NET_SessionId': session_id,
+            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+        }
+        headers = DEFAULT_HEADERS
+        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
+
+        return [
+            base.Content(content=response.content, 
+            dest=f"{filepath}.pdf", content_type='application/pdf')]
+
+        # return response.content
+
+    # @utils.retryable(max_retries=3)
+    # def fetch_pdf(self, pdf_href, act_id, publication_date):
+    #     data = self.client.data
+    #     data['__EVENTTARGET'] = utils.find_between(
+    #         pdf_href, start='WebForm_PostBackOptions\("', end='"')
+    #     data['__EVENTARGUMENT'] = ''
+    #     pdf_response = self.client.requester.post(self.client.base_url, data=data)
+    #     pdf_filepath = utils.get_filepath(
+    #         date=publication_date, filename=act_id, extension='pdf')
+    #     return base.Content(content=pdf_response.content, dest=pdf_filepath,
+    #         content_type='application/pdf')
 
     def _get_page_trs(self, soup):
-        return soup.find_all('tr')
+        trs = soup.find_all('tr')
+        return trs[1:len(trs)-1]
 
 
 @celery.task(queue='crawlers.cmtsp', default_retry_delay=5 * 60,
