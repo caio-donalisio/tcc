@@ -9,6 +9,10 @@ from app import cli, celery
 import re
 import time
 import os
+import captcha
+from selenium.common.exceptions import UnexpectedAlertPresentException
+import browsers
+
 
 DEBUG = True
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
@@ -21,9 +25,10 @@ PDF_URL = ''
 CMTSP_SEARCH_LINK = ''
 
 DEFAULT_HEADERS =  {
-            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:106.0) Gecko/20100101 Firefox/106.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.56',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+            'Cache-Control': 'max-age=0',
             # 'Accept-Encoding': 'gzip, deflate',
             'Referer': 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx',
             'Connection': 'keep-alive',
@@ -39,10 +44,12 @@ class CMTSPClient:
 
     def __init__(self):
         import browsers
-        self.browser = browsers.FirefoxBrowser(headless=not DEBUG)
+        # self.browser = browsers.FirefoxBrowser()
+        # self.browser = browsers.FirefoxBrowser(headless=not DEBUG)
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def setup(self):
+        self.browser = browsers.FirefoxBrowser(headless=not DEBUG)
         self.browser.get(WEBSITE_URL)
 
     @property
@@ -57,12 +64,12 @@ class CMTSPClient:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def make_search(self,filters):
-        import captcha
         self.browser.driver.implicitly_wait(10)
 
         #ACEITA COOKIES
-        self.browser.driver.execute_script('''
-        document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao']").click()''')
+        if self.browser.bsoup().find('prodamsp-componente-consentimento'):
+            self.browser.driver.execute_script('''
+            document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
 
         #PREENCHE DATAS
         self.browser.driver.implicitly_wait(10)
@@ -70,12 +77,24 @@ class CMTSPClient:
         self.browser.fill_in('txtDtFim',pendulum.parse(filters.get('end_date')).format(CMTSP_DATE_FORMAT))
 
         #RECAPTCHA
-        # captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
+        captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
         
         #CLICK 'PESQUISAR'
         self.browser.driver.find_element_by_id('btnPesquisar').click()
         self.browser.driver.implicitly_wait(10)
-        return bool(self.browser.bsoup().find('td', text='Ementa'))
+
+        #C
+        # browser.switch_to.alert
+        # alert = self.browser.driver.find_element_by_link_text("Informações não cadastradas!")
+        # if alert:
+        #     alert.accept()
+            # alert.click()
+            # alert = world.browser.switch_to.alert
+        try: 
+            bool(self.browser.bsoup().find('td', text='Ementa'))
+        except UnexpectedAlertPresentException:
+            return False
+        # return bool(self.browser.bsoup().find('td', text='Ementa'))
 
 
     @utils.retryable(max_retries=9, sleeptime=20)
@@ -112,20 +131,31 @@ class CMTSPClient:
     def get_pdf_session_id(self, tr):
         self.browser.driver.find_element_by_id(tr.a['id']).click()
         self.browser.driver.implicitly_wait(3)
-        return self.browser.get_cookie('ASP.NET_SessionId')
+        main_window, pop_up_window = self.browser.driver.window_handles
+        self.browser.driver.switch_to_window(pop_up_window)
+        self.browser.driver.implicitly_wait(10)
+        while self.browser.bsoup().find('div', class_='g-recaptcha'):
+            captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
+            self.browser.driver.find_element_by_id('btnVerificar').click()
+            self.browser.driver.implicitly_wait(3)
+        # session_id = self.browser.get_cookie('ASP.NET_SessionId')
+        self.browser.driver.close()
+        self.browser.driver.switch_to_window(main_window)
+        session_id = self.browser.get_cookie('ASP.NET_SessionId')
+        return session_id
         # self.browser.click()
         ...
 
-    def fetch_pdf(self, session_id):
-        import requests
-        #self.browser.get_cookie('ASP.NET_SessionId')
-        cookies = {
-            'ASP.NET_SessionId': session_id,
-            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
-        }
-        headers = DEFAULT_HEADERS
-        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
-        return response.content
+    # def fetch_pdf(self, session_id):
+    #     import requests
+    #     #self.browser.get_cookie('ASP.NET_SessionId')
+    #     cookies = {
+    #         'ASP.NET_SessionId': session_id,
+    #         'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+    #     }
+    #     headers = DEFAULT_HEADERS
+    #     response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
+    #     return response.content
 
 
 
@@ -144,12 +174,12 @@ class CMTSPCollector(base.ICollector):
         ranges = utils.timely(
             pendulum.parse(self.filters['start_date']), 
             pendulum.parse(self.filters['end_date']), 
-            unit='weeks', step=1)
+            unit='days', step=1)
 
         for start_date, end_date in reversed(list(ranges)):
             keys =\
                 {'start_date': start_date.to_date_string(),
-                'end_date'  : end_date.to_date_string()}
+                'end_date'  : end_date.add(days=1).to_date_string()}
 
             yield CMTSPChunk(
                 keys=keys,
@@ -177,13 +207,17 @@ class CMTSPChunk(base.Chunk):
             while True:
                 soup = self.client.fetch(self.filters, page)
                 trs = self._get_page_trs(soup)
+                
                 for tr in trs:
+                    day = self.keys.get('start_date').day
                     ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
                     process_code = utils.extract_digits(tr.find('td').text)
-                    filepath = f"{process_code}_{ementa_hash}"
+                    filepath = f"{day}_{process_code}_{ementa_hash}"
                     yield self.fetch_act_meta(tr, filepath)
                     act_session_id = self.client.get_pdf_session_id(tr)
-                    yield self.fetch_act_pdf(act_session_id, filepath)
+                    # yield self.fetch_act_pdf(act_session_id, filepath)
+                    # import time, random
+                    # time.sleep(0.8151235 + random.random())
                     
 
                     # pdf_content = self.fetch_act_pdf(tr_session_id)
@@ -200,6 +234,7 @@ class CMTSPChunk(base.Chunk):
                 if self.client.search_is_over(page):
                     break
                 page += 1
+        self.client.browser.driver.quit()
             
 
             # for tr in trs:
@@ -211,6 +246,7 @@ class CMTSPChunk(base.Chunk):
         
         # tds = tr.find_all('td')
         if self.keys['start_date']==self.keys['end_date']:
+            
             tr.insert_tag('td',text=f"Data de Julgamento: {self.keys['start_date']}")
             # tds.append(f'<td>Data de Julgamento: {self.keys["start_date"]}<td>')
         else:
@@ -231,10 +267,10 @@ class CMTSPChunk(base.Chunk):
         #self.browser.get_cookie('ASP.NET_SessionId')
         cookies = {
             'ASP.NET_SessionId': session_id,
-            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"S","aceiteDesempenho":"S","aceiteEstatisticos":"S","aceiteTermos":"S"}',
         }
         headers = DEFAULT_HEADERS
-        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
+        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers, verify=False)
 
         return [
             base.Content(content=response.content, 
