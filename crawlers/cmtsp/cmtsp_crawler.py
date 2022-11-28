@@ -242,8 +242,12 @@ class CMTSPChunk(base.Chunk):
 
     @utils.retryable(max_retries=3)
     def fetch_act_meta(self, tr, filepath):
+        session_date = f"Data de Julgamento: {self.keys['start_date']}"
         assert pendulum.parse(self.keys['start_date']).add(days=1) == pendulum.parse(self.keys['end_date'])
-        tr.insert(3, bs4.Tag(name="td",attrs={"text":f"Data de Julgamento: {self.keys['start_date']}"}))
+        #Manually inserts session date
+        new_tag = bs4.Tag(name="td")
+        new_tag.append(session_date)
+        tr.insert(3, new_tag)
         return [
             base.Content(content=tr.prettify(), dest=f"{filepath}.html",
             content_type='text/html'),
