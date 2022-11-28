@@ -94,6 +94,28 @@ class CMTSPClient:
             return False
         # return bool(self.browser.bsoup().find('td', text='Ementa'))
 
+    def get_pdf_content(self, row):
+        self.browser.driver.implicitly_wait(10)
+        if self.browser.bsoup().find('prodamsp-componente-consentimento'):
+            self.browser.driver.execute_script('''
+            document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
+        self.browser.driver.implicitly_wait(10)
+
+        process = row.find_all('td')[0].text
+        camara = row.find_all('td')[1].text
+        ementa = row.find_all('td')[3].text
+        self.browser.fill_in("txtExpressao", process.strip())
+        self.browser.driver.implicitly_wait(10)
+        captcha.solve_recaptcha(self.browser, logger, site_key=SITE_KEY)
+        self.browser.driver.find_element_by_id('btnPesquisar').click()
+        self.browser.driver.implicitly_wait(10)
+
+        trs = self.browser.bsoup().find_all('tr')
+        trs = [tr for tr in trs if tr.find_all('td')[0].text.strip() == process.strip()]
+        trs = [tr for tr in trs if tr.find_all('td')[1].text.strip() == camara.strip()]
+        trs = [tr for tr in trs if tr.find_all('td')[2].text.strip() == ementa.strip()]
+        assert len(trs) == 1, 'Expected one line'
+        return self.fetch_pdf(self.get_pdf_session_id(trs[0]))
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def count(self, filters):
@@ -132,10 +154,12 @@ class CMTSPClient:
         main_window, pop_up_window = self.browser.driver.window_handles
         self.browser.driver.switch_to_window(pop_up_window)
         self.browser.driver.implicitly_wait(10)
-        while self.browser.bsoup().find('div', class_='g-recaptcha'):
-            captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-            self.browser.driver.find_element_by_id('btnVerificar').click()
-            self.browser.driver.implicitly_wait(3)
+        if self.browser.bsoup().find('div', class_='g-recaptcha'):
+            raise Exception('Captcha not expected')
+        # while self.browser.bsoup().find('div', class_='g-recaptcha'):
+        #     captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
+        #     self.browser.driver.find_element_by_id('btnVerificar').click()
+        #     self.browser.driver.implicitly_wait(3)
         # session_id = self.browser.get_cookie('ASP.NET_SessionId')
         self.browser.driver.close()
         self.browser.driver.switch_to_window(main_window)
@@ -144,16 +168,16 @@ class CMTSPClient:
         # self.browser.click()
         ...
 
-    # def fetch_pdf(self, session_id):
-    #     import requests
-    #     #self.browser.get_cookie('ASP.NET_SessionId')
-    #     cookies = {
-    #         'ASP.NET_SessionId': session_id,
-    #         'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
-    #     }
-    #     headers = DEFAULT_HEADERS
-    #     response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
-    #     return response.content
+    def fetch_pdf(self, session_id):
+        import requests
+        #self.browser.get_cookie('ASP.NET_SessionId')
+        cookies = {
+            'ASP.NET_SessionId': session_id,
+            'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+        }
+        headers = DEFAULT_HEADERS
+        response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
+        return response.content
 
 
 
@@ -207,10 +231,11 @@ class CMTSPChunk(base.Chunk):
                 trs = self._get_page_trs(soup)
                 
                 for tr in trs:
-                    day = pendulum.parse(self.keys.get('start_date')).day
+                    date = pendulum.parse(self.keys.get('start_date')) 
+                    year, month, day = date.year, date.month, date.day
                     ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
                     process_code = utils.extract_digits(tr.find('td').text)
-                    filepath = f"{day}_{process_code}_{ementa_hash}"
+                    filepath = f"{year}/{month:02}/{day}_{process_code}_{ementa_hash}"
                     yield self.fetch_act_meta(tr, filepath)
                     time.sleep(0.1)
                     # act_session_id = self.client.get_pdf_session_id(tr)
