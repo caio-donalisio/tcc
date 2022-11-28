@@ -322,7 +322,7 @@ def tjrj_task(start_year, end_year, output_uri, pdf_async, skip_pdf):
 
 @cli.command(name='tjrj')
 @click.option('--start-year',
-  default=utils.DefaultDates.LAST_YEAR.strftime("%Y"),
+  default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y"),
   help='Format YYYY.',
 )
 @click.option('--end-year'  ,
