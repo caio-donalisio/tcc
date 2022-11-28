@@ -1,5 +1,4 @@
 import base
-import math
 import pendulum
 import celery
 import utils
@@ -8,11 +7,10 @@ import click
 from app import cli, celery
 import re
 import time
-import os
 import captcha
 from selenium.common.exceptions import UnexpectedAlertPresentException
 import browsers
-
+import bs4
 
 DEBUG = True
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
@@ -91,7 +89,7 @@ class CMTSPClient:
             # alert.click()
             # alert = world.browser.switch_to.alert
         try: 
-            bool(self.browser.bsoup().find('td', text='Ementa'))
+            return bool(self.browser.bsoup().find('td', text='Ementa'))
         except UnexpectedAlertPresentException:
             return False
         # return bool(self.browser.bsoup().find('td', text='Ementa'))
@@ -209,12 +207,13 @@ class CMTSPChunk(base.Chunk):
                 trs = self._get_page_trs(soup)
                 
                 for tr in trs:
-                    day = self.keys.get('start_date').day
+                    day = pendulum.parse(self.keys.get('start_date')).day
                     ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
                     process_code = utils.extract_digits(tr.find('td').text)
                     filepath = f"{day}_{process_code}_{ementa_hash}"
                     yield self.fetch_act_meta(tr, filepath)
-                    act_session_id = self.client.get_pdf_session_id(tr)
+                    time.sleep(0.1)
+                    # act_session_id = self.client.get_pdf_session_id(tr)
                     # yield self.fetch_act_pdf(act_session_id, filepath)
                     # import time, random
                     # time.sleep(0.8151235 + random.random())
@@ -243,22 +242,11 @@ class CMTSPChunk(base.Chunk):
 
     @utils.retryable(max_retries=3)
     def fetch_act_meta(self, tr, filepath):
-        
-        # tds = tr.find_all('td')
-        if self.keys['start_date']==self.keys['end_date']:
-            
-            tr.insert_tag('td',text=f"Data de Julgamento: {self.keys['start_date']}")
-            # tds.append(f'<td>Data de Julgamento: {self.keys["start_date"]}<td>')
-        else:
-            logger.info('Skipped session date injection - key is not a single day')
-        # return ''.join(tds)
-
-
-        # pdf_href = tds[7].a['href']
+        assert pendulum.parse(self.keys['start_date']).add(days=1) == pendulum.parse(self.keys['end_date'])
+        tr.insert(3, bs4.Tag(name="td",attrs={"text":f"Data de Julgamento: {self.keys['start_date']}"}))
         return [
             base.Content(content=tr.prettify(), dest=f"{filepath}.html",
             content_type='text/html'),
-            # self.fetch_pdf(pdf_href, act_id, publication_date)
         ]
 
     @utils.retryable(max_retries=3)
