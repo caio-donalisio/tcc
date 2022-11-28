@@ -13,18 +13,15 @@ from crawlers.cmtsp.cmtsp_utils import list_pending_pdfs
 from logconfig import logger_factory
 import captcha
 from browsers import FirefoxBrowser
+from bs4 import BeautifulSoup
 
 logger = logger_factory('cmtsp-pdf')
 
-DEBUG = False
+
+MAX_WORKERS=3
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
 WEBSITE_URL = 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx'
-CMTSP_DATE_FORMAT = 'DD/MM/YYYY'
-CRAWLER_DATE_FORMAT = 'YYYY-MM-DD'
-DATE_PATTERN = re.compile(r'\d{2}/\d{2}/\d{4}')
-# FILES_PER_PAGE = 30  #10, 30 or 50
 PDF_URL = 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx'
-# CMTSP_SEARCH_LINK = 'https://pje2g.cmtsp.jus.br/consultapublica/ConsultaPublica/listView.seam'
 DEFAULT_HEADERS =  {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.56',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -48,10 +45,9 @@ class CMTSPDownloader:
   def download(self, items, pbar=None):
     import concurrent.futures
     import time
-    from bs4 import BeautifulSoup
 
     interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
       last_run = None
       for item in items:
@@ -64,20 +60,21 @@ class CMTSPDownloader:
             sleep_time = (interval - since) + jitter
             time.sleep(sleep_time)
 
-        pdf_content = self.get_pdf_content(BeautifulSoup(item.content,'html.parser'))
+        # pdf_content = self.get_pdf_content(BeautifulSoup(item.content,'html.parser'))
         
         if pbar:
           pbar.update(1)
 
         # up async
-        if pdf_content:
-          last_run = time.time()
-          futures.append(executor.submit(self._handle_upload, item, pdf_content))
+        # if pdf_content:
+        last_run = time.time()
+        futures.append(executor.submit(self._handle_upload, item))#, pdf_content))
 
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
-  def _handle_upload(self, item, pdf_content):
+  def _handle_upload(self, item):
+    pdf_content = self.get_pdf_content(BeautifulSoup(item.content,'html.parser'))
     logger.debug(f'GET {item} UPLOAD')
 
     if pdf_content and len(pdf_content) > 100:
@@ -88,55 +85,66 @@ class CMTSPDownloader:
     else:
       logger.warn(f"Got empty document for {item.dest}.pdf")
 
+
   @utils.retryable()
   def get_pdf_content(self, row):
+      process, *_ = self.extract_info_from_meta(row)
+      # self.browser = FirefoxBrowser(headless=False)
+      # get_pdf_content(self):
+      browser = self.make_pdf_search(process)
+      trs = self.filter_rows(reference_row=row, rows=browser.bsoup().find_all('tr'))
+      return self.fetch_pdf(self.get_pdf_session_id(browser, trs[0]))
 
-      process = row.find_all('td')[0].text
-      camara = row.find_all('td')[1].text
-      ementa = row.find_all('td')[3].text
+  def make_pdf_search(self, process):
+    browser = FirefoxBrowser(headless=False)
+    browser.get(WEBSITE_URL)
+    browser.driver.implicitly_wait(10)
+    logger.info(f'Trying to collect {process} ...')
+    if browser.bsoup().find('prodamsp-componente-consentimento'):
+        browser.driver.execute_script('''
+        document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
+    browser.driver.implicitly_wait(10)
+    browser.fill_in("txtExpressao", process.strip())
+    browser.driver.implicitly_wait(10)
+    captcha.solve_recaptcha(browser, logger, site_key=SITE_KEY)
+    browser.driver.find_element_by_id('btnPesquisar').click()
+    browser.driver.implicitly_wait(10)
+    return browser
 
-      self.browser = FirefoxBrowser()
-      self.browser.get(WEBSITE_URL)
-      self.browser.driver.implicitly_wait(10)
-      logger.info(f'Trying to collect {process.strip()} ...')
-      if self.browser.bsoup().find('prodamsp-componente-consentimento'):
-          self.browser.driver.execute_script('''
-          document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
-      self.browser.driver.implicitly_wait(10)
+  def extract_info_from_meta(self, row):
+    process = row.find_all('td')[0].text.strip()
+    camara = row.find_all('td')[1].text.strip()
+    ementa = row.find_all('td')[3].text.strip()
+    return (process, camara, ementa)
 
-      self.browser.fill_in("txtExpressao", process.strip())
-      self.browser.driver.implicitly_wait(10)
-      captcha.solve_recaptcha(self.browser, logger, site_key=SITE_KEY)
-      self.browser.driver.find_element_by_id('btnPesquisar').click()
-      self.browser.driver.implicitly_wait(10)
-
-      trs = self.browser.bsoup().find_all('tr')
-      trs = [tr for tr in trs if tr.find_all('td')[0].text.strip() == process.strip()]
-      trs = [tr for tr in trs if tr.find_all('td')[1].text.strip() == camara.strip()]
-      trs = [tr for tr in trs if tr.find_all('td')[2].text.strip() == ementa.strip()]
-      assert len(trs) == 1, 'Expected one line'
-      return self.fetch_pdf(self.get_pdf_session_id(trs[0]))
+  def filter_rows(self, reference_row, rows):
+    process, camara, ementa = self.extract_info_from_meta(reference_row)
+    rows = [tr for tr in rows if tr.find_all('td')[0].text.strip() == process]
+    rows = [tr for tr in rows if tr.find_all('td')[1].text.strip() == camara]
+    rows = [tr for tr in rows if tr.find_all('td')[2].text.strip() == ementa]
+    assert not len(rows) < 1, 'Expected one line, got 0'
+    assert not len(rows) > 1, 'Expected one line, got multiple'
+    return rows
 
   @utils.retryable()
-  def get_pdf_session_id(self, tr):
-    self.browser.driver.find_element_by_id(tr.a['id']).click()
-    self.browser.driver.implicitly_wait(3)
-    main_window, pop_up_window = self.browser.driver.window_handles
-    self.browser.driver.switch_to_window(pop_up_window)
-    self.browser.driver.implicitly_wait(10)
-    if self.browser.bsoup().find('div', class_='g-recaptcha'):
+  def get_pdf_session_id(self, browser, tr):
+    browser.driver.find_element_by_id(tr.a['id']).click()
+    browser.driver.implicitly_wait(3)
+    main_window, pop_up_window = browser.driver.window_handles
+    browser.driver.switch_to_window(pop_up_window)
+    browser.driver.implicitly_wait(10)
+    if browser.bsoup().find('div', class_='g-recaptcha'):
         raise Exception('Captcha not expected')
     # while self.browser.bsoup().find('div', class_='g-recaptcha'):
     #     captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
     #     self.browser.driver.find_element_by_id('btnVerificar').click()
     #     self.browser.driver.implicitly_wait(3)
     # session_id = self.browser.get_cookie('ASP.NET_SessionId')
-    self.browser.driver.close()
-    self.browser.driver.switch_to_window(main_window)
-    session_id = self.browser.get_cookie('ASP.NET_SessionId')
+    browser.driver.close()
+    browser.driver.switch_to_window(main_window)
+    session_id = browser.get_cookie('ASP.NET_SessionId')
     return session_id
-    # self.browser.click()
-    ...
+    
   @utils.retryable()
   def fetch_pdf(self, session_id):
       import requests
@@ -148,13 +156,6 @@ class CMTSPDownloader:
       headers = DEFAULT_HEADERS
       response = requests.get(PDF_URL, cookies=cookies, headers=headers)
       return response.content
-
-    
-  # @utils.retryable()
-  # def download_files(self, row):
-  #   client = CMTSPClient()
-  #   client.setup()
-  #   return client.get_pdf_content(row)
 
 @celery.task(queue='cmtsp.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=3)
@@ -223,12 +224,12 @@ def cmtsp_pdf_command(input_uri, prefix, dry_run, local, count):
       pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+      executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
       futures  = []
       for pending in pendings:
         if not dry_run:
           batch.append(pending)
-          if len(batch) >= 10:    
+          if len(batch) >= 5:    
             futures.append(executor.submit(cmtsp_download, batch, input_uri, pbar))
             # time.sleep(random.uniform(5., 8.))
             batch = []

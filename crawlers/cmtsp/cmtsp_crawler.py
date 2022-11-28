@@ -12,7 +12,7 @@ from selenium.common.exceptions import UnexpectedAlertPresentException
 import browsers
 import bs4
 
-DEBUG = True
+DEBUG = False
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
 WEBSITE_URL = 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx'
 CMTSP_DATE_FORMAT = 'DDMMYYYY'
