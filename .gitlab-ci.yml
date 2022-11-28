@@ -3,7 +3,6 @@ default:
     - docker
 
 variables:
-  DOCKER_HOST: tcp://docker:2375
   DOCKER_IMAGE: "us-docker.pkg.dev/inspira-registry/docker/data/crawlers"
 
 stages:
@@ -16,21 +15,24 @@ stages:
   - gcloud auth activate-service-account --key-file gcloud-service-key.json
 
 build:
-  image: google/cloud-sdk
-  services:
-    - docker:19.03.8-dind
+  image:
+    name: gcr.io/kaniko-project/executor:v1.9.0-debug
+    entrypoint: [""]
   stage: build
+  variables:
+    GOOGLE_APPLICATION_CREDENTIALS: gcloud-service-key.json
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
   before_script:
-    - *configure-gcloud
+    - echo $GCP_SERVICE_KEY > gcloud-service-key.json
   script:
-    - gcloud auth configure-docker us-docker.pkg.dev
-    - docker pull ${DOCKER_IMAGE}:latest || true
-    - docker build -t ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG} .
-    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}
-    - docker push ${DOCKER_IMAGE}:${CI_COMMIT_REF_SLUG}
+    - /kaniko/executor
+      --log-format text
+      --context "${CI_PROJECT_DIR}"
+      --cache
+      --cache-copy-layers
+      --destination "${DOCKER_IMAGE}:${CI_COMMIT_SHORT_SHA}"
 
 retag:
   stage: deploy
