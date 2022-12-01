@@ -25,22 +25,18 @@ class CARFClient:
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
-        try:
 
-            items_per_page = filters.get('rows')
+        items_per_page = filters.get('rows')
 
-            params = {
-                **filters,
-                **{'start': (page - 1) * items_per_page}
-            }
+        params = {
+            **filters,
+            **{'start': (page - 1) * items_per_page}
+        }
 
-            return requests.get(self.url,
-                                params=params,
-                                verify=False).json()
+        return requests.get(self.url,
+                            params=params,
+                            verify=False).json()
 
-        except Exception as e:
-            logger.error(f"page fetch error params: {filters}")
-            raise e
 
 
 class CARFCollector(base.ICollector):
