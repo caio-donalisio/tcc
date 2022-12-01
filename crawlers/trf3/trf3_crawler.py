@@ -154,11 +154,22 @@ class TRF3Chunk(base.Chunk):
                 headers=DEFAULT_HEADERS
                 )
 
-            #THIS CHECK REQUIRES FURTHER TESTING
-            if soup.find('h2', text='Para iniciar uma nova sessão clique em algum dos links ao lado.'):
-                self.client.setup()
-                logger.warn(f"Session expired - trying again")
-                raise utils.PleaseRetryException()
+            #TODO: Refactor
+            #Handle session expiration
+            for n in range(1, 9):
+                if soup.find('h2', text='Para iniciar uma nova sessão clique em algum dos links ao lado.'):
+                    logger.warn(f"Session expired - trying again. Retry #{n}...")
+                    self.client.setup()
+                    self.client.fetch(self.filters)
+                    soup = self.get_page_soup(
+                        logger,
+                        url=f'https://web.trf3.jus.br/base-textual/Home/ListaColecao/9?np={proc_number}',
+                        headers=DEFAULT_HEADERS
+                    )
+                else:
+                    break
+            else:
+                raise Exception('Could not stablish session')
 
             pub_date_div = soup.find('div', text='Data da Publicação/Fonte ')
             pub_date, = DATE_PATTERN.findall(
