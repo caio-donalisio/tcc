@@ -105,13 +105,15 @@ class TJBACollector(base.ICollector):
       self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
     for start_date, end_date in reversed(ranges):
+      filters = get_filters(start_date, end_date)
       keys =\
         {'start_date': start_date.to_date_string(),
-         'end_date'  : end_date.to_date_string()}
+         'end_date'  : end_date.to_date_string(),
+         'total': self.client.count(filters)}
 
       yield TJBAChunk(keys=keys,
         client=self.client,
-        filters=get_filters(start_date, end_date),
+        filters=filters,
         prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
