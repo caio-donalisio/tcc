@@ -96,35 +96,38 @@ class CMTSPDownloader:
     client = CMTSPClient()
     client.setup()
 
-    #Try searching by process:
+    #Try searching by process number:
     filters = {'process':process}
     client.make_search(filters=filters, by='process')
     rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
-    if len(rows) > 1:
-      raise Exception(f'{len(rows)} processes found for {process}, expected 1')
 
-    # Retry searching by date:
-    elif not rows:
+    # Retry searching by date if not found:
+    if not rows:
       logger.info(f"Couldn't find process {process} by process number, searching by date...")
-      date_obj = pendulum.from_format(utils.extract_digits(date),CMTSP_DATE_FORMAT)
+      date_obj = pendulum.from_format(utils.extract_digits(date),'YYYYMMDD')
       filters = {
         'start_date': date_obj.format('YYYY-MM-DD'),
         'end_date': date_obj.add(days=1).format('YYYY-MM-DD')}
+      client.setup()
       client.make_search(filters=filters, by='date')
-      while not client.search_is_over(client.current_page()):
-        rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
-        if len(rows) > 1:
-          raise Exception(f'{len(rows)} processes found for {process}, expected 1')
-        elif len(rows) == 1:
-          break
-        page += 1
-        client.fetch(filters, page=page)
+      rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
+      if not rows:
+        while not client.search_is_over(client.get_current_page()):
+          if len(rows) > 0:
+            break
+          else:
+            page += 1
+            client.fetch(filters, page=page)
+            rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
     
-    if not rows:
-      raise Exception(f'Could not find searched process: {process}')
-    # browser = self.make_pdf_search(row)
-    # trs = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
-    return self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
+    if len(rows) == 0:
+      logger.warn(f'Could not find searched process: {process}')
+      client.browser.driver.quit()
+    elif len(rows) == 1:
+      return self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
+    elif len(rows) > 1:
+      client.browser.driver.quit()
+      raise Exception(f'{len(rows)} processes found for {process}, expected 1')
 
   @utils.retryable()
   def make_pdf_search(self, row, by:str):

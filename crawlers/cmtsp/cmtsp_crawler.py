@@ -8,7 +8,7 @@ from app import cli, celery
 import re
 import time
 import captcha
-from selenium.common.exceptions import UnexpectedAlertPresentException
+from selenium.common.exceptions import UnexpectedAlertPresentException, JavascriptException
 import browsers
 import bs4
 
@@ -68,16 +68,20 @@ class CMTSPClient:
 
         #ACEITA COOKIES
         if self.browser.bsoup().find('prodamsp-componente-consentimento'):
-            self.browser.driver.execute_script('''
+            try:
+                self.browser.driver.execute_script('''
             document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
-
-        #PREENCHE DATAS
+            except JavascriptException:
+                pass
+        #PREENCHE DADOD
         self.browser.driver.implicitly_wait(10)
         if by=='date':
             self.browser.fill_in('txtDtInicio',pendulum.parse(filters.get('start_date')).format(CMTSP_DATE_FORMAT))
             self.browser.fill_in('txtDtFim',pendulum.parse(filters.get('end_date')).format(CMTSP_DATE_FORMAT))
         elif by=='process':
             self.browser.fill_in("txtExpressao", filters['process'])
+        else:
+            raise Exception(f'Option "{by}" not available')
         #RECAPTCHA
         captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
         
