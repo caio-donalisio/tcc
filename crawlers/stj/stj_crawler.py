@@ -81,7 +81,7 @@ class STJClient:
 
   @utils.retryable(max_retries=3)
   def get(self, path):
-    return self.requester.get(f'{self.base_url}/{path}')
+    return self.requester.get(f'{self.base_url}/{path}', verify=False)
 
   @utils.retryable(max_retries=3)
   def _response_or_retry(self, data):
