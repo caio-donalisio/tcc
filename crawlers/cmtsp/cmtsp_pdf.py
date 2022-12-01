@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 logger = logger_factory('cmtsp-pdf')
 
-
+CMTSP_DATE_FORMAT = 'DDMMYYYY'
 MAX_WORKERS=3
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
 WEBSITE_URL = 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx'
@@ -88,18 +88,51 @@ class CMTSPDownloader:
 
   @utils.retryable()
   def get_pdf_content(self, row):
-      process, *_ = self.extract_info_from_meta(row)
-      # self.browser = FirefoxBrowser(headless=False)
-      # get_pdf_content(self):
-      browser = self.make_pdf_search(process)
-      trs = self.filter_rows(reference_row=row, rows=browser.bsoup().find_all('tr'))
-      return self.fetch_pdf(self.get_pdf_session_id(browser, trs[0]))
+    process, _, date , __ = self.extract_info_from_meta(row)
+    # self.browser = FirefoxBrowser(headless=False)
+    # get_pdf_content(self):
+    rows = []
+    page = 1
+    client = CMTSPClient()
+    client.setup()
 
-  def make_pdf_search(self, process):
-    browser = FirefoxBrowser(headless=False)
+    #Try searching by process:
+    filters = {'process':process}
+    client.make_search(filters=filters, by='process')
+    rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
+    if len(rows) > 1:
+      raise Exception(f'{len(rows)} processes found for {process}, expected 1')
+
+    # Retry searching by date:
+    elif not rows:
+      logger.info(f"Couldn't find process {process} by process number, searching by date...")
+      date_obj = pendulum.from_format(utils.extract_digits(date),CMTSP_DATE_FORMAT)
+      filters = {
+        'start_date': date_obj.format('YYYY-MM-DD'),
+        'end_date': date_obj.add(days=1).format('YYYY-MM-DD')}
+      client.make_search(filters=filters, by='date')
+      while not client.search_is_over(client.current_page()):
+        rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
+        if len(rows) > 1:
+          raise Exception(f'{len(rows)} processes found for {process}, expected 1')
+        elif len(rows) == 1:
+          break
+        page += 1
+        client.fetch(filters, page=page)
+    
+    if not rows:
+      raise Exception(f'Could not find searched process: {process}')
+    # browser = self.make_pdf_search(row)
+    # trs = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
+    return self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
+
+  @utils.retryable()
+  def make_pdf_search(self, row, by:str):
+    process, _, date , __ = self.extract_info_from_meta(row)
+    browser = FirefoxBrowser(headless=True)
     browser.get(WEBSITE_URL)
     browser.driver.implicitly_wait(10)
-    logger.info(f'Trying to collect {process} ...')
+    logger.info(f'Trying to collect {process} by number...')
     if browser.bsoup().find('prodamsp-componente-consentimento'):
         browser.driver.execute_script('''
         document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
@@ -108,22 +141,35 @@ class CMTSPDownloader:
     browser.driver.implicitly_wait(10)
     captcha.solve_recaptcha(browser, logger, site_key=SITE_KEY)
     browser.driver.find_element_by_id('btnPesquisar').click()
+    rows = self.filter_rows(row, browser.bsoup().find_all('tr'))
+    if not rows:
+      date_obj = pendulum.from_format(utils.extract_digits(date),CMTSP_DATE_FORMAT)
+      browser.fill_in('txtDtInicio',date_obj.format(CMTSP_DATE_FORMAT))
+      browser.fill_in('txtDtFim',date_obj.add(days=1).format(CMTSP_DATE_FORMAT))
+      browser.driver.implicitly_wait(10)
+      captcha.solve_recaptcha(browser, logger, site_key=SITE_KEY)
+      browser.driver.find_element_by_id('btnPesquisar').click()
     browser.driver.implicitly_wait(10)
     return browser
 
   def extract_info_from_meta(self, row):
     process = row.find_all('td')[0].text.strip()
     camara = row.find_all('td')[1].text.strip()
+    date = row.find_all('td')[2].text.strip()
     ementa = row.find_all('td')[3].text.strip()
-    return (process, camara, ementa)
+    return (process, camara, date, ementa)
 
   def filter_rows(self, reference_row, rows):
-    process, camara, ementa = self.extract_info_from_meta(reference_row)
+    process, camara, _, ementa = self.extract_info_from_meta(reference_row)
     rows = [tr for tr in rows if tr.find_all('td')[0].text.strip() == process]
     rows = [tr for tr in rows if tr.find_all('td')[1].text.strip() == camara]
     rows = [tr for tr in rows if tr.find_all('td')[2].text.strip() == ementa]
-    assert not len(rows) < 1, 'Expected one line, got 0'
-    assert not len(rows) > 1, 'Expected one line, got multiple'
+    # try:
+    #   assert not len(rows) < 1, f'{process}: Expected one line, got 0'
+    
+    #   assert not len(rows) > 1, f'{process}: Expected one line, got multiple'
+    # except AssertionError:
+    #   utils.PleaseRetryException()
     return rows
 
   @utils.retryable()
@@ -143,6 +189,7 @@ class CMTSPDownloader:
     browser.driver.close()
     browser.driver.switch_to_window(main_window)
     session_id = browser.get_cookie('ASP.NET_SessionId')
+    browser.driver.quit()
     return session_id
     
   @utils.retryable()
