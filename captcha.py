@@ -8,6 +8,8 @@ API_KEY = os.getenv('CAPTCHA_API_KEY')
 
 @utils.retryable(max_retries=9, sleeptime=20)
 def get_captcha_response(logger, site_key, site_url):
+    if API_KEY is None:
+        raise Exception("Captcha Api key is missing.")
     for n in range(1,11):
         headers= {
             'User-Agent':'PostmanRuntime/7.29.0',

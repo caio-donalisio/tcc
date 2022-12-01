@@ -42,6 +42,7 @@ class FirefoxBrowser:
         )
 
   def get(self, url, wait_for=(By.TAG_NAME, 'body')):
+    # TODO: HANDLE: Exception has occurred: TimeoutException -- Message: TimedPromise timed out after 300000 ms
     self.driver.get(url)
     if wait_for is not None:
         self.wait_for_element(locator=wait_for)

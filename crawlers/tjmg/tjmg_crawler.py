@@ -34,7 +34,6 @@ TJMG_DATE_FORMAT = "DD/MM/YYYY"
 STANDARD_DATE_FORMAT = "YYYY-MM-DD"
 QUERY = 'NAO e'
 DEFAULT_USER_AGENT = {
-    # 'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0')
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.44'
 }
 EXTRA_PARAMS = [
@@ -196,10 +195,10 @@ class TJMG(base.BaseCrawler, base.ICollector):
                     }
 
                     if query.get('listaClasse'):
-                        keys.update({'listaClasse': query.get('listaClasse')})
+                        keys.update({'listaClasse': str(query.get('listaClasse')).upper()})
                     elif query.get('excluirRepetitivos'):
                         keys.update(
-                            {'excluirRepetitivos': query.get('excluirRepetitivos')})
+                            {'excluirRepetitivos': str(query.get('excluirRepetitivos')).upper()})
 
                     yield TJMGChunk(
                         keys=keys,
@@ -240,14 +239,14 @@ class CaptchaSolver(TJMG):
         while not browser.is_text_present('Resultado da busca') \
                 and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
             browser.wait_for_element(locator=(By.ID, 'captcha_text'))
-            response = self.requester.get(f'{BASE_URL}/captchaAudio.svl', headers=self.headers, proxies = {'http': IP}, timeout=30, verify=False)
+            response = utils.get_response(
+                logger,
+                self.requester,
+                url=f'{BASE_URL}/captchaAudio.svl',
+                headers=self.headers)
             text = self._recognize_audio_by_content(response.content)
             captcha_box = browser.driver.find_element_by_id('captcha_text')
             captcha_box.send_keys(text)
-            # for char in text:
-            #     captcha_box.send_keys(char)
-                # time.sleep(random.random())
-            # time.sleep(1+random.random())
             if browser.is_text_present('não corresponde', tag='div'):
                 browser.click(self._find(id='gerar'))
             else:
@@ -273,7 +272,11 @@ class CaptchaSolver(TJMG):
             if not DEBUG:
                 os.remove(filename)
 
-        return recognizer.recognize_google(audio, language='pt-BR')
+        try:
+            return recognizer.recognize_google(audio, language='pt-BR')
+        except sr.UnknownValueError:
+            logger.warn('Could not recognize captcha audio. Retrying...')
+            raise utils.PleaseRetryException()
 
 
 class TJMGChunk(base.Chunk):
