@@ -75,8 +75,8 @@ def retryable(*, max_retries=3, sleeptime=5,
                     logger.fatal(
                         f'Retry count exceeded (>{max_retries})')
                     raise ex
-                logger.warn(
-                    f'{message} -- retrying in {retry_count * sleeptime}s.')
+                logger.warn(ex)
+                logger.warn(f'{message} -- retrying in {retry_count * sleeptime}s.')
                 time.sleep(sleeptime * retry_count)
         if not ignore_if_exceeds:
             raise Exception(f'Retry count exceeded (>{max_retries})')
@@ -341,9 +341,9 @@ def get_response(logger, session, url, headers):
     """Gets response and checks if response object has status code 200, throws Retry exception if not"""
     response = session.get(
         url=url, headers=headers)
-    if response.status_code != 200:               
+    if response.status_code != 200:
         logger.warn(f"Response <{response.status_code}> - {response.url}")
-        raise PleaseRetryException()    
+        raise PleaseRetryException()
     else:
         return response
 

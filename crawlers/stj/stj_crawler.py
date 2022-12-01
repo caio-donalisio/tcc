@@ -88,6 +88,7 @@ class STJClient:
     response = self.requester.post(
       f'{self.base_url}/SCON/pesquisar.jsp',
       headers=DEFAULT_HEADERS,
+      verify=False,
       data=data)
     soup = utils.soup_by_content(response.content)
 
@@ -96,7 +97,7 @@ class STJClient:
       logger.warn('Got captcha -- reseting session.')
       self.reset_session()
       raise utils.PleaseRetryException()
-     
+
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
     if not info:
