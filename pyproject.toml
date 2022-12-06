@@ -20,7 +20,7 @@ celery = {version = "^5.1.1", extras = ["redis"]}
 pydantic = "^1.8.2"
 wrapt = "^1.12.1"
 fake-headers = "^1.0.2"
-fake-useragent = "^0.1.11"
+fake-useragent = "^1.1.1"
 google-cloud-logging = "^2.5.0"
 python-slugify = {version = "^5.0.2", extras = ["unidecode"]}
 flower = "^1.0.0"
