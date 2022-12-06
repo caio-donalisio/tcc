@@ -122,7 +122,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     session_id = None
 
     WebDriverWait(self.browser.driver, 120) \
-      .until(EC.presence_of_element_located((By.ID, 'seletorPaginasTopo')))
+      .until(EC.presence_of_element_located((By.ID, 'content')))
 
     cookies = self.browser.driver.get_cookies()
 
