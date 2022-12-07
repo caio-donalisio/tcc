@@ -1,8 +1,6 @@
 import logging
-import pathlib
 import random
 import time
-import re
 import base
 import click
 import pendulum
@@ -89,8 +87,6 @@ class CMTSPDownloader:
   @utils.retryable()
   def get_pdf_content(self, row):
     process, _, date , __ = self.extract_info_from_meta(row)
-    # self.browser = FirefoxBrowser(headless=False)
-    # get_pdf_content(self):
     rows = []
     page = 1
     client = CMTSPClient()
@@ -127,7 +123,8 @@ class CMTSPDownloader:
       return self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
     elif len(rows) > 1:
       client.browser.driver.quit()
-      raise Exception(f'{len(rows)} processes found for {process}, expected 1')
+      logger.warn(f'{len(rows)} processes found for {process}, expected 1')
+      # raise Exception(f'{len(rows)} processes found for {process}, expected 1')
 
   @utils.retryable()
   def make_pdf_search(self, row, by:str):
@@ -167,28 +164,20 @@ class CMTSPDownloader:
     rows = [tr for tr in rows if tr.find_all('td')[0].text.strip() == process]
     rows = [tr for tr in rows if tr.find_all('td')[1].text.strip() == camara]
     rows = [tr for tr in rows if tr.find_all('td')[2].text.strip() == ementa]
-    # try:
-    #   assert not len(rows) < 1, f'{process}: Expected one line, got 0'
-    
-    #   assert not len(rows) > 1, f'{process}: Expected one line, got multiple'
-    # except AssertionError:
-    #   utils.PleaseRetryException()
     return rows
 
   @utils.retryable()
   def get_pdf_session_id(self, browser, tr):
     browser.driver.find_element_by_id(tr.a['id']).click()
     browser.driver.implicitly_wait(3)
-    main_window, pop_up_window = browser.driver.window_handles
+    try:
+      main_window, pop_up_window = browser.driver.window_handles
+    except ValueError:
+      raise utils.PleaseRetryException()
     browser.driver.switch_to_window(pop_up_window)
     browser.driver.implicitly_wait(10)
     if browser.bsoup().find('div', class_='g-recaptcha'):
         raise Exception('Captcha not expected')
-    # while self.browser.bsoup().find('div', class_='g-recaptcha'):
-    #     captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-    #     self.browser.driver.find_element_by_id('btnVerificar').click()
-    #     self.browser.driver.implicitly_wait(3)
-    # session_id = self.browser.get_cookie('ASP.NET_SessionId')
     browser.driver.close()
     browser.driver.switch_to_window(main_window)
     session_id = browser.get_cookie('ASP.NET_SessionId')
@@ -198,7 +187,6 @@ class CMTSPDownloader:
   @utils.retryable()
   def fetch_pdf(self, session_id):
       import requests
-      #self.browser.get_cookie('ASP.NET_SessionId')
       cookies = {
           'ASP.NET_SessionId': session_id,
           'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',

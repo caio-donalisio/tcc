@@ -73,7 +73,7 @@ class CMTSPClient:
             document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
             except JavascriptException:
                 pass
-        #PREENCHE DADOD
+        #PREENCHE DADOS
         self.browser.driver.implicitly_wait(10)
         if by=='date':
             self.browser.fill_in('txtDtInicio',pendulum.parse(filters.get('start_date')).format(CMTSP_DATE_FORMAT))
@@ -89,41 +89,10 @@ class CMTSPClient:
         self.browser.driver.find_element_by_id('btnPesquisar').click()
         self.browser.driver.implicitly_wait(10)
 
-        #C
-        # browser.switch_to.alert
-        # alert = self.browser.driver.find_element_by_link_text("Informações não cadastradas!")
-        # if alert:
-        #     alert.accept()
-            # alert.click()
-            # alert = world.browser.switch_to.alert
         try: 
             return bool(self.browser.bsoup().find('td', text='Ementa'))
         except UnexpectedAlertPresentException:
             return False
-        # return bool(self.browser.bsoup().find('td', text='Ementa'))
-
-    # def get_pdf_content(self, row):
-    #     self.browser.driver.implicitly_wait(10)
-    #     if self.browser.bsoup().find('prodamsp-componente-consentimento'):
-    #         self.browser.driver.execute_script('''
-    #         document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
-    #     self.browser.driver.implicitly_wait(10)
-
-    #     process = row.find_all('td')[0].text
-    #     camara = row.find_all('td')[1].text
-    #     ementa = row.find_all('td')[3].text
-    #     self.browser.fill_in("txtExpressao", process.strip())
-    #     self.browser.driver.implicitly_wait(10)
-    #     captcha.solve_recaptcha(self.browser, logger, site_key=SITE_KEY)
-    #     self.browser.driver.find_element_by_id('btnPesquisar').click()
-    #     self.browser.driver.implicitly_wait(10)
-
-    #     trs = self.browser.bsoup().find_all('tr')
-    #     trs = [tr for tr in trs if tr.find_all('td')[0].text.strip() == process.strip()]
-    #     trs = [tr for tr in trs if tr.find_all('td')[1].text.strip() == camara.strip()]
-    #     trs = [tr for tr in trs if tr.find_all('td')[2].text.strip() == ementa.strip()]
-    #     assert len(trs) == 1, 'Expected one line'
-    #     return self.fetch_pdf(self.get_pdf_session_id(trs[0]))
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def count(self, filters):
@@ -132,7 +101,6 @@ class CMTSPClient:
 
     @utils.retryable(max_retries=9, sleeptime=20)
     def fetch(self, filters, page=1):
-       
 
         while not self.page_searched:
             self.setup()
@@ -163,28 +131,10 @@ class CMTSPClient:
         self.browser.driver.implicitly_wait(10)
         if self.browser.bsoup().find('div', class_='g-recaptcha'):
             raise Exception('Captcha not expected')
-        # while self.browser.bsoup().find('div', class_='g-recaptcha'):
-        #     captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-        #     self.browser.driver.find_element_by_id('btnVerificar').click()
-        #     self.browser.driver.implicitly_wait(3)
-        # session_id = self.browser.get_cookie('ASP.NET_SessionId')
         self.browser.driver.close()
         self.browser.driver.switch_to_window(main_window)
         session_id = self.browser.get_cookie('ASP.NET_SessionId')
         return session_id
-        # self.browser.click()
-        ...
-
-    # def fetch_pdf(self, session_id):
-    #     import requests
-    #     #self.browser.get_cookie('ASP.NET_SessionId')
-    #     cookies = {
-    #         'ASP.NET_SessionId': session_id,
-    #         'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
-    #     }
-    #     headers = DEFAULT_HEADERS
-    #     response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers)
-    #     return response.content
 
 
 
@@ -226,8 +176,6 @@ class CMTSPChunk(base.Chunk):
 
     @utils.retryable(max_retries=3)
     def rows(self):
-
-        # self.client._get_cookies()
         page = 1
         self.client.setup()
         success = self.client.make_search(self.keys)
@@ -245,37 +193,16 @@ class CMTSPChunk(base.Chunk):
                     filepath = f"{year}/{month:02}/{day}_{process_code}_{ementa_hash}"
                     yield self.fetch_act_meta(tr, filepath)
                     time.sleep(0.1)
-                    # act_session_id = self.client.get_pdf_session_id(tr)
-                    # yield self.fetch_act_pdf(act_session_id, filepath)
-                    # import time, random
-                    # time.sleep(0.8151235 + random.random())
-                    
-
-                    # pdf_content = self.fetch_act_pdf(tr_session_id)
-                    # meta_content = self.fetch_act_meta(tr)
-                    # ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
-                    # process_code = utils.extract_digits(tr.find('td').text)
-                    # file_path = f"{process_code}_{ementa_hash}"
-                    # self.fetch_act(filepath)
-                    # self.fetch_act_pdf(filepath)
-                    # pdf_content = fetch_pdf(tr_session_id)
-
-                    ...
-                # trs.extend(self._get_page_trs(soup))
                 if self.client.search_is_over(page):
                     break
                 page += 1
         self.client.browser.driver.quit()
-            
-
-            # for tr in trs:
-            #     yield self.fetch_act(tr)
-            #     time.sleep(0.1)
 
     @utils.retryable(max_retries=3)
     def fetch_act_meta(self, tr, filepath):
         session_date = f"Data de Julgamento: {self.keys['start_date']}"
         assert pendulum.parse(self.keys['start_date']).add(days=1) == pendulum.parse(self.keys['end_date'])
+        
         #Manually inserts session date
         new_tag = bs4.Tag(name="td")
         new_tag.append(session_date)
@@ -284,35 +211,6 @@ class CMTSPChunk(base.Chunk):
             base.Content(content=tr.prettify(), dest=f"{filepath}.html",
             content_type='text/html'),
         ]
-
-    # @utils.retryable(max_retries=3)
-    # def fetch_act_pdf(self, session_id, filepath):
-    #     import requests
-    #     #self.browser.get_cookie('ASP.NET_SessionId')
-    #     cookies = {
-    #         'ASP.NET_SessionId': session_id,
-    #         'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"S","aceiteDesempenho":"S","aceiteEstatisticos":"S","aceiteTermos":"S"}',
-    #     }
-    #     headers = DEFAULT_HEADERS
-    #     response = requests.get('http://sagror.prefeitura.sp.gov.br/ManterDecisoes/VisualizarArquivo.aspx', cookies=cookies, headers=headers, verify=False)
-
-    #     return [
-    #         base.Content(content=response.content, 
-    #         dest=f"{filepath}.pdf", content_type='application/pdf')]
-
-        # return response.content
-
-    # @utils.retryable(max_retries=3)
-    # def fetch_pdf(self, pdf_href, act_id, publication_date):
-    #     data = self.client.data
-    #     data['__EVENTTARGET'] = utils.find_between(
-    #         pdf_href, start='WebForm_PostBackOptions\("', end='"')
-    #     data['__EVENTARGUMENT'] = ''
-    #     pdf_response = self.client.requester.post(self.client.base_url, data=data)
-    #     pdf_filepath = utils.get_filepath(
-    #         date=publication_date, filename=act_id, extension='pdf')
-    #     return base.Content(content=pdf_response.content, dest=pdf_filepath,
-    #         content_type='application/pdf')
 
     def _get_page_trs(self, soup):
         trs = soup.find_all('tr')
