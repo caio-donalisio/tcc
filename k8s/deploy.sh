@@ -29,6 +29,7 @@ deploy() {
     fi
 
     echo "Applying file job.yaml"
+    kubectl -n crawlers delete job "crawler-${K8S_JOB_NAME}"
     envsubst < job.yaml | kubectl apply -f -
 }
 

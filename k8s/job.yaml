@@ -4,62 +4,25 @@ metadata:
   name: crawler-${K8S_JOB_NAME}
   namespace: crawlers
 spec:
-  ttlSecondsAfterFinished: 300
   backoffLimit: 0
   template:
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: node_pool
-                operator: In
-                values:
-                - spot
       containers:
       - name: crawler
         image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
         imagePullPolicy: Always
-        command: [
-          "bash", "-c"
-        ]
+        command: [ "bash", "-c" ]
         args: [ "python commands.py ${JOB_NAME} ${PARAMS}" ]
-        env:
-          - name: CAPTCHA_API_KEY
-            value: "${CAPTCHA_API_KEY}"
-          - name: TJSP_USERNAME
-            value: "${TJSP_USERNAME}"
-          - name: TJSP_PASSWORD
-            value: "${TJSP_PASSWORD}"
-          - name: CELERY_BROKER_URL
-            value: "${CELERY_BROKER_URL}"
-          - name: CELERY_BACKEND_URL
-            value: "${CELERY_BACKEND_URL}"
-          - name: CELERY_QUEUES
-            value: "${CELERY_QUEUES}"
-          - name: PYTHONUNBUFFERED
-            value: "1"
-          - name: LOG_FILE
-            value: "false"
-          - name: ENV
-            value: "production"
-          - name: GOOGLE_APPLICATION_CREDENTIALS
-            value: "/etc/gcloud/credential.json"
-        resources:
-          requests:
-            cpu: "2"
-            memory: "4Gi"
-          limits:
-            cpu: "4"
-            memory: "8Gi"
+        envFrom:
+        - secretRef:
+            name: crawler-env
         volumeMounts:
-          - mountPath: "/etc/gcloud"
-            name: gcp-credentials
+        - mountPath: "/etc/gcloud"
+          name: gcp-credentials
       volumes:
-        - name: gcp-credentials
-          secret:
-            secretName: crawlers-credentials
+      - name: gcp-credentials
+        secret:
+          secretName: crawlers-credentials
       restartPolicy: Never
 
 
