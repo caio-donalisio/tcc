@@ -174,9 +174,22 @@ class TJPRChunk(base.Chunk):
         self.count_only = count_only
 
     def get_act_id(self, soup):
-                act_id = soup.find('b',text=re.compile(r'.*Processo.*')).next.next
-                act_id = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL).group(1).replace('-','').replace('.','')
-                return act_id
+        process_regex = re.compile(r'\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{3,6}')
+
+        act_id = soup.find('b',text=re.compile(r'.*Processo.*'))
+        if (process_regex.search(act_id.text) is None):
+            if soup.find('div', text=process_regex) is None:
+                print(soup)
+            act_id = soup.find('div', text=process_regex).text
+        else:
+            act_id = act_id.next.next
+
+        act_id_matches = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL)
+        if act_id_matches is None:
+            logger.warn(f"Failed to match process number on {act_id}")
+            return None
+        act_id = act_id_matches.group(1).replace('-','').replace('.','')
+        return act_id
 
     def get_publication_date(self, soup):
         publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
