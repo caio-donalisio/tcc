@@ -69,6 +69,9 @@ def get_filters(start_date, end_date, **kwargs):
     'iniciar': 'Pesquisar',
 }
 
+class NoProcessNumberError(Exception):
+    pass
+
 class TJPRClient:
 
     def __init__(self):
@@ -179,7 +182,7 @@ class TJPRChunk(base.Chunk):
         act_id = soup.find('b',text=re.compile(r'.*Processo.*'))
         if (process_regex.search(act_id.text) is None):
             if soup.find('div', text=process_regex) is None:
-                print(soup)
+                raise NoProcessNumberError()
             act_id = soup.find('div', text=process_regex).text
         else:
             act_id = act_id.next.next
@@ -187,7 +190,7 @@ class TJPRChunk(base.Chunk):
         act_id_matches = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL)
         if act_id_matches is None:
             logger.warn(f"Failed to match process number on {act_id}")
-            return None
+            raise NoProcessNumberError()
         act_id = act_id_matches.group(1).replace('-','').replace('.','')
         return act_id
 
@@ -222,7 +225,11 @@ class TJPRChunk(base.Chunk):
         else:
             to_download = []
             for act in self.get_acts():
-                act_id = self.get_act_id(act)
+                try:
+                    act_id = self.get_act_id(act)
+                except NoProcessNumberError:
+                    logger.info("Skipping process without number")
+                    continue
                 publication_date = self.get_publication_date(act)
                 pdf_bytes, _ = self.download_pdf(act)
                 system_code = act.find(id=re.compile(r'integra_\d{7,}')) or act.find(id=re.compile(r'ementa\d{7,}'))
