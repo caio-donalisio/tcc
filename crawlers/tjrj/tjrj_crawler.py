@@ -17,7 +17,7 @@ from logconfig import logger_factory, setup_cloud_logger
 
 logger = logger_factory('tjrj')
 
-
+BASE_VERSION = '1.1.19.0'
 BASE_URL = 'http://www4.tjrj.jus.br'
 EJURIS_URL = f'{BASE_URL}/EJURIS'
 EJUD_URL = f'{BASE_URL}/ejud/WS'
@@ -51,7 +51,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
       'Content-Type': 'application/json',
       'Host': 'www4.tjrj.jus.br',
       **self.header_generator.generate(),
-      **{'Referer': 'http://www4.tjrj.jus.br/EJURIS/ProcessarConsJuris.aspx?PageSeq=1&Version=1.1.14.2'}
+      **{'Referer': f'http://www4.tjrj.jus.br/EJURIS/ProcessarConsJuris.aspx?PageSeq=1&Version={BASE_VERSION}'}
     }
 
     self.payload = {
@@ -103,7 +103,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
 
-    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx?Version=1.1.14.2'
+    url = f'{EJURIS_URL}/ConsultarJurisprudencia.aspx?Version={BASE_VERSION}'
     logger.info(f'GET {url}')
 
     self.browser.get(url)
