@@ -83,23 +83,23 @@ class FirefoxBrowser:
 
   def select_option(self, bs4_element, option_text):
     xpath = get_soup_xpath(bs4_element)
-    select = Select(self.driver.find_element_by_xpath(xpath))
+    select = Select(self.driver.find_element(By.XPATH, xpath))
     if option_text:
         select.select_by_visible_text(option_text)
 
   def fill_in(self, field_id, value):
-    start_input = self.driver.find_element_by_id(field_id)
+    start_input = self.driver.find_element(By.ID, field_id)
     start_input.clear()
     start_input.send_keys(value)
 
   def select_by_id(self, field_id, option):
-    self.driver.find_element_by_xpath(
+    self.driver.find_element(By.XPATH,
       f"//select[@id='{field_id}']/option[text()='{option}']").click()
 
   def is_text_present(self, substring, tag="*"):
     try:
         xpath = f"//{tag}[contains(text(),'{substring}')]"
-        self.driver.find_element_by_xpath(xpath)
+        self.driver.find_element(By.XPATH, xpath)
         return True
     except NoSuchElementException:
         return False

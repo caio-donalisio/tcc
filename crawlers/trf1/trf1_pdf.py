@@ -51,7 +51,7 @@ class TRF1Downloader:
             time.sleep(sleep_time)
 
         pdf_content, inteiro_page_content = self.download_files(BeautifulSoup(item.content,'html.parser'))
-        
+
         if pbar:
           pbar.update(1)
 
@@ -73,26 +73,26 @@ class TRF1Downloader:
           content_type='application/pdf')
     else:
       logger.warn(f"Got empty document for {item.dest}.pdf")
-    
+
     if inteiro_page_content and len(inteiro_page_content) > 100:
       self._output.save_from_contents(
         filepath=f"{item.dest}_B.html",
         contents=inteiro_page_content,
         content_type='text/html')
 
-    
+
   @utils.retryable()
   def download_files(self, row):
-    
+
     from bs4 import BeautifulSoup
     import re
     import browsers
-    
+
     MAXIMUM_TIME_DISTANCE = 150
     try_pje = False
-    
+
     pdf_content, inteiro_page_content = '',''
-    
+
     acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text if row.find(attrs={'class':"titulo_doc"}) else ''
     title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
     process_link = row.find('a',text='Acesse aqui')
@@ -106,14 +106,14 @@ class TRF1Downloader:
     else:
       logger.warn(f'Process link not available for {title}')
       try_pje=True
-    
+
     #ARQUIVO TRF1
     if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
       def order_candidate(candidate):
         ordering = {'ementa':1,'relatório':2,'voto':3}
         for key in ordering:
-          if key in candidate['name'].lower(): 
+          if key in candidate['name'].lower():
             return ordering[key]
         else:
           return max(ordering.values()) + 1
@@ -139,7 +139,7 @@ class TRF1Downloader:
         pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
         dates = [link['date'] for link in candidates if re.search(DATE_PATTERN, link['date'])]
         nearest_date = self.get_nearest_date(dates, pub_date_string)
-          
+
         if nearest_date:
             time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
         if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
@@ -163,7 +163,7 @@ class TRF1Downloader:
         error_div = inteiro_soup.find(text=re.compile(r'.*Unhandled or Wrapper.*'))
         if not success or error_div:
             logger.warn(f'Document not available for: {title}')
-        
+
         else:
             inteiro_page_content = browser.page_source()
             links = self.collect_all_links(browser)
@@ -173,10 +173,10 @@ class TRF1Downloader:
                 LINK_PATTERN = r".*\'(?P<pdf_link>http.*?)\'.*"
                 if re.search(LINK_PATTERN, link['onclick']) and re.search(DATE_PATTERN_2, link.text).group(1):
                     ls.append({
-                        'date':re.search(DATE_PATTERN_2, link.text).group(1), 
+                        'date':re.search(DATE_PATTERN_2, link.text).group(1),
                         'url': re.search(LINK_PATTERN, link['onclick']).group(1)
                         })
-            
+
             nearest_date = self.get_nearest_date([l['date'] for l in ls], pub_date.groupdict().get('date'))
             ls = [l for l in ls if l['date'] == nearest_date.format(TRF1_DATE_FORMAT)]
             if not ls or abs(pendulum.from_format(pub_date.groupdict().get('date'), TRF1_DATE_FORMAT) - nearest_date).days > MAXIMUM_TIME_DISTANCE:
@@ -200,14 +200,14 @@ class TRF1Downloader:
 
   @utils.retryable(max_retries=9)
   def merge_pdfs_from_links(self, document_links, is_doc=False):
-      import PyPDF2 
+      import PyPDF2
       from io import BytesIO
       import requests
-      
+
       TRF1_ARCHIVE = 'https://arquivo.trf1.jus.br'
       merger = PyPDF2.PdfFileMerger()
       for link in document_links:
-          
+
           file = requests.get(f"{TRF1_ARCHIVE}{link}")
           if file.status_code == 200 and len(file.content) > 1:
               if is_doc:
@@ -227,8 +227,9 @@ class TRF1Downloader:
   @utils.retryable()
   def click_next_document_page(self, browser, slider_id, page):
     from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+    from selenium.webdriver.common.by import By
     try:
-        slider_page_input = browser.driver.find_element_by_id(slider_id)
+        slider_page_input = browser.driver.find_element(By.ID, slider_id)
         browser.driver.execute_script(f"arguments[0].value =  {page};", slider_page_input);
         browser.driver.execute_script("A4J.AJAX.Submit('j_id141:j_id633',event,{'similarityGroupingId':'j_id141:j_id633:j_id635','actionUrl':'/consultapublica/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'','containerId':'j_id141:j_id549','parameters':{'j_id141:j_id633:j_id635':'j_id141:j_id633:j_id635'},'status':'_viewRoot:status'} )");
         browser.driver.implicitly_wait(10)
@@ -256,9 +257,9 @@ class TRF1Downloader:
         last_page = int(last_page.text)
         current_page = table.find('input',attrs={'class':"rich-inslider-field-right rich-inslider-field"})
         current_page = int(current_page['value'])
-        
+
         if last_page and not last_page < current_page + 1:
-            self.click_next_document_page(browser=browser, 
+            self.click_next_document_page(browser=browser,
                 slider_id='j_id141:j_id633:j_id634Input', page=current_page+1)
             browser.driver.implicitly_wait(20)
         else:
@@ -283,7 +284,7 @@ class TRF1Downloader:
       browser.get(TRF1_SEARCH_LINK)
       browser.fill_in('fPP:numProcesso-inputNumeroProcessoDecoration:numProcesso-inputNumeroProcesso', title)
       browser.driver.implicitly_wait(20)
-      WebDriverWait(browser.driver, 20).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click() 
+      WebDriverWait(browser.driver, 20).until(EC.element_to_be_clickable((By.ID,'fPP:searchProcessos'))).click()
       try:
           WebDriverWait(browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//a[@title="Ver Detalhes"]')))
       except TimeoutException:
@@ -350,7 +351,7 @@ def trf1_download_task(items, output_uri):
   downloader = TRF1Downloader(output)
 
   tqdm_out = utils.TqdmToLogger(logger, level=logging.INFO)
-  
+
 
   with tqdm(total=len(items), file=tqdm_out) as pbar:
     to_download = []
@@ -358,7 +359,7 @@ def trf1_download_task(items, output_uri):
     for item in items:
       to_download.append(
         base.Content(
-          content=item['row'], 
+          content=item['row'],
           dest=item['dest'])
         )
       downloader.download(to_download, pbar)
@@ -371,7 +372,7 @@ def trf1_download(items, output_uri, pbar):
   for n, item in enumerate(items):
     to_download.append(
         base.Content(
-          content=item['row'], 
+          content=item['row'],
           dest=item['dest'],
           content_type='text/html')
         )
@@ -411,7 +412,7 @@ def trf1_pdf_command(input_uri, prefix, dry_run, local, count):
       for pending in pendings:
         if not dry_run:
           batch.append(pending)
-          if len(batch) >= 10:    
+          if len(batch) >= 10:
             futures.append(executor.submit(trf1_download, batch, input_uri, pbar))
             # time.sleep(random.uniform(5., 8.))
             batch = []

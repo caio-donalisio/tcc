@@ -10,6 +10,7 @@ import requests
 import utils
 from celery_singleton import Singleton
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from slugify import slugify
@@ -239,14 +240,14 @@ class TJSPClient:
     password = os.getenv('TJSP_PASSWORD')
     assert password
 
-    user_name = self.driver.find_element_by_id('usernameForm')
+    user_name = self.driver.find_element(By.ID, 'usernameForm')
     user_name.send_keys(username)
 
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.ID, 'passwordForm')))
-    user_name = self.driver.find_element_by_id('passwordForm')
+    user_name = self.driver.find_element(By.ID, 'passwordForm')
     user_name.send_keys(password)
-    self.driver.find_element_by_id('pbEntrar').click()
+    self.driver.find_element(By.ID, 'pbEntrar').click()
 
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.CLASS_NAME, 'esajTabelaServico')))
@@ -276,16 +277,16 @@ class TJSPClient:
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.ID, 'iddados.buscaInteiroTeor')))
 
-    search_box = self.driver.find_element_by_id('iddados.buscaInteiroTeor')
+    search_box = self.driver.find_element(By.ID, 'iddados.buscaInteiroTeor')
     search_box.send_keys('a ou de ou o')
-    start_box = self.driver.find_element_by_id('iddados.dtJulgamentoInicio')
+    start_box = self.driver.find_element(By.ID, 'iddados.dtJulgamentoInicio')
     start_box.send_keys(start_)
-    end_box = self.driver.find_element_by_id('iddados.dtJulgamentoFim')
+    end_box = self.driver.find_element(By.ID, 'iddados.dtJulgamentoFim')
     end_box.send_keys(end_)
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.ID, 'pbSubmit')))
 
-    search_button = self.driver.find_element_by_id('pbSubmit')
+    search_button = self.driver.find_element(By.ID, 'pbSubmit')
     search_button.click()
 
     WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.ID, 'totalResultadoAba-A')))

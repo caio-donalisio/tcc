@@ -21,8 +21,8 @@ RUN apt-get update \
 
 # Install Poetry - respects $POETRY_VERSION & $POETRY_HOME
 # Versao em 12 set 2021
-ENV POETRY_VERSION=1.1.8
-RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
+ENV POETRY_VERSION=1.2.0
+RUN curl -sSL https://install.python-poetry.org | python -
 
 # We copy our Python requirements here to cache them
 # and install only runtime deps using poetry
