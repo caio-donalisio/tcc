@@ -234,7 +234,6 @@ def cmtsp_download(items, output_uri, pbar):
   downloader.download(to_download, pbar)
 
 @cli.command(name='cmtsp-pdf')
-@click.option('--prefix', default=None)
 @click.option('--start-date',
   default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
   help='Format YYYY-MM.',
@@ -247,42 +246,22 @@ def cmtsp_download(items, output_uri, pbar):
 @click.option('--dry-run'     , default=False, is_flag=True)
 @click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def cmtsp_pdf_command(input_uri, prefix, start_date, end_date, dry_run, local, count):
-  batch  = []
+def cmtsp_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
   output = utils.get_output_strategy_by_path(path=input_uri)
   startDate = pendulum.parse(start_date)
   endDate = pendulum.parse(end_date)
 
   if count:
     total = 0
-    if prefix is None:
-      while startDate <= endDate:
-        for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
-          total += 1
-        startDate = startDate.add(months=1)
-    else:
-      for _ in list_pending_pdfs(output._bucket_name, prefix):
+    while startDate <= endDate:
+      for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
         total += 1
+      startDate = startDate.add(months=1)
     print('Total files to download', total)
     return
 
-  # for testing purposes
-  if local:
-    import concurrent.futures
-
-    from tqdm import tqdm
-
-    # just to count
-    pendings = []
-    if prefix is None:
-      while startDate <= endDate:
-        for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
-          total += 1
-        startDate = startDate.add(months=1)
-    else:
-      for pending in list_pending_pdfs(output._bucket_name, prefix):
-        pendings.append(pending)
-
+  def run_tasks(pendings):
+    batch = []
     with tqdm(total=len(pendings)) as pbar:
       executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
       futures  = []
@@ -300,3 +279,18 @@ def cmtsp_pdf_command(input_uri, prefix, start_date, end_date, dry_run, local, c
     executor.shutdown()
     if len(batch):
       cmtsp_download(batch, input_uri, pbar)
+
+  if local:
+    total = 0
+    import concurrent.futures
+    from tqdm import tqdm
+    while startDate <= endDate:
+      print(f"CMTSP - Collecting {startDate.format('YYYY/MM')}...")
+      pendings = []
+      for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+
+        pendings.append(pending)
+        total += 1
+      
+      run_tasks(pendings)
+      startDate = startDate.add(months=1)
