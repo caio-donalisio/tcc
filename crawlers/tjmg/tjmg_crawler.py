@@ -245,7 +245,7 @@ class CaptchaSolver(TJMG):
                 url=f'{BASE_URL}/captchaAudio.svl',
                 headers=self.headers)
             text = self._recognize_audio_by_content(response.content)
-            captcha_box = browser.driver.find_element_by_id('captcha_text')
+            captcha_box = browser.driver.find_element(By.ID, 'captcha_text')
             captcha_box.send_keys(text)
             if browser.is_text_present('não corresponde', tag='div'):
                 browser.click(self._find(id='gerar'))

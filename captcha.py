@@ -3,6 +3,8 @@ import pendulum
 import requests
 import os
 
+from selenium.webdriver.common.by import By
+
 API_KEY = os.getenv('CAPTCHA_API_KEY')
 
 
@@ -35,7 +37,7 @@ def get_captcha_response(logger, site_key, site_url):
             # raise utils.PleaseRetryException
 
 def solve_recaptcha(browser, logger, site_key):
-    google_captcha_response_input = browser.driver.find_element_by_id('g-recaptcha-response')
+    google_captcha_response_input = browser.driver.find_element(By.ID, 'g-recaptcha-response')
     # make input visible
     browser.driver.execute_script(
         "arguments[0].setAttribute('style','type: text; visibility:visible;');",

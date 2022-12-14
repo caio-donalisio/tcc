@@ -46,8 +46,8 @@ class TRF5Downloader:
         #     jitter     = random.uniform(.5, 1.2)
         #     sleep_time = (interval - since) + jitter
         #     time.sleep(sleep_time)
-        
-      
+
+
         report = self._get_report_url(item.content)
         if report.get('url'):
           response = self._get_response(base.ContentFromURL(
@@ -57,7 +57,7 @@ class TRF5Downloader:
 
                 ))
           item.content_type = report.get('content_type')
-        
+
         if pbar:
           pbar.update(1)
 
@@ -122,7 +122,7 @@ class TRF5Downloader:
 
     return self._get_judgment_doc_url_by_closest_date(links)
 
-    
+
   def _get_report_url_from_pje(self, doc):
     import browsers
 
@@ -134,7 +134,7 @@ class TRF5Downloader:
     doc_url = self._get_judgment_doc_url(details_url, browser, doc)
     browser.quit()
     return doc_url
-    
+
 
   def _get_judgment_details_url(self, browser, doc):
     from selenium.webdriver.common.by import By
@@ -145,41 +145,41 @@ class TRF5Downloader:
 
     judgment_id = self._format_process_number(doc['numeroProcesso'])
     logger.info(judgment_id)
-    process_input = browser.driver.find_element_by_id('consultaPublicaForm:Processo:ProcessoDecoration:Processo')  
+    process_input = browser.driver.find_element(By.ID, 'consultaPublicaForm:Processo:ProcessoDecoration:Processo')
     browser.driver.execute_script(f"arguments[0].value='{judgment_id}';", process_input)
 
     while not browser.is_text_present('Ver Detalhes', tag='img'):
         logger.debug(f'Solving Captcha...')
-        captcha_img = browser.driver.find_element_by_id('consultaPublicaForm:captcha:captchaImg')
+        captcha_img = browser.driver.find_element(By.ID, 'consultaPublicaForm:captcha:captchaImg')
 
         captcha_img_base64 = browser.driver.execute_script("""
             var ele = arguments[0];
             var cnv = document.createElement('canvas');
             cnv.width = ele.width; cnv.height = ele.height;
             cnv.getContext('2d').drawImage(ele, 0, 0);
-            return cnv.toDataURL('image/jpeg').substring(23);    
+            return cnv.toDataURL('image/jpeg').substring(23);
             """, captcha_img)
 
         captcha_resolved = self._resolve_captcha(captcha_img_base64)
         logger.debug(f'Captcha API Resolved: {captcha_resolved}')
-        captcha_input = browser.driver.find_element_by_id('consultaPublicaForm:captcha:j_id268:verifyCaptcha')
+        captcha_input = browser.driver.find_element(By.ID, 'consultaPublicaForm:captcha:j_id268:verifyCaptcha')
         captcha_input.send_keys(captcha_resolved)
 
-        search_button = browser.driver.find_element_by_id('consultaPublicaForm:pesq')
+        search_button = browser.driver.find_element(By.ID, 'consultaPublicaForm:pesq')
         search_button.click()
         time.sleep(1)
-    
+
         if not browser.is_text_present('Resposta incorreta'):
           if browser.is_text_present('Foram encontrados: 0 resultados'):
             logger.warn(f'Not results for {judgment_id}')
             return None
           browser.wait_for_element(locator=(By.ID, 'consultaPublicaList2:0:j_id315:j_id318'), timeout=60)
-          doc_link = browser.driver.find_element_by_id('consultaPublicaList2:0:j_id315:j_id318')                                            
+          doc_link = browser.driver.find_element(By.ID, 'consultaPublicaList2:0:j_id315:j_id318')
           return self._extract_judgment_detail_url(doc_link)
         else:
             logger.warn(f'Incorrect Captcha!!! Trying again...')
 
-    
+
   def _format_process_number(self, value):
     import re
 
@@ -188,7 +188,7 @@ class TRF5Downloader:
                 "\\1-\\2.\\3.\\4.\\5.\\6",
                 value)
 
-    
+
   def _resolve_captcha(self, captcha):
     import requests
     import os
@@ -244,7 +244,7 @@ class TRF5Downloader:
         slider_total_pages_td = browser.driver.find_element(By.XPATH, "//td[contains(@class, 'rich-inslider-right-num')]")
         slider_total_pages = int(slider_total_pages_td.text)
 
-        slider_page_input = browser.driver.find_element_by_id('j_id423:j_id424Input')
+        slider_page_input = browser.driver.find_element(By.ID, 'j_id423:j_id424Input')
         slider_page = int(slider_page_input.get_attribute('value'))
 
     links = []
@@ -264,9 +264,9 @@ class TRF5Downloader:
                         'days': days,
                         'url': self._extract_url_from_event(a.get('onclick'))
                     })
-                    
+
         if browser.driver.find_elements_by_id('j_id423:j_id424Input'):
-            slider_page_input = browser.driver.find_element_by_id('j_id423:j_id424Input')
+            slider_page_input = browser.driver.find_element(By.ID, 'j_id423:j_id424Input')
             browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
             slider_page = int(slider_page_input.get_attribute('value'))
             browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");
@@ -276,12 +276,12 @@ class TRF5Downloader:
 
     return self._get_judgment_doc_url_by_closest_date(links)
 
-    
+
   def _get_judgment_doc_url_by_closest_date(self, links):
     if len(links) > 0:
         sorted_list = sorted(links, key=lambda d: d['days'])
         return sorted_list[0]['url']
-    
+
     return None
 
   def _extract_url_from_event(self, event_data):
@@ -291,7 +291,7 @@ class TRF5Downloader:
     m = pattern.match(event_data)
     if m:
         return m.group(1)
-    
+
     return None
 
 
@@ -331,7 +331,7 @@ class TRF5Downloader:
       filepath = f'{content_from_url.dest}.pdf'
     elif 'html' in content_from_url.content_type:
       filepath = f'{content_from_url.dest}.html'
-    
+
     if len(response.content) > 0:
       self._output.save_from_contents(
           filepath=filepath,

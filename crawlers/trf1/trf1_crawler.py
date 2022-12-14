@@ -57,7 +57,7 @@ class TRF1Client:
         captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
 
         #CLICK 'PESQUISAR'
-        self.browser.driver.find_element_by_id('formulario:actPesquisar').click()
+        self.browser.driver.find_element(By.ID, 'formulario:actPesquisar').click()
         self.browser.driver.implicitly_wait(10)
 
         #SELECT NUMBER OF PROCESS PER PAGE
