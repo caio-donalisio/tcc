@@ -59,7 +59,7 @@ class CMTSPDownloader:
             time.sleep(sleep_time)
 
         # pdf_content = self.get_pdf_content(BeautifulSoup(item.content,'html.parser'))
-        
+
         if pbar:
           pbar.update(1)
 
@@ -115,7 +115,7 @@ class CMTSPDownloader:
             page += 1
             client.fetch(filters, page=page)
             rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
-    
+
     if len(rows) == 0:
       logger.warn(f'Could not find searched process: {process}')
       client.browser.driver.quit()
@@ -183,7 +183,7 @@ class CMTSPDownloader:
     session_id = browser.get_cookie('ASP.NET_SessionId')
     browser.driver.quit()
     return session_id
-    
+
   @utils.retryable()
   def fetch_pdf(self, session_id):
       import requests
@@ -206,7 +206,7 @@ def cmtsp_download_task(items, output_uri):
   downloader = CMTSPDownloader(output)
 
   tqdm_out = utils.TqdmToLogger(logger, level=logging.INFO)
-  
+
 
   with tqdm(total=len(items), file=tqdm_out) as pbar:
     to_download = []
@@ -214,7 +214,7 @@ def cmtsp_download_task(items, output_uri):
     for item in items:
       to_download.append(
         base.Content(
-          content=item['row'], 
+          content=item['row'],
           dest=item['dest'])
         )
       downloader.download(to_download, pbar)
@@ -227,26 +227,42 @@ def cmtsp_download(items, output_uri, pbar):
   for n, item in enumerate(items):
     to_download.append(
         base.Content(
-          content=item['row'], 
+          content=item['row'],
           dest=item['dest'],
           content_type='text/html')
         )
   downloader.download(to_download, pbar)
 
 @cli.command(name='cmtsp-pdf')
-@click.option('--prefix')
+@click.option('--prefix', default=None)
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
 @click.option('--input-uri'   , help='Input URI')
 @click.option('--dry-run'     , default=False, is_flag=True)
 @click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def cmtsp_pdf_command(input_uri, prefix, dry_run, local, count):
+def cmtsp_pdf_command(input_uri, prefix, start_date, end_date, dry_run, local, count):
   batch  = []
   output = utils.get_output_strategy_by_path(path=input_uri)
+  startDate = pendulum.parse(start_date)
+  endDate = pendulum.parse(end_date)
 
   if count:
     total = 0
-    for _ in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
+    if prefix is None:
+      while startDate <= endDate:
+        for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+          total += 1
+        startDate = startDate.add(months=1)
+    else:
+      for _ in list_pending_pdfs(output._bucket_name, prefix):
+        total += 1
     print('Total files to download', total)
     return
 
@@ -258,8 +274,14 @@ def cmtsp_pdf_command(input_uri, prefix, dry_run, local, count):
 
     # just to count
     pendings = []
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
-      pendings.append(pending)
+    if prefix is None:
+      while startDate <= endDate:
+        for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+          total += 1
+        startDate = startDate.add(months=1)
+    else:
+      for pending in list_pending_pdfs(output._bucket_name, prefix):
+        pendings.append(pending)
 
     with tqdm(total=len(pendings)) as pbar:
       executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
@@ -267,7 +289,7 @@ def cmtsp_pdf_command(input_uri, prefix, dry_run, local, count):
       for pending in pendings:
         if not dry_run:
           batch.append(pending)
-          if len(batch) >= 5:    
+          if len(batch) >= 5:
             futures.append(executor.submit(cmtsp_download, batch, input_uri, pbar))
             # time.sleep(random.uniform(5., 8.))
             batch = []
