@@ -144,11 +144,16 @@ class TJBAChunk(base.Chunk):
       report_url  =\
         f'https://jurisprudenciaws.tjba.jus.br/inteiroTeor/{doc_hash}'
 
-      yield [
-        base.Content(content=json.dumps(record), dest=dest_record,
-                     content_type='application/json'),
-        base.ContentFromURL(src=report_url, dest=dest_report)
-      ]
+
+      if doc_hash is not None:
+        yield [
+          base.Content(content=json.dumps(record), dest=dest_record,
+            content_type='application/json'),
+          base.ContentFromURL(src=report_url, dest=dest_report)
+        ]
+      else:
+        logger.warn(f'Inteiro not available for {base_path=} {doc_id=}')
+        yield []
 
 
 @celery.task(name='crawlers.tjba', default_retry_delay=5 * 60,
