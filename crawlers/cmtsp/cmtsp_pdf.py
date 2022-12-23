@@ -106,6 +106,7 @@ class CMTSPDownloader:
       filters = {
         'start_date': date_obj.format('YYYY-MM-DD'),
         'end_date': date_obj.add(days=1).format('YYYY-MM-DD')}
+      client.browser.driver.close()
       client.setup()
       client.make_search(filters=filters, by='date')
       rows = self.filter_rows(reference_row=row, rows=client.browser.bsoup().find_all('tr'))
@@ -122,37 +123,13 @@ class CMTSPDownloader:
       logger.warn(f'Could not find searched process: {process}')
       client.browser.driver.quit()
     elif len(rows) == 1:
-      return self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
+      pdf_content = self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
+      client.browser.driver.quit()
+      return pdf_content
     elif len(rows) > 1:
       client.browser.driver.quit()
       logger.warn(f'{len(rows)} processes found for {process}, expected 1')
       # raise Exception(f'{len(rows)} processes found for {process}, expected 1')
-
-  @utils.retryable(ignore_if_exceeds=True)
-  def make_pdf_search(self, row, by:str):
-    process, _, date , __ = self.extract_info_from_meta(row)
-    browser = FirefoxBrowser(headless=True)
-    browser.get(WEBSITE_URL)
-    browser.driver.implicitly_wait(10)
-    logger.info(f'Trying to collect {process} by number...')
-    if browser.bsoup().find('prodamsp-componente-consentimento'):
-        browser.driver.execute_script('''
-        document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
-    browser.driver.implicitly_wait(10)
-    browser.fill_in("txtExpressao", process.strip())
-    browser.driver.implicitly_wait(10)
-    captcha.solve_recaptcha(browser, logger, site_key=SITE_KEY)
-    browser.driver.find_element_by_id('btnPesquisar').click()
-    rows = self.filter_rows(row, browser.bsoup().find_all('tr'))
-    if not rows:
-      date_obj = pendulum.from_format(utils.extract_digits(date),CMTSP_DATE_FORMAT)
-      browser.fill_in('txtDtInicio',date_obj.format(CMTSP_DATE_FORMAT))
-      browser.fill_in('txtDtFim',date_obj.add(days=1).format(CMTSP_DATE_FORMAT))
-      browser.driver.implicitly_wait(10)
-      captcha.solve_recaptcha(browser, logger, site_key=SITE_KEY)
-      browser.driver.find_element_by_id('btnPesquisar').click()
-    browser.driver.implicitly_wait(10)
-    return browser
 
   def extract_info_from_meta(self, row):
     process = row.find_all('td')[0].text.strip()
