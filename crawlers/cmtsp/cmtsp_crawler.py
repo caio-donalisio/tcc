@@ -53,8 +53,17 @@ class CMTSPClient:
     def page_searched(self):
         return bool(self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$')))
     
-    def get_current_page(self):
-        return int(self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$')).text)
+    def get_current_page(self, retries=3):
+        for _ in range(retries):
+            counter = self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$'))
+            if counter:
+                return int(counter.text)
+            else:
+                print('sleeping')
+                time.sleep(3)
+        else:
+            logger.warn('Could not find current page number')
+            raise utils.PleaseRetryException()
     
     def search_is_over(self, current_page):
         return bool(

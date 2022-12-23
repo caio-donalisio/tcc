@@ -71,20 +71,22 @@ class CMTSPDownloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
+  @utils.retryable(ignore_if_exceeds=True)
   def _handle_upload(self, item):
     pdf_content = self.get_pdf_content(BeautifulSoup(item.content,'html.parser'))
     logger.debug(f'GET {item} UPLOAD')
 
-    if pdf_content and len(pdf_content) > 100:
+    if pdf_content and len(pdf_content) > 50_000:
       self._output.save_from_contents(
           filepath=f"{item.dest}.pdf",
           contents=pdf_content,
           content_type='application/pdf')
     else:
-      logger.warn(f"Got empty document for {item.dest}.pdf")
+      logger.warn(f"Got empty document for {item.dest}.pdf - retrying...")
+      raise utils.PleaseRetryException()
 
 
-  @utils.retryable()
+  @utils.retryable(ignore_if_exceeds=True)
   def get_pdf_content(self, row):
     process, _, date , __ = self.extract_info_from_meta(row)
     rows = []
@@ -126,7 +128,7 @@ class CMTSPDownloader:
       logger.warn(f'{len(rows)} processes found for {process}, expected 1')
       # raise Exception(f'{len(rows)} processes found for {process}, expected 1')
 
-  @utils.retryable()
+  @utils.retryable(ignore_if_exceeds=True)
   def make_pdf_search(self, row, by:str):
     process, _, date , __ = self.extract_info_from_meta(row)
     browser = FirefoxBrowser(headless=True)
@@ -166,7 +168,7 @@ class CMTSPDownloader:
     rows = [tr for tr in rows if tr.find_all('td')[2].text.strip() == ementa]
     return rows
 
-  @utils.retryable()
+  @utils.retryable(ignore_if_exceeds=True)
   def get_pdf_session_id(self, browser, tr):
     browser.driver.find_element_by_id(tr.a['id']).click()
     browser.driver.implicitly_wait(3)
@@ -184,7 +186,7 @@ class CMTSPDownloader:
     browser.driver.quit()
     return session_id
 
-  @utils.retryable()
+  @utils.retryable(ignore_if_exceeds=True)
   def fetch_pdf(self, session_id):
       import requests
       cookies = {

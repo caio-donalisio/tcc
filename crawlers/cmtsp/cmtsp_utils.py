@@ -5,7 +5,7 @@ from google.cloud import storage
 client = storage.Client()
 
 
-
+@utils.retryable()
 def list_all(bucket_name, prefix):
   bucket = utils.get_bucket_ref(bucket_name)
   for blob in bucket.list_blobs(prefix=prefix):
