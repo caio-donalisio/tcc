@@ -1,15 +1,15 @@
-import base
+from app.crawlers import base, utils, browsers, captcha
 import pendulum
-import celery
-import utils
-from logconfig import logger_factory, setup_cloud_logger
+
+from app.crawlers.logconfig import logger_factory, setup_cloud_logger
+
 import click
-from app import cli, celery
+from app.celery_run import celery_app as celery
+from app.crawler_cli import cli
 import re
 import time
-import captcha
+
 from selenium.common.exceptions import UnexpectedAlertPresentException, JavascriptException
-import browsers
 import bs4
 
 DEBUG = False
@@ -40,7 +40,7 @@ logger = logger_factory('cmtsp')
 class CMTSPClient:
 
     def __init__(self):
-        import browsers
+        from app.crawlers import browsers
         # self.browser = browsers.FirefoxBrowser()
         # self.browser = browsers.FirefoxBrowser(headless=not DEBUG)
 
@@ -226,13 +226,13 @@ class CMTSPChunk(base.Chunk):
         return trs[1:len(trs)-1]
 
 
-@celery.task(queue='crawlers.cmtsp', default_retry_delay=5 * 60,
+@celery.task(name='crawlers.cmtsp', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def cmtsp_task(**kwargs):
-    import utils
+    from app.crawlers import utils
     setup_cloud_logger(logger)
 
-    from logutils import logging_context
+    from app.crawlers.logutils import logging_context
 
     with logging_context(crawler='cmtsp'):
         output = utils.get_output_strategy_by_path(

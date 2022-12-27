@@ -1,6 +1,6 @@
 import pathlib
 
-import utils
+from app.crawlers import  utils
 from google.cloud import storage
 client = storage.Client()
 

@@ -1,16 +1,17 @@
 import logging
 import random
 import time
-import base
+from app.crawlers import base, utils
+
 import click
 import pendulum
-import utils
-from app import celery, cli
-from crawlers.cmtsp.cmtsp_crawler import CMTSPClient
-from crawlers.cmtsp.cmtsp_utils import list_pending_pdfs
-from logconfig import logger_factory
-import captcha
-from browsers import FirefoxBrowser
+
+from app.celery_run import celery_app as celery
+from app.crawler_cli import cli
+
+from app.crawlers.cmtsp.cmtsp_crawler import CMTSPClient
+from app.crawlers.cmtsp.cmtsp_utils import list_pending_pdfs
+from app.crawlers.logconfig import logger_factory
 from bs4 import BeautifulSoup
 
 logger = logger_factory('cmtsp-pdf')
