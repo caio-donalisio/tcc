@@ -16,7 +16,7 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "python", "commands.py", "scrfb", "--output-uri", "gs://inspira-production-buckets-scrfb" ]
+            command: [ "python", "-m", "app.commands", "scrfb", "--output-uri", "gs://inspira-production-buckets-scrfb" ]
             envFrom:
             - secretRef:
                 name: crawler-env
