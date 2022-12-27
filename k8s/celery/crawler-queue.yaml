@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crawler-queue
+  labels:
+    app: crawler-queue
+  namespace: crawlers
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "80%"
+  selector:
+    matchLabels:
+      app: crawler-queue
+  template:
+    metadata:
+      labels:
+        app: crawler-queue
+    spec:
+      terminationGracePeriodSeconds: 600
+      containers:
+        - name: crawler-queue
+          image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: [ 'celery', '-A', 'app.celery_run.celery_app', 'worker', '-Q', 'crawler-queue','--concurrency=2', '-l', 'info' ]
+          envFrom:
+            - configMapRef:
+                name: crawler-env
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "150M"
+            limits:
+              memory: "512M"
+      restartPolicy: Always

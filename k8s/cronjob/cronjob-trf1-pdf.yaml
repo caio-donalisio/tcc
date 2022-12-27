@@ -19,7 +19,7 @@ spec:
             command: [ "/bin/bash", "-c" ]
             args:
             - export PREFIX=$(TZ=UTC+167 date +"%Y/%m");
-              python commands.py trf1-pdf --prefix "${PREFIX}" --local --input-uri gs://inspira-production-buckets-trf1
+              python -m app.commands trf1-pdf --prefix "${PREFIX}" --local --input-uri gs://inspira-production-buckets-trf1
             envFrom:
             - secretRef:
                 name: crawler-env

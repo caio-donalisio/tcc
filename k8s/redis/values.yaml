@@ -1,0 +1,25 @@
+auth:
+  enabled: false
+  sentinel: false
+
+sentinel:
+  enabled: true
+  downAfterMilliseconds: 15000
+  failoverTimeout: 180000
+
+
+replica:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "2Gi"
+    limits:
+      memory: "4Gi"
+  persistence:
+    size: "16Gi"
+
+  securityContext:
+    # https://docs.bitnami.com/kubernetes/infrastructure/redis/administration/configure-kernel-settings/
+    sysctls:
+      - name: net.core.somaxconn
+        value: "10000"

@@ -43,7 +43,8 @@ COPY --from=inspira-builder-base $PYSETUP_PATH $PYSETUP_PATH
 WORKDIR $PYSETUP_PATH
 RUN poetry install
 
-WORKDIR /opt/service
-COPY . ./
+WORKDIR /app
+
+COPY ./app /app/app
 
 CMD [ "bash" ]
