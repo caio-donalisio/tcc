@@ -14,6 +14,8 @@ from app.crawlers.cmtsp.cmtsp_utils import list_pending_pdfs
 from app.crawlers.logconfig import logger_factory
 from bs4 import BeautifulSoup
 
+from selenium.webdriver.common.by import By
+
 logger = logger_factory('cmtsp-pdf')
 
 CMTSP_DATE_FORMAT = 'DDMMYYYY'
@@ -148,7 +150,7 @@ class CMTSPDownloader:
 
   @utils.retryable(ignore_if_exceeds=True)
   def get_pdf_session_id(self, browser, tr):
-    browser.driver.find_element_by_id(tr.a['id']).click()
+    browser.driver.find_element(By.ID, tr.a['id']).click()
     browser.driver.implicitly_wait(3)
     try:
       main_window, pop_up_window = browser.driver.window_handles
@@ -271,6 +273,6 @@ def cmtsp_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
 
         pendings.append(pending)
         total += 1
-      
+
       run_tasks(pendings)
       startDate = startDate.add(months=1)
