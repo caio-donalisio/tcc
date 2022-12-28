@@ -1,11 +1,9 @@
 import os
 
+from kombu import Queue
+
 TJSP_USERNAME = os.getenv("TJSP_USERNAME", None)
 TJSP_PASSWORD = os.getenv("TJSP_PASSWORD", None)
-
-from .default import *  # noqa
-
-from kombu import Queue
 
 result_backend = os.getenv("CELERY_BACKEND_URL", "redis://127.0.0.1:6379/0")
 broker_url = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")

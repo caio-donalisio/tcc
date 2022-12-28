@@ -1,4 +1,4 @@
-from .default import *  # noqa
+import os
 
 from kombu import Queue
 
