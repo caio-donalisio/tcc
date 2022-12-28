@@ -3,6 +3,7 @@ import pendulum
 
 from app.crawlers.logconfig import logger_factory, setup_cloud_logger
 
+import bs4
 import click
 from app.celery_run import celery_app as celery
 from app.crawler_cli import cli
@@ -10,7 +11,7 @@ import re
 import time
 
 from selenium.common.exceptions import UnexpectedAlertPresentException, JavascriptException
-import bs4
+from selenium.webdriver.common.by import By
 
 DEBUG = False
 SITE_KEY = '6Lf778wZAAAAAKo4YvpkhvjwsrXd53EoJOWsWjAY' # k value of recaptcha, found inside page
@@ -22,17 +23,17 @@ FILES_PER_PAGE = 10
 PDF_URL = ''
 CMTSP_SEARCH_LINK = ''
 DEFAULT_HEADERS =  {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.56',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-            'Cache-Control': 'max-age=0',
-            # 'Accept-Encoding': 'gzip, deflate',
-            'Referer': 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx',
-            'Connection': 'keep-alive',
-            # Requests sorts cookies= alphabetically
-            # 'Cookie': 'ASP.NET_SessionId=pl0zpa11y03mwmshi1inotwv; SWCookieConfig={"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
-            'Upgrade-Insecure-Requests': '1',
-        }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.56',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+        'Cache-Control': 'max-age=0',
+        # 'Accept-Encoding': 'gzip, deflate',
+        'Referer': 'http://sagror.prefeitura.sp.gov.br/ManterDecisoes/pesquisaDecisoesCMT.aspx',
+        'Connection': 'keep-alive',
+        # Requests sorts cookies= alphabetically
+        # 'Cookie': 'ASP.NET_SessionId=pl0zpa11y03mwmshi1inotwv; SWCookieConfig={"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
+        'Upgrade-Insecure-Requests': '1',
+    }
 
 
 logger = logger_factory('cmtsp')
@@ -52,7 +53,7 @@ class CMTSPClient:
     @property
     def page_searched(self):
         return bool(self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$')))
-    
+
     def get_current_page(self, retries=3):
         for _ in range(retries):
             counter = self.browser.bsoup().find(name='span', text=re.compile(r'^\d+$'))
@@ -64,7 +65,7 @@ class CMTSPClient:
         else:
             logger.warn('Could not find current page number')
             raise utils.PleaseRetryException()
-    
+
     def search_is_over(self, current_page):
         return bool(
             not self.browser.bsoup().find('a',attrs={'href':"__doPostBack('grdPesquisaDecisoes$ctl14$ctl11','')"}) and \
@@ -93,12 +94,12 @@ class CMTSPClient:
             raise Exception(f'Option "{by}" not available')
         #RECAPTCHA
         captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-        
+
         #CLICK 'PESQUISAR'
-        self.browser.driver.find_element_by_id('btnPesquisar').click()
+        self.browser.driver.find_element(By.ID, 'btnPesquisar').click()
         self.browser.driver.implicitly_wait(10)
 
-        try: 
+        try:
             return bool(self.browser.bsoup().find('td', text='Ementa'))
         except UnexpectedAlertPresentException:
             return False
@@ -129,11 +130,11 @@ class CMTSPClient:
                     else:
                         self.browser.driver.execute(f"""__doPostBack('grdPesquisaDecisoes$ctl14$ctl00','')""")
                 else:
-                    self.browser.driver.find_element_by_xpath(f'//a[text()="{page}"]').click()
+                    self.browser.driver.find_element(By.XPATH, f'//a[text()="{page}"]').click()
         return self.browser.bsoup()
 
     def get_pdf_session_id(self, tr):
-        self.browser.driver.find_element_by_id(tr.a['id']).click()
+        self.browser.driver.find_element(By.ID, tr.a['id']).click()
         self.browser.driver.implicitly_wait(3)
         main_window, pop_up_window = self.browser.driver.window_handles
         self.browser.driver.switch_to_window(pop_up_window)
@@ -160,8 +161,8 @@ class CMTSPCollector(base.ICollector):
     @utils.retryable(max_retries=9, sleeptime=20)
     def chunks(self):
         ranges = utils.timely(
-            pendulum.parse(self.filters['start_date']), 
-            pendulum.parse(self.filters['end_date']), 
+            pendulum.parse(self.filters['start_date']),
+            pendulum.parse(self.filters['end_date']),
             unit='days', step=1)
 
         for start_date, end_date in reversed(list(ranges)):
@@ -193,9 +194,9 @@ class CMTSPChunk(base.Chunk):
             while True:
                 soup = self.client.fetch(self.filters, page)
                 trs = self._get_page_trs(soup)
-                
+
                 for tr in trs:
-                    date = pendulum.parse(self.keys.get('start_date')) 
+                    date = pendulum.parse(self.keys.get('start_date'))
                     year, month, day = date.year, date.month, date.day
                     ementa_hash = utils.get_content_hash(tr, [{'name':'td'}])
                     process_code = utils.extract_digits(tr.find('td').text)
@@ -211,7 +212,7 @@ class CMTSPChunk(base.Chunk):
     def fetch_act_meta(self, tr, filepath):
         session_date = f"Data de Julgamento: {self.keys['start_date']}"
         assert pendulum.parse(self.keys['start_date']).add(days=1) == pendulum.parse(self.keys['end_date'])
-        
+
         #Manually inserts session date
         new_tag = bs4.Tag(name="td")
         new_tag.append(session_date)
