@@ -156,12 +156,12 @@ class CMTSPDownloader:
       main_window, pop_up_window = browser.driver.window_handles
     except ValueError:
       raise utils.PleaseRetryException()
-    browser.driver.switch_to_window(pop_up_window)
+    browser.driver.switch_to.window(pop_up_window)
     browser.driver.implicitly_wait(10)
     if browser.bsoup().find('div', class_='g-recaptcha'):
         raise Exception('Captcha not expected')
     browser.driver.close()
-    browser.driver.switch_to_window(main_window)
+    browser.driver.switch_to.window(main_window)
     session_id = browser.get_cookie('ASP.NET_SessionId')
     browser.driver.quit()
     return session_id
