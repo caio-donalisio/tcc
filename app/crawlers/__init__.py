@@ -1,4 +1,5 @@
 import app.crawlers.carf
+import app.crawlers.cmtsp
 import app.crawlers.scrfb
 import app.crawlers.stj
 import app.crawlers.stf
