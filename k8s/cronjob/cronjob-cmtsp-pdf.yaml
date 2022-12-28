@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: cmtsp-pdf-ago-crawler
+  name: cmtsp-pdf-crawler
   namespace: crawlers
 spec:
   schedule: "10 6 */2 * *"
@@ -16,7 +16,7 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "python", "commands.py", "cmtsp-pdf", "--local", "--input-uri", "gs://inspira-production-buckets-cmtsp" ]
+            command: [ "python", "-m", "app.commands", "cmtsp-pdf", "--input-uri", "gs://inspira-production-buckets-cmtsp" ]
             envFrom:
             - secretRef:
                 name: crawler-env
