@@ -1,6 +1,7 @@
 import logging
 import random
 import time
+import requests
 from app.crawlers import base, utils
 
 import click
@@ -127,7 +128,10 @@ class CMTSPDownloader:
       client.browser.driver.quit()
     elif len(rows) == 1:
       pdf_content = self.fetch_pdf(self.get_pdf_session_id(client.browser, rows[0]))
-      client.browser.driver.quit()
+      try:
+        client.browser.driver.quit()
+      except Exception as e:
+        logger.warn(e)
       return pdf_content
     elif len(rows) > 1:
       client.browser.driver.quit()
@@ -168,7 +172,6 @@ class CMTSPDownloader:
 
   @utils.retryable(ignore_if_exceeds=True)
   def fetch_pdf(self, session_id):
-      import requests
       cookies = {
           'ASP.NET_SessionId': session_id,
           'SWCookieConfig': '{"aceiteSessao":"S","aceitePersistentes":"N","aceiteDesempenho":"N","aceiteEstatisticos":"N","aceiteTermos":"S"}',
