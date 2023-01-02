@@ -53,21 +53,30 @@ class TRF5Downloader:
         future.result()
 
 
-  def _get_report_url(self, record: dict, browser):
+  def _get_report_url(self, record: dict, browser = None):
     import re
+
+    internal = (browser is None)
+    if internal:
+      browser = browsers.FirefoxBrowser(headless=True)
 
     report_url = None
     content_type_report = "text/html"
 
-    if re.search(r'www4.trf5.jus.br\/processo', record['url']):
-      # if not self.filters('skip_full'):
-      report_url = self._get_report_url_from_trf5(record)
-      if report_url is None:
-        report_url = self._get_report_url_from_trf5(record, digits=2)
-      if report_url is not None:
-        content_type_report = "application/pdf"
-    else:
-      report_url = self._get_report_url_from_pje(browser, record)
+    try:
+      if re.search(r'www4.trf5.jus.br\/processo', record['url']):
+        # if not self.filters('skip_full'):
+        report_url = self._get_report_url_from_trf5(record)
+        if report_url is None:
+          report_url = self._get_report_url_from_trf5(record, digits=2)
+        if report_url is not None:
+          content_type_report = "application/pdf"
+      else:
+        report_url = self._get_report_url_from_pje(browser, record)
+
+    finally:
+      if internal:
+        browser.quit()
 
     return {
       'url':report_url,
