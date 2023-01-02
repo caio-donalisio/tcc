@@ -1,4 +1,4 @@
-from app.crawlers import base, utils
+from app.crawlers import base, browsers, utils
 import math
 import json
 import pendulum
@@ -61,16 +61,6 @@ class TRF5Client:
         result = self.fetch(filters, page=1)
         return result['recordsTotal']
 
-    # def get_cookie(self, cookie_name):
-    #     value = None
-    #     cookies = self.driver.get_cookies()
-    #     for cookie in cookies:
-    #         if cookie.get('name') == cookie_name:
-    #             value = cookie['value']
-    #     if cookie is None:
-    #         raise Exception(f'Cookie not found: {cookie_name}')
-    #     return value
-
     @utils.retryable(max_retries=6)
     def fetch(self, filters, page=1, per_page=10):
         try:
@@ -125,6 +115,7 @@ class TRF5Chunk(base.Chunk):
     def rows(self):
 
         from app.crawlers.trf5 import trf5_pdf
+        browser = browsers.FirefoxBrowser(headless=True)
 
         result = self.client.fetch(merged_with_default_filters(**self.filters), self.page)
         for _, record in enumerate(result['data']):
@@ -143,7 +134,7 @@ class TRF5Chunk(base.Chunk):
                                             content_type='application/json'))
 
             if not self.filters.get('skip_full'):
-                report = trf5_pdf.TRF5Downloader()._get_report_url(record)
+                report = trf5_pdf.TRF5Downloader()._get_report_url(record, browser)
 
                 if report.get('url') is None:
                     logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
