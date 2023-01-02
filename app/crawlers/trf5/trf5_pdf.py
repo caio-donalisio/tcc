@@ -261,8 +261,8 @@ class TRF5Downloader:
               'url': self._extract_url_from_event(a.get('onclick'))
             })
 
-      slider_page_input = browser.driver.find_element(By.ID, 'j_id423:j_id424Input')
-      if slider_page_input:
+      if browser.driver.find_elements_by_id('j_id423:j_id424Input'):
+        slider_page_input = browser.driver.find_element(By.ID, 'j_id423:j_id424Input')
         browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
         slider_page = int(slider_page_input.get_attribute('value'))
         browser.driver.execute_script("A4J.AJAX.Submit('j_id423',event,{'similarityGroupingId':'j_id423:j_id425','actionUrl':'/pjeconsulta/ConsultaPublica/DetalheProcessoConsultaPublica/listView.seam','eventsQueue':'default','containerId':'j_id340','parameters':{'j_id423:j_id425':'j_id423:j_id425'} ,'status':'_viewRoot:status'} )");

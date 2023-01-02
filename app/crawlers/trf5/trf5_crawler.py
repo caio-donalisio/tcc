@@ -1,8 +1,8 @@
-from app.crawlers import base, browsers, utils
+from app.crawlers import base, utils
 import math
 import json
 import pendulum
-from app.crawlers.logconfig import logger_factory, setup_cloud_logger
+from app.crawlers.logconfig import logger_factory
 import click
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
