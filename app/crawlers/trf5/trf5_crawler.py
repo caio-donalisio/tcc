@@ -61,15 +61,15 @@ class TRF5Client:
         result = self.fetch(filters, page=1)
         return result['recordsTotal']
 
-    def get_cookie(self, cookie_name):
-        value = None
-        cookies = self.driver.get_cookies()
-        for cookie in cookies:
-            if cookie.get('name') == cookie_name:
-                value = cookie['value']
-        if cookie is None:
-            raise Exception(f'Cookie not found: {cookie_name}')
-        return value
+    # def get_cookie(self, cookie_name):
+    #     value = None
+    #     cookies = self.driver.get_cookies()
+    #     for cookie in cookies:
+    #         if cookie.get('name') == cookie_name:
+    #             value = cookie['value']
+    #     if cookie is None:
+    #         raise Exception(f'Cookie not found: {cookie_name}')
+    #     return value
 
     @utils.retryable(max_retries=6)
     def fetch(self, filters, page=1, per_page=10):
@@ -77,14 +77,12 @@ class TRF5Client:
             filters['start'] = (page * per_page) - per_page
             filters['length'] = per_page
 
-            response = requests.get(self.url,
-                                params=filters,
-                                headers=DEFAULT_HEADERS
-                                )
-            return requests.get(self.url,
-                                params=filters,
-                                headers=DEFAULT_HEADERS
-                                ).json()
+            response = requests.get(
+                self.url,
+                params=filters,
+                headers=DEFAULT_HEADERS
+            )
+            return response.json()
 # https://juliapesquisa.trf5.jus.br/julia-pesquisa/api/documentos:dt
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
@@ -93,10 +91,9 @@ class TRF5Client:
 
 class TRF5Collector(base.ICollector):
 
-    def __init__(self, client, filters, browser):
+    def __init__(self, client, filters):
         self.client  = client
         self.filters = filters
-        self.browser = browser
 
     def count(self):
         return self.client.count(merged_with_default_filters(**self.filters))
@@ -113,29 +110,27 @@ class TRF5Collector(base.ICollector):
                 prefix='',
                 filters=self.filters,
                 page=page,
-                client=self.client,
-                browser=self.browser
+                client=self.client
             )
 
 
 class TRF5Chunk(base.Chunk):
 
-    def __init__(self, keys, prefix, filters, page, client, browser):
+    def __init__(self, keys, prefix, filters, page, client):
         super(TRF5Chunk, self).__init__(keys, prefix)
         self.filters = filters
         self.page = page
         self.client = client
-        self.browser = browser
 
     def rows(self):
 
         from app.crawlers.trf5 import trf5_pdf
 
-        result = self.client.fetch(merged_with_default_filters(**self.filters),self.page)
+        result = self.client.fetch(merged_with_default_filters(**self.filters), self.page)
         for _, record in enumerate(result['data']):
 
             session_at = pendulum.parse(record['dataJulgamento'])
-            codigo = re.sub("\:", "-", record['codigoDocumento'])
+            codigo = re.sub(r"\:", "-", record['codigoDocumento'])
             numero = record['numeroProcesso']
 
             base_path   = f'{session_at.year}/{session_at.month:02d}'
@@ -153,22 +148,26 @@ class TRF5Chunk(base.Chunk):
                 if report.get('url') is None:
                     logger.warn(f"Not found 'Inteiro Teor' for judgment {record['numeroProcesso']}")
 
-                if report.get('url'):
-                    if 'html' in report.get('content_type'):
-                        dest_report = f"{doc_base_path}.html"
-                    elif 'pdf' in report.get('content_type'):
-                        dest_report = f"{doc_base_path}.pdf"
+                dest_report = None
+                if 'html' in report.get('content_type', []):
+                    dest_report = f"{doc_base_path}.html"
+                elif 'pdf' in report.get('content_type', []):
+                    dest_report = f"{doc_base_path}.pdf"
 
-                to_download.append(base.ContentFromURL(src=report['url'], dest=dest_report,
-                                                       content_type=report['content_type']))
+                if report.get('url') and dest_report:
+                    to_download.append(base.ContentFromURL(
+                        src=report['url'],
+                        dest=dest_report,
+                        content_type=report['content_type']
+                    ))
+                else:
+                    logger.warn("Missing required values to append download task")
 
             yield to_download
 
 @celery.task(name='crawlers.trf5', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
 def trf5_task(**kwargs):
-    setup_cloud_logger(logger)
-
     from app.crawlers.logutils import logging_context
 
     with logging_context(crawler='trf5'):
@@ -186,8 +185,7 @@ def trf5_task(**kwargs):
 
         collector = TRF5Collector(
             client=TRF5Client(),
-            filters=filters,
-            browser=browsers.FirefoxBrowser(headless=True)
+            filters=filters
         )
         handler   = base.ContentHandler(output=output)
         snapshot = base.Snapshot(keys=filters)
@@ -214,7 +212,7 @@ def trf5_task(**kwargs):
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--skip-full'   ,    default=False,    help='Collects metadata only'  , is_flag=True)
+@click.option('--skip-full' ,    default=False,    help='Collects metadata only'  , is_flag=True)
 def trf5_command(**kwargs):
   if kwargs.get('enqueue'):
     if kwargs.get('split_tasks'):

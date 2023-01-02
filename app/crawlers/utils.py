@@ -126,7 +126,7 @@ class LSOutput:
         source = f'{self._output_folder}/{filepath}'
         return Path(source).exists()
 
-    def save_from_contents(self, filepath, contents, **kwargs):
+    def save_from_contents(self, filepath, contents):
         target = f'{self._output_folder}/{filepath}'
         write_file(target, contents)
 
