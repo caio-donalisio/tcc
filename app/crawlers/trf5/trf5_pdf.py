@@ -402,35 +402,11 @@ def trf5_pdf_command(input_uri, start_date, end_date, dry_run, count):
     print('Total files to download', total)
     return
 
-  def run_tasks(pendings):
-    batch = []
-    with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
-      futures  = []
-      for pending in pendings:
-        if dry_run:
-          continue
-
-        batch.append(pending)
-        if len(batch) >= 5:
-          futures.append(executor.submit(trf5_download, batch, input_uri, pbar))
-          batch = []
-
-    print("Tasks distributed -- waiting for results")
-    for future in concurrent.futures.as_completed(futures):
-      future.result()
-    executor.shutdown()
-    if len(batch):
-      trf5_download(batch, input_uri, pbar)
-
-  import concurrent.futures
-  from tqdm import tqdm
-
   while startDate <= endDate:
     print(f"TRF5 - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
     for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)
 
-    run_tasks(pendings)
+    utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
     startDate = startDate.add(months=1)
