@@ -15,7 +15,6 @@ logger = logger_factory('trf5-pdf')
 
 MAX_WORKERS = 3
 
-
 class TRF5Downloader:
 
   def __init__(self, client=None, output=None):
@@ -24,50 +23,40 @@ class TRF5Downloader:
 
   def download(self, items, pbar=None):
     import concurrent.futures
-    # self._client.signin()
-    # self._client.set_search(
-    #   start_date=pendulum.DateTime(2020, 1, 1),
-    #   end_date=pendulum.DateTime(2020, 1, 31),
-    # )
-    # self._client.close()
 
-    interval = 20
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
-      last_run = None
-      for item in items:
-        # request sync
-        # now = time.time()
-        # if last_run is not None:
-        #   since = now - last_run
-        #   if since < interval:
-        #     jitter     = random.uniform(.5, 1.2)
-        #     sleep_time = (interval - since) + jitter
-        #     time.sleep(sleep_time)
+      logger.info("Browser: init")
+      browser = browsers.FirefoxBrowser(headless=True)
+      try:
+        logger.info("Browser: started")
+        for item in items:
+          logger.info(f"Fetching for: {item.content['numeroProcesso']}@{item.content['sistema']}")
+          report = self._get_report_url(item.content, browser)
 
+          report_url = report.get('url')
+          if report_url:
+            response = self._get_response(base.ContentFromURL(
+              src=report_url,
+              dest=item.dest,
+              content_type=report.get('content_type'),
+            ))
+            item.content_type = report.get('content_type')
 
-        report = self._get_report_url(item.content)
-        if report.get('url'):
-          response = self._get_response(base.ContentFromURL(
-            src=report.get('url'),
-            dest=item.dest,
-            content_type=report.get('content_type'),
-          ))
-          item.content_type = report.get('content_type')
+            futures.append(executor.submit(self._handle_upload, item, response))
+          else:
+            logger.warn(f"URL not found for {item['numeroProcesso']}")
 
-        if pbar:
-          pbar.update(1)
-
-        # up async
-        if report.get('url') and response:
-          # last_run = time.time()
-          futures.append(executor.submit(self._handle_upload, item, response))
+          if pbar:
+            pbar.update(1)
+      finally:
+        browser.quit()
 
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
 
-  def _get_report_url(self, record: dict):
+  def _get_report_url(self, record: dict, browser):
     import re
 
     report_url = None
@@ -81,7 +70,8 @@ class TRF5Downloader:
       if report_url is not None:
         content_type_report = "application/pdf"
     else:
-      report_url = self._get_report_url_from_pje(record)
+      report_url = self._get_report_url_from_pje(browser, record)
+
     return {
       'url':report_url,
       'content_type':content_type_report
@@ -120,23 +110,20 @@ class TRF5Downloader:
     return self._get_judgment_doc_url_by_closest_date(links)
 
 
-  def _get_report_url_from_pje(self, doc):
-
-    browser = browsers.FirefoxBrowser(headless=True)
+  def _get_report_url_from_pje(self, browser, doc):
     details_url = self._get_judgment_details_url(browser, doc)
     if not details_url:
-      browser.quit()
       return None
     doc_url = self._get_judgment_doc_url(details_url, browser, doc)
-    browser.quit()
     return doc_url
-
 
   def _get_judgment_details_url(self, browser, doc):
     from selenium.webdriver.common.by import By
 
     browser.get(doc['url'])
+    logger.info(f"Loaded: {doc['url']}")
     browser.wait_for_element(locator=(By.ID, 'consultaPublicaForm:captcha:captchaImg'), timeout=30)
+    logger.info(f"Captcha loaded")
 
     judgment_id = self._format_process_number(doc['numeroProcesso'])
     logger.info(judgment_id)
@@ -261,7 +248,7 @@ class TRF5Downloader:
               'url': self._extract_url_from_event(a.get('onclick'))
             })
 
-      if browser.driver.find_elements_by_id('j_id423:j_id424Input'):
+      if browser.driver.find_elements(By.ID, 'j_id423:j_id424Input'):
         slider_page_input = browser.driver.find_element(By.ID, 'j_id423:j_id424Input')
         browser.driver.execute_script("arguments[0].value = Number(arguments[0].value) + 1;", slider_page_input);
         slider_page = int(slider_page_input.get_attribute('value'))
@@ -371,6 +358,7 @@ def trf5_download(items, output_uri, pbar):
   output     = utils.get_output_strategy_by_path(path=output_uri)
   client     = TRF5Client()
   downloader = TRF5Downloader(client=client, output=output)
+  logger.info("Starting")
   downloader.download(
     [
       base.Content(
@@ -385,59 +373,60 @@ def trf5_download(items, output_uri, pbar):
 
 
 @cli.command(name='trf5-pdf')
-@click.option('--prefix')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
 @click.option('--input-uri'   , help='Input URI')
 @click.option('--dry-run'     , default=False, is_flag=True)
-@click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def trf5_pdf_command(input_uri, prefix, dry_run, local, count):
-  batch  = []
+def trf5_pdf_command(input_uri, start_date, end_date, dry_run, count):
   output = utils.get_output_strategy_by_path(path=input_uri)
+  startDate = pendulum.parse(start_date)
+  endDate = pendulum.parse(end_date)
 
   if count:
     total = 0
-    for _ in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
+    while startDate <= endDate:
+      for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+        total += 1
+      startDate = startDate.add(months=1)
     print('Total files to download', total)
     return
 
-  # for testing purposes
-  if local:
-    import concurrent.futures
-
-    from tqdm import tqdm
-
-    # just to count
-    pendings = []
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
-      pendings.append(pending)
-
+  def run_tasks(pendings):
+    batch = []
     with tqdm(total=len(pendings)) as pbar:
       executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
       futures  = []
       for pending in pendings:
-        if not dry_run:
-          batch.append(pending)
-          if len(batch) >= 25:
-            futures.append(executor.submit(trf5_download, batch, input_uri, pbar))
-            # time.sleep(random.uniform(5., 8.))
-            batch = []
+        if dry_run:
+          continue
+
+        batch.append(pending)
+        if len(batch) >= 5:
+          futures.append(executor.submit(trf5_download, batch, input_uri, pbar))
+          batch = []
 
     print("Tasks distributed -- waiting for results")
     for future in concurrent.futures.as_completed(futures):
       future.result()
     executor.shutdown()
-    if batch:
+    if len(batch):
       trf5_download(batch, input_uri, pbar)
 
-  else:
-    total = 0
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
-      batch.append(pending)
-      if len(batch) >= 100:
-        print("Task", trf5_download_task.delay(batch, input_uri))
-        batch = []
-    if len(batch):
-      print("Task", trf5_download_task.delay(batch, input_uri))
-    print('Total files to download', total)
+  import concurrent.futures
+  from tqdm import tqdm
+
+  while startDate <= endDate:
+    print(f"TRF5 - Collecting {startDate.format('YYYY/MM')}...")
+    pendings = []
+    for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+      pendings.append(pending)
+
+    run_tasks(pendings)
+    startDate = startDate.add(months=1)

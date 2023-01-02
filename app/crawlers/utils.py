@@ -120,28 +120,28 @@ class GSOutput:
 
 class LSOutput:
     def __init__(self, output_folder):
-        self._output_folder = output_folder
+        self._bucket_name = output_folder
 
     def exists(self, filepath):
-        source = f'{self._output_folder}/{filepath}'
+        source = f'{self._bucket_name}/{filepath}'
         return Path(source).exists()
 
     def save_from_contents(self, filepath, contents):
-        target = f'{self._output_folder}/{filepath}'
+        target = f'{self._bucket_name}/{filepath}'
         write_file(target, contents)
 
     def load_as_string(self, filepath):
-        source = f'{self._output_folder}/{filepath}'
+        source = f'{self._bucket_name}/{filepath}'
         if Path(source).exists():
             with open(source, 'r') as f:
                 return f.read()
 
     @property
     def uri(self):
-        return self._output_folder
+        return self._bucket_name
 
     def __repr__(self):
-        return f"Local({self._output_folder})"
+        return f"Local({self._bucket_name})"
 
 
 def get_output_strategy_by_path(path):
