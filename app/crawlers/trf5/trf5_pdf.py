@@ -26,12 +26,9 @@ class TRF5Downloader:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
-      logger.info("Browser: init")
       browser = browsers.FirefoxBrowser(headless=True)
       try:
-        logger.info("Browser: started")
         for item in items:
-          logger.info(f"Fetching for: {item.content['numeroProcesso']}@{item.content['sistema']}")
           report = self._get_report_url(item.content, browser)
 
           report_url = report.get('url')
@@ -121,12 +118,10 @@ class TRF5Downloader:
     from selenium.webdriver.common.by import By
 
     browser.get(doc['url'])
-    logger.info(f"Loaded: {doc['url']}")
     browser.wait_for_element(locator=(By.ID, 'consultaPublicaForm:captcha:captchaImg'), timeout=30)
-    logger.info(f"Captcha loaded")
 
     judgment_id = self._format_process_number(doc['numeroProcesso'])
-    logger.info(judgment_id)
+    logger.info(f"Downloading: {judgment_id}")
     process_input = browser.driver.find_element(By.ID, 'consultaPublicaForm:Processo:ProcessoDecoration:Processo')
     browser.driver.execute_script(f"arguments[0].value='{judgment_id}';", process_input)
 
@@ -303,7 +298,8 @@ class TRF5Downloader:
       logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')
       if response.status_code != 200:
         logger.warn(
-        f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
+          f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}."
+        )
         raise utils.PleaseRetryException()
       else:
         return response
@@ -358,7 +354,6 @@ def trf5_download(items, output_uri, pbar):
   output     = utils.get_output_strategy_by_path(path=output_uri)
   client     = TRF5Client()
   downloader = TRF5Downloader(client=client, output=output)
-  logger.info("Starting")
   downloader.download(
     [
       base.Content(
