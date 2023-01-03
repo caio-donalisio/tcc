@@ -229,9 +229,8 @@ def cmtsp_download(items, output_uri, pbar):
 )
 @click.option('--input-uri'   , help='Input URI')
 @click.option('--dry-run'     , default=False, is_flag=True)
-@click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def cmtsp_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
+def cmtsp_pdf_command(input_uri, start_date, end_date, dry_run, count):
   output = utils.get_output_strategy_by_path(path=input_uri)
   startDate = pendulum.parse(start_date)
   endDate = pendulum.parse(end_date)
@@ -245,37 +244,11 @@ def cmtsp_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
     print('Total files to download', total)
     return
 
-  def run_tasks(pendings):
-    batch = []
-    with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
-      futures  = []
-      for pending in pendings:
-        if not dry_run:
-          batch.append(pending)
-          if len(batch) >= 5:
-            futures.append(executor.submit(cmtsp_download, batch, input_uri, pbar))
-            # time.sleep(random.uniform(5., 8.))
-            batch = []
+  while startDate <= endDate:
+    print(f"CMTSP - Collecting {startDate.format('YYYY/MM')}...")
+    pendings = []
+    for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+      pendings.append(pending)
 
-    print("Tasks distributed -- waiting for results")
-    for future in concurrent.futures.as_completed(futures):
-      future.result()
-    executor.shutdown()
-    if len(batch):
-      cmtsp_download(batch, input_uri, pbar)
-
-  if local:
-    total = 0
-    import concurrent.futures
-    from tqdm import tqdm
-    while startDate <= endDate:
-      print(f"CMTSP - Collecting {startDate.format('YYYY/MM')}...")
-      pendings = []
-      for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
-
-        pendings.append(pending)
-        total += 1
-
-      run_tasks(pendings)
-      startDate = startDate.add(months=1)
+    utils.run_pending_tasks(cmtsp_download, pendings, input_uri=input_uri, dry_run=dry_run)
+    startDate = startDate.add(months=1)

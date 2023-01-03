@@ -1,5 +1,4 @@
 import logging
-import pathlib
 import random
 import time
 import re
@@ -82,15 +81,15 @@ class TRF1Downloader:
 
   @utils.retryable()
   def download_files(self, row):
-    
+
     from bs4 import BeautifulSoup
     import re
 
     MAXIMUM_TIME_DISTANCE = 150
     try_pje = False
-    
+
     pdf_content, inteiro_page_content = '',''
-    
+
     acordao_titulo = row.find(attrs={'class':"titulo_doc"}).text if row.find(attrs={'class':"titulo_doc"}) else ''
     title = re.sub(r'[^\d\-\.]+','',acordao_titulo)
     process_link = row.find('a',text='Acesse aqui')
@@ -104,7 +103,7 @@ class TRF1Downloader:
     else:
       logger.warn(f'Process link not available for {title}')
       try_pje=True
-    
+
     #ARQUIVO TRF1
     if not try_pje and 'PesquisaMenuArquivo' in process_link:
 
@@ -137,7 +136,7 @@ class TRF1Downloader:
         pub_date_string = f"{pub_date['day']}/{pub_date['month']}/{pub_date['year']}"
         dates = [link['date'] for link in candidates if re.search(DATE_PATTERN, link['date'])]
         nearest_date = self.get_nearest_date(dates, pub_date_string)
-          
+
         if nearest_date:
             time_from_pub_date = abs((pendulum.from_format(pub_date_string,TRF1_DATE_FORMAT) - nearest_date).days)
         if dates and nearest_date and time_from_pub_date < MAXIMUM_TIME_DISTANCE:
@@ -367,7 +366,7 @@ def trf1_download(items, output_uri, pbar):
   output     = utils.get_output_strategy_by_path(path=output_uri)
   downloader = TRF1Downloader(output=output)
   to_download = []
-  for n, item in enumerate(items):
+  for _, item in enumerate(items):
     to_download.append(
         base.Content(
           content=item['row'],
@@ -377,47 +376,38 @@ def trf1_download(items, output_uri, pbar):
   downloader.download(to_download, pbar)
 
 @cli.command(name='trf1-pdf')
-@click.option('--prefix')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
 @click.option('--input-uri'   , help='Input URI')
 @click.option('--dry-run'     , default=False, is_flag=True)
 @click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def trf1_pdf_command(input_uri, prefix, dry_run, local, count):
+def trf1_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
   batch  = []
   output = utils.get_output_strategy_by_path(path=input_uri)
+  startDate = pendulum.parse(start_date)
+  endDate = pendulum.parse(end_date)
 
   if count:
     total = 0
-    for _ in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
+    while startDate <= endDate:
+      for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+        total += 1
+      startDate = startDate.add(months=1)
     print('Total files to download', total)
     return
 
-  # for testing purposes
-  if local:
-    import concurrent.futures
-
-    from tqdm import tqdm
-
-    # just to count
+  while startDate <= endDate:
+    print(f"TRF5 - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
+    for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)
 
-    with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-      futures  = []
-      for pending in pendings:
-        if not dry_run:
-          batch.append(pending)
-          if len(batch) >= 10:
-            futures.append(executor.submit(trf1_download, batch, input_uri, pbar))
-            # time.sleep(random.uniform(5., 8.))
-            batch = []
-
-    print("Tasks distributed -- waiting for results")
-    for future in concurrent.futures.as_completed(futures):
-      future.result()
-    executor.shutdown()
-    if len(batch):
-      trf1_download(batch, input_uri, pbar)
+    utils.run_pending_tasks(trf1_download, pendings, input_uri=input_uri, dry_run=dry_run)
+    startDate = startDate.add(months=1)
