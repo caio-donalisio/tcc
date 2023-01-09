@@ -135,7 +135,7 @@ class LSOutput:
     source = f'{self._bucket_name}/{filepath}'
     return Path(source).exists()
 
-  def save_from_contents(self, filepath, contents):
+  def save_from_contents(self, filepath, contents, **kwargs):
     target = f'{self._bucket_name}/{filepath}'
     write_file(target, contents)
 
