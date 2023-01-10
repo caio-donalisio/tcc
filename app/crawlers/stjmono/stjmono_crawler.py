@@ -1,11 +1,10 @@
 import re
-import base
-import utils
 import pendulum
 import click
 import requests
 from typing import List
 import bs4
+from app.crawlers import base, utils, logutils
 
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
@@ -323,9 +322,9 @@ class STJMONOChunk(base.Chunk):
              autoretry_for=(BaseException,))
 def stjmono_task(start_date, end_date, output_uri):
   setup_cloud_logger(logger)
-
-  from logutils import logging_context
-
+ 
+  from app.crawlers.logutils import logging_context
+  
   with logging_context(crawler='STJMONO'):
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger.info(f'Output: {output}.')

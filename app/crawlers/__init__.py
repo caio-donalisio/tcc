@@ -2,6 +2,7 @@ import app.crawlers.carf
 import app.crawlers.cmtsp
 import app.crawlers.scrfb
 import app.crawlers.stj
+import app.crawlers.stjmono
 import app.crawlers.stf
 import app.crawlers.titsp
 import app.crawlers.tjba
@@ -17,6 +18,7 @@ import app.crawlers.trf3
 import app.crawlers.trf4
 import app.crawlers.trf5
 import app.crawlers.tst
+
 
 import app.crawlers.utils
 import app.crawlers.tasks
