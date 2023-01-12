@@ -167,13 +167,13 @@ Antes, configure seu `.env`. Há um `.env.dist` que serve de exemplo.
 
 Localmente, via poetry shell e python direto. No caso se seu crawler faz uso do celery, primeiro precisa subir os workers. Há uma dependência pelo redis que funciona com o broker e backend para o celery. Via docker-compose não há necessidade do redis instalado local pois lá já sobe um.
 
-    $ celery -A tasks worker -Q crawlers --concurrency=2 -E --loglevel=INFO
+    $ celery -A app.celery_run.celery_app worker -Q crawler-queue --concurrency=2 -E --loglevel=INFO
 
 Ajuste o loglevel conforme preferir.
 
 Em outro shell é possível disparar uma task via command line. Exemplo:
 
-    $ python commands.py tjba --start-date 2020-05-01 --end-date 2020-05-30 --output-uri ./data/tjba
+    $ python -m app.commands tjba --start-date 2020-05-01 --end-date 2020-05-30 --output-uri ./data/tjba
 
 Esta é a lista de parâmetros disponíveis para cada tribunal.
 Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implementação de alguns parâmetros secundários (e.g. skip-cache) precisam de revisão.
@@ -233,7 +233,7 @@ Idealmente no futuro todos os crawlers devem ter os mesmos parâmetros. A implem
   
 &emsp;Para o TJSP, TRF5 e TRF1 é possível coletar apenas os inteiros teores dos metadados correspondentes que não tenham um inteiro teor associado ainda, definindo um ano e mês específico com o parâmetro "prefix":
 
-    $ python commands.py tjsp-pdf --input-uri gs://inspira-production-buckets-tjsp --prefix 2022/04 
+    $ python -m app.commands tjsp-pdf --input-uri gs://inspira-production-buckets-tjsp --prefix 2022/04 
 <br>
 
 ## Produção
