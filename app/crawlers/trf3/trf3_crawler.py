@@ -24,14 +24,13 @@ FILES_PER_PAGE = 50
 
 logger = logger_factory('trf3')
 
-
 def nearest_date(items, pivot):
     pivot = pendulum.from_format(pivot, TRF3_DATE_FORMAT)
     if items and pivot:
         return min([pendulum.from_format(item.text, TRF3_DATE_FORMAT) for item in items],
                    key=lambda x: abs(x - pivot))
-    else:
-        return ''
+
+    return ''
 
 
 def get_content_hash(soup):
