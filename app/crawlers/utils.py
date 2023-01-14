@@ -352,13 +352,13 @@ def get_pdf_hash(pdf_content: bytes,
 
 
 @retryable(max_retries=9)
-def get_response(logger, session, url, headers):
+def get_response(logger, session, url, headers, verify=True):
   """Gets response and checks if response object has status code 200, throws Retry exception if not"""
   response = session.get(
-      url=url, headers=headers)
+      url=url, headers=headers, verify=verify)
   if response.status_code != 200:
-    logger.warn(f"Response <{response.status_code}> - {response.url}")
-    raise PleaseRetryException()
+      logger.warn(f"Response <{response.status_code}> - {response.url}")
+      raise PleaseRetryException()
   else:
     return response
 
