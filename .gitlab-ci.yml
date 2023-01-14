@@ -55,11 +55,8 @@ retag:
 # RELEASE
 # ------------------
 release:
-  image: node:16-buster-slim
+  image: $CI_REGISTRY/inspiralegal/gitlabci-docker-images/semantic-release:latest
   stage: release
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates
-    - npm install -g semantic-release @semantic-release/gitlab semantic-release-slack-bot
   script:
     - semantic-release
   rules:
