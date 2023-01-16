@@ -6,7 +6,6 @@ import click
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
 import requests
-from urllib.parse import parse_qs
 import time
 
 logger = logger_factory('tjsc')
@@ -106,7 +105,7 @@ class TJSCClient:
         self.session = requests.Session()
         self.url = f'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do'
 
-    @utils.retryable(max_retries=3)
+    @utils.retryable(max_retries=3, sleeptime=31)
     def count(self,filters, min_votes=3):
         counts = []
         while not any(counts.count(n) >= min_votes for n in counts):
@@ -114,11 +113,15 @@ class TJSCClient:
             soup = utils.soup_by_content(result.text)
             count_tag = soup.find('div', attrs={'class':'texto_resultados'})
             if count_tag:
-                count = re.search(r'^\s*(\d+) resultados.*$',count_tag.text, re.M)
-                count = int(count.group(1))
+                count = re.search(r'^\s*([\d\,]+) resultados.*$',count_tag.text, re.M)
+                count = int(utils.extract_digits(count.group(1)))
             else:
                 count = 0
             counts.append(count)
+        def check_if_recaptcha(soup):
+            if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
+                raise utils.PleaseRetryException()
+        check_if_recaptcha(soup)
         return max(counts, key=lambda n: counts.count(n))
 
     @utils.retryable(max_retries=3)
@@ -185,25 +188,46 @@ class TJSCChunk(base.Chunk):
         self.page = page
         self.client = client
 
-    @utils.retryable()
+    @utils.retryable(sleeptime=31)
     def rows(self):
         to_download = []
         result = self.client.fetch(self.filters, self.page)
         soup = utils.soup_by_content(result.text)
         time.sleep(2)
+
+        @utils.retryable(sleeptime=31)
+        def check_if_recaptcha(soup):
+            if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
+                raise utils.PleaseRetryException()
+            
+        check_if_recaptcha(soup)
         for act in soup.find_all('div', class_='resultados'):
             
-            html_link = act.find('a', href=re.compile(r".*html\.do.*"))
-            html_link = BASE_URL + html_link.get('href') if html_link else ''
+            if soup.find('img', src=re.compile(r".*imagens/html.png")):
+                html_link = act.find('a', href=re.compile(r".*html\.do.*"))
+                html_link = BASE_URL + html_link.get('href') if html_link else ''
 
-            rtf_link = act.find('a', href=re.compile(r".*integra\.do.*"))
-            rtf_link = BASE_URL + rtf_link.get('href') if rtf_link else ''
+            if soup.find('img', src=re.compile(r".*imagens/pdf.png")):
+                pdf_link = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
+                pdf_link = BASE_URL + pdf_link.get('href') if pdf_link else ''
+            
+            if soup.find('img', src=re.compile(r".*imagens/rtf.png")):
+                rtf_link = act.find('a', href=re.compile(r".*integra\.do.*?(?!arq=pdf)"))
+                rtf_link = BASE_URL + rtf_link.get('href') if rtf_link else ''
 
-            process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
-            assert process_code
+            # process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
+            process_code = act.find(text=re.compile('.*Processo\:.*'))
+            while not re.search(r'[\d\-\.]+', str(process_code)):
+                process_code = process_code.next
+            process_code = utils.extract_digits(str(process_code))
+            
+
+            assert process_code and len(process_code) > 5
             session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
             session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
-            act_id = parse_qs(html_link).get('id').pop()
+            
+            act_id = act.find(onclick=re.compile(r".*abreIntegra.*\(.*\,\'.+\W.*")).get('onclick')
+            act_id = re.search(r".*abreIntegra.*\(.*\,\'([\w\d]+)\W.*", act_id).group(1)
 
             base_path = f'{session_date.year}/{session_date.month}/{session_date.format("DD")}_{process_code}_{act_id}'
             
@@ -211,12 +235,20 @@ class TJSCChunk(base.Chunk):
                 to_download.append(
                     base.ContentFromURL(src=html_link, dest=f'{base_path}_FULL.html', content_type='text/html')
                 )
+
+            if pdf_link:
+                to_download.append(
+                    base.ContentFromURL(src=pdf_link, dest=f'{base_path}.pdf', content_type='application/pdf')
+                )
+            
             if rtf_link:
                 to_download.append(
                     base.ContentFromURL(src=rtf_link, dest=f'{base_path}.rtf', content_type='application/rtf')
                 )
             
+            #TJSC will cut connection if too many requests are made
             time.sleep(0.5)
+
             to_download.append(base.Content(
                 content=str(act),
                 dest=f'{base_path}.html',
