@@ -6,15 +6,17 @@ import click
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
 import requests
+from urllib.parse import parse_qs
+import time
 
 logger = logger_factory('tjsc')
 
 COURT_NAME = 'tjsc'
-RESULTS_PER_PAGE = 10  # DEFINED BY THEIR SERVER, SHOULDN'T BE CHANGED
+RESULTS_PER_PAGE = 50  
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
-BASE_URL = 'https://portal.tjsc.jus.br'
+BASE_URL = 'https://busca.tjsc.jus.br/jurisprudencia/'
 DOC_TO_PDF_CONTAINER_URL = 'http://localhost/unoconv/pdf'
 
 DEFAULT_HEADERS = {
@@ -36,37 +38,64 @@ DEFAULT_HEADERS = {
     # 'TE': 'trailers',
 }
 
+
+
+# response = requests.post(
+#     'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do?&categoria=acordaos&categoria=acma&categoria=recurso',
+#     cookies=cookies,
+#     headers=headers,
+#     data=data,
+# )
+
 def get_filters(start_date, end_date, **kwargs):
     return {
-    'backURL': '',
-    'postCampo': '',
-    'tmp': '',
-    'criterioPesquisa': '',
-    'processo': '',
-    'acordao': '',
-    'idRelator': '',
-    'nomeRelator': '',
-    'idOrgaoJulgadorSelecao': '',
-    'nomeOrgaoJulgador': '',
-    'idComarca': '',
-    'nomeComarca': '',
-    'idClasseProcessual': '',
-    'descricaoClasseProcessualHidden': '',
-    'descricaoClasseProcessual': '',
-    'idAssunto': '',
-    'descricaoAssuntoHidden': '',
-    'descricaoAssunto': '',
-    'dataJulgamentoInicio': '',
-    'dataJulgamentoFim': '',
-    'dataPublicacaoInicio': start_date.format(SEARCH_DATE_FORMAT),
-    'dataPublicacaoFim':  end_date.format(SEARCH_DATE_FORMAT),
-    'idLocalPesquisa': '1',
-    'ambito': '6',
-    'idsTipoDecisaoSelecionados': '1',
-    'segredoJustica': 'pesquisar sem',
-    'mostrarCompleto': 'true',
-    'iniciar': 'Pesquisar',
+    'q': '',
+    'only_ementa': '',
+    'frase': '',
+    'excluir': '',
+    'qualquer': '',
+    '': '',
+    'prox1': '',
+    'prox2': '',
+    'proxc': '',
+    'sort': 'dtJulgamento desc',
+    'ps': '50',
+    'busca': 'avancada',
+    #'pg': '2',
+    'flapto': '1',
+    'datainicial': start_date.format(SEARCH_DATE_FORMAT),
+    'datafinal': end_date.format(SEARCH_DATE_FORMAT),
+    'radio_campo': 'integra',
+    'categoria[]': [
+        'acordaos',
+        'acma',
+        'recurso',
+    ],
+    'faceta': 'false',
 }
+#     {
+#     'q': '',
+#     'only_ementa': '',
+#     'qualquer': '',
+#     'excluir': '',
+#     'prox1': '',
+#     'prox2': '',
+#     'proxc': '',
+#     'frase': '',
+#     'classe': '',
+#     'juizProlator': '',
+#     'origem': '',
+#     'relator': '',
+#     'radio_campo': 'ementa',
+#     'faceta': 'true',
+#     'busca': 'avancada',
+#     'datainicial': start_date.format(SEARCH_DATE_FORMAT),
+#     'datafinal': end_date.format(SEARCH_DATE_FORMAT),
+#     'nuProcesso': '',
+#     'ps': '50',
+#     'sort': 'dtJulgamento desc',
+# }
+
 
 class NoProcessNumberError(Exception):
     pass
@@ -75,7 +104,7 @@ class TJSCClient:
 
     def __init__(self):
         self.session = requests.Session()
-        self.url = f'{BASE_URL}/jurisprudencia/publico/pesquisa.do'
+        self.url = f'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do'
 
     @utils.retryable(max_retries=3)
     def count(self,filters, min_votes=3):
@@ -83,22 +112,14 @@ class TJSCClient:
         while not any(counts.count(n) >= min_votes for n in counts):
             result = self.fetch(filters)
             soup = utils.soup_by_content(result.text)
-            count_tag = soup.find('div', attrs={'class':'navLeft'})
+            count_tag = soup.find('div', attrs={'class':'texto_resultados'})
             if count_tag:
-                count = re.search(r'^\s*(\d+) registro.*$',count_tag.text)
+                count = re.search(r'^\s*(\d+) resultados.*$',count_tag.text, re.M)
                 count = int(count.group(1))
             else:
                 count = 0
             counts.append(count)
         return max(counts, key=lambda n: counts.count(n))
-
-    def count_periods(self,filters,unit='months'):
-        return sum(1 for _ in utils.timely(
-                    filters.get('start_date'),
-                    filters.get('end_date'),
-                    unit=unit,
-                    step=1)
-                )
 
     @utils.retryable(max_retries=3)
     def fetch(self, filters, page=1):
@@ -108,12 +129,8 @@ class TJSCClient:
                 url=f'{self.url}',
                 data={
                     **get_filters(**filters),
-                    'pageNumber':str(page)
-                },
-                params = {
-                'actionType': 'pesquisar',
-                },
-                proxies={'http': proxy.get_random_proxy()}
+                    'pg':str(page)
+                }
             )
 
         except Exception as e:
@@ -128,9 +145,7 @@ class TJSCCollector(base.ICollector):
         self.filters = filters
 
     def count(self, period=None):
-        if self.filters.get('count_only'):
-            return self.client.count_periods(self.filters)
-        elif period:
+        if period:
             return self.client.count(period)
         else:
             return self.client.count(self.filters)
@@ -145,7 +160,7 @@ class TJSCCollector(base.ICollector):
         ))
         for start,end in reversed(periods):
             total = self.count({'start_date':start,'end_date':end})
-            pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
+            pages = range(1, 2 + total//RESULTS_PER_PAGE)
             for page in pages:
                 yield TJSCChunk(
                     keys={
@@ -153,7 +168,6 @@ class TJSCCollector(base.ICollector):
                         'end_date':end.to_date_string(),
                         'page': page,
                         'count': total,
-                        'count_only':self.filters.get('count_only'),
                         },
                     prefix='',
                     filters={
@@ -161,146 +175,55 @@ class TJSCCollector(base.ICollector):
                         'end_date':end,
                         },
                     page=page,
-                    count_only = self.filters.get('count_only'),
                     client=self.client
                 )
 class TJSCChunk(base.Chunk):
 
-    def __init__(self, keys, prefix, filters, page, count_only, client):
+    def __init__(self, keys, prefix, filters, page, client):
         super(TJSCChunk, self).__init__(keys, prefix)
         self.filters  = filters
         self.page = page
         self.client = client
-        self.count_only = count_only
-
-    def get_act_id(self, soup):
-        process_regex = re.compile(r'\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{3,6}')
-
-        act_id = soup.find('b',text=re.compile(r'.*Processo.*'))
-        if (process_regex.search(act_id.text) is None):
-            if soup.find('div', text=process_regex) is None:
-                raise NoProcessNumberError()
-            act_id = soup.find('div', text=process_regex).text
-        else:
-            act_id = act_id.next.next
-
-        act_id_matches = re.search(r'\s*([\.\d\-]+)\s*', act_id, re.DOTALL)
-        if act_id_matches is None:
-            logger.warn(f"Failed to match process number on {act_id}")
-            raise NoProcessNumberError()
-        act_id = act_id_matches.group(1).replace('-','').replace('.','')
-        return act_id
-
-    def get_publication_date(self, soup):
-        publication_date=  soup.find('b', text=re.compile(r'.*Data da Publicação.*')).next.next
-        publication_date= re.search(r'.*((?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})).*$', publication_date, re.DOTALL).groupdict()
-        return publication_date
-
-    @utils.retryable(max_retries=10)
-    def get_acts(self):
-        result = self.client.fetch(self.filters,self.page)
-        soup = utils.soup_by_content(result.text)
-        acts = soup.find_all('table', class_='resultTable linksacizentados juris-dados-completos')
-        if acts:
-            return acts
-        else:
-            raise utils.PleaseRetryException()
-
 
     @utils.retryable()
     def rows(self):
-        if self.count_only:
-            count_data,count_filepath = utils.get_count_data_and_filepath(
-                start_date=self.filters.get('start_date'),
-                end_date=self.filters.get('end_date'),
-                court_name=COURT_NAME,
-                count = self.client.count(self.filters),
-                count_time=NOW
+        to_download = []
+        result = self.client.fetch(self.filters, self.page)
+        soup = utils.soup_by_content(result.text)
+        time.sleep(2)
+        for act in soup.find_all('div', class_='resultados'):
+            
+            html_link = act.find('a', href=re.compile(r".*html\.do.*"))
+            html_link = BASE_URL + html_link.get('href') if html_link else ''
+
+            rtf_link = act.find('a', href=re.compile(r".*integra\.do.*"))
+            rtf_link = BASE_URL + rtf_link.get('href') if rtf_link else ''
+
+            process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
+            assert process_code
+            session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
+            session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
+            act_id = parse_qs(html_link).get('id').pop()
+
+            base_path = f'{session_date.year}/{session_date.month}/{session_date.format("DD")}_{process_code}_{act_id}'
+            
+            if html_link:
+                to_download.append(
+                    base.ContentFromURL(src=html_link, dest=f'{base_path}_FULL.html', content_type='text/html')
                 )
-            yield utils.count_data_content(count_data, count_filepath)
-
-        else:
-            to_download = []
-            for act in self.get_acts():
-                try:
-                    act_id = self.get_act_id(act)
-                except NoProcessNumberError:
-                    logger.info("Skipping process without number")
-                    continue
-                publication_date = self.get_publication_date(act)
-                pdf_bytes, _ = self.download_pdf(act)
-                system_code = act.find(id=re.compile(r'integra_\d{7,}')) or act.find(id=re.compile(r'ementa\d{7,}'))
-                system_code = ''.join(char  for char in system_code['id'] if char.isdigit())
-                base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{system_code}'
-
-                if pdf_bytes:
-                    to_download.append(base.Content(
-                        content=pdf_bytes,
-                        dest=f'{base_path}.pdf',
-                        content_type='application/pdf'))
-                else:
-                    logger.warn(f'Inteiro not available for {act_id}')
-
-                to_download.append(base.Content(
-                    content=str(act),
-                    dest=f'{base_path}.html',
-                    content_type='text/html'))
+            if rtf_link:
+                to_download.append(
+                    base.ContentFromURL(src=rtf_link, dest=f'{base_path}.rtf', content_type='application/rtf')
+                )
+            
+            time.sleep(0.5)
+            to_download.append(base.Content(
+                content=str(act),
+                dest=f'{base_path}.html',
+                content_type='text/html'))
 
 
-                yield to_download
-
-    @utils.retryable()
-    def download_pdf(self, act, hash_len=10):
-        from io import BytesIO
-        import zipfile
-        from PyPDF2 import PdfFileMerger
-        import hashlib
-
-        is_zip = lambda text: 'Carregar documento' in text
-        is_single_file = lambda text: 'PDF assinado' in text
-        NULL_VALUE = b'', 0 * hash_len
-
-        pdf_link = [link for link in act.find_all('a') if link.next.next in ['Carregar documento','PDF assinado']]
-
-        if pdf_link:
-            pdf_link = pdf_link.pop()
-            PATTERN = re.compile(r".*replace\(\'(.*?)\'\)")
-            relative_pdf_url = PATTERN.search(pdf_link['href']).group(1)
-            url = f"{BASE_URL}{relative_pdf_url}"
-            response = requests.get(url)
-
-            if is_zip(pdf_link):
-                try:
-                    zip_obj = zipfile.ZipFile(BytesIO(response.content))
-                    merger = PdfFileMerger()
-                    for file in sorted(zip_obj.namelist()):
-                        bytes = zip_obj.open(file)
-                        if file.endswith('.doc'):
-                            bytes = utils.convert_doc_to_pdf(bytes, container_url=DOC_TO_PDF_CONTAINER_URL)
-                            bytes = BytesIO(bytes)
-                        merger.append(bytes)
-
-                except zipfile.BadZipFile:
-                    logger.warn(f'Could not download ZIP from {self.get_act_id(act)}')
-                    return NULL_VALUE
-
-                pdf_bytes = BytesIO()
-                merger.write(pdf_bytes)
-                bytes_value = pdf_bytes.getvalue()
-
-            elif is_single_file(pdf_link):
-                bytes_value = response.content
-
-            pdf_hash = hashlib.sha1(bytes_value).hexdigest()[:hash_len]
-
-            if len(bytes_value) < 10:
-                raise utils.PleaseRetryException()
-
-        elif not pdf_link:
-            return NULL_VALUE
-
-        return bytes_value, pdf_hash
-
+            yield to_download
 
 @celery.task(name='crawlers.tjsc', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
@@ -321,7 +244,6 @@ def tjsc_task(**kwargs):
         query_params = {
             'start_date':start_date,
             'end_date': end_date,
-            'count_only':kwargs.get('count_only')
         }
 
         collector = TJSCCollector(client=TJSCClient(), filters=query_params)
@@ -349,8 +271,6 @@ def tjsc_task(**kwargs):
 @click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
     default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--count-only',
-    default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def tjsc_command(**kwargs):
   # VALIDATE URI
   if COURT_NAME.lower() not in kwargs.get('output_uri').lower():
