@@ -191,17 +191,22 @@ class TJSCChunk(base.Chunk):
     @utils.retryable(sleeptime=31)
     def rows(self):
         to_download = []
-        result = self.client.fetch(self.filters, self.page)
-        soup = utils.soup_by_content(result.text)
-        time.sleep(2)
+        # result = self.client.fetch(self.filters, self.page)
+        # soup = utils.soup_by_content(result.text)
+        # time.sleep(2)
 
-        @utils.retryable(sleeptime=31)
-        def check_if_recaptcha(soup):
+        @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
+        def check_if_recaptcha():
+            result = self.client.fetch(self.filters, self.page)
+            soup = utils.soup_by_content(result.text)
             if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
                 raise utils.PleaseRetryException()
-            
-        check_if_recaptcha(soup)
+            return soup
+        
+        soup = check_if_recaptcha()
+        
         for act in soup.find_all('div', class_='resultados'):
+
             links = {}
         #     if soup.find('img', src=re.compile(r".*imagens/html.png")) and not \
         # soup.find('img', src=re.compile(r".*imagens/html_desabilitado.png")):
@@ -219,10 +224,10 @@ class TJSCChunk(base.Chunk):
             links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
             # process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
-            process_code = act.find(text=re.compile('.*Processo\:.*'))
-            while not re.search(r'[\d\-\.]+', str(process_code)):
-                process_code = process_code.next
-            process_code = utils.extract_digits(str(process_code))
+            process_code = re.search(r'.*Processo\:\s?([\d\-\.]+)\s.*', act.find('p').text).group(1)
+            # while not re.search(r'[\d\-\.]+', str(process_code)):
+                # process_code = process_code.next
+            process_code = utils.extract_digits(process_code)
             
 
             assert process_code and 25 > len(process_code) > 5
@@ -270,6 +275,36 @@ class TJSCChunk(base.Chunk):
 
             yield to_download
 
+class TJSCContentHandler(base.ContentHandler):
+
+  def __init__(self, output):
+    self.output = output
+
+  @utils.retryable()
+  def _handle_url_event(self, event : base.ContentFromURL):
+    if self.output.exists(event.dest):
+      return
+
+    try:
+      response = requests.get(event.src,
+        allow_redirects=True,
+        verify=False,
+)
+    except:
+      raise utils.PleaseRetryException()
+    if response.status_code == 404:
+      return
+
+    dest = event.dest
+    content_type = event.content_type
+
+
+    if response.status_code == 200 and len(response.content) > 0:
+      self.output.save_from_contents(
+        filepath=dest,
+        contents=response.content,
+        content_type=content_type)
+
 @celery.task(name='crawlers.tjsc', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
 def tjsc_task(**kwargs):
@@ -292,7 +327,7 @@ def tjsc_task(**kwargs):
         }
 
         collector = TJSCCollector(client=TJSCClient(), filters=query_params)
-        handler   = base.ContentHandler(output=output)
+        handler   = TJSCContentHandler(output=output)
         snapshot = base.Snapshot(keys=query_params)
 
         base.get_default_runner(
