@@ -202,18 +202,21 @@ class TJSCChunk(base.Chunk):
             
         check_if_recaptcha(soup)
         for act in soup.find_all('div', class_='resultados'):
-            
-            if soup.find('img', src=re.compile(r".*imagens/html.png")):
-                html_link = act.find('a', href=re.compile(r".*html\.do.*"))
-                html_link = BASE_URL + html_link.get('href') if html_link else ''
+            links = {}
+        #     if soup.find('img', src=re.compile(r".*imagens/html.png")) and not \
+        # soup.find('img', src=re.compile(r".*imagens/html_desabilitado.png")):
+            links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
+            links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
 
-            if soup.find('img', src=re.compile(r".*imagens/pdf.png")):
-                pdf_link = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
-                pdf_link = BASE_URL + pdf_link.get('href') if pdf_link else ''
+        #     if soup.find('img', src=re.compile(r".*imagens/pdf.png")) and not \
+        # soup.find('img', src=re.compile(r".*imagens/pdf_desabilitado.png")):
+            links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
+            links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
             
-            if soup.find('img', src=re.compile(r".*imagens/rtf.png")):
-                rtf_link = act.find('a', href=re.compile(r".*integra\.do.*?(?!arq=pdf)"))
-                rtf_link = BASE_URL + rtf_link.get('href') if rtf_link else ''
+        #     if soup.find('img', src=re.compile(r".*imagens/rtf.png")) and not \
+        # soup.find('img', src=re.compile(r".*imagens/rtf_desabilitado.png")):
+            links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
+            links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
             # process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
             process_code = act.find(text=re.compile('.*Processo\:.*'))
@@ -222,28 +225,38 @@ class TJSCChunk(base.Chunk):
             process_code = utils.extract_digits(str(process_code))
             
 
-            assert process_code and len(process_code) > 5
+            assert process_code and 25 > len(process_code) > 5
             session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
             session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
             
-            act_id = act.find(onclick=re.compile(r".*abreIntegra.*\(.*\,\'.+\W.*")).get('onclick')
-            act_id = re.search(r".*abreIntegra.*\(.*\,\'([\w\d]+)\W.*", act_id).group(1)
+            # act_id = act.find(onclick=re.compile(r".*abreIntegra.*\(.*\,\'.+\W.*")).get('onclick')
+            # act_id = re.search(r".*abreIntegra.*\(.*\,\'([\w\d]+)\W.*", act_id).group(1)
+
+            onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
+            ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
+            links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
+
 
             base_path = f'{session_date.year}/{session_date.month}/{session_date.format("DD")}_{process_code}_{act_id}'
             
-            if html_link:
+            if links.get('short_html'):
                 to_download.append(
-                    base.ContentFromURL(src=html_link, dest=f'{base_path}_FULL.html', content_type='text/html')
+                    base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
                 )
 
-            if pdf_link:
+            if links.get('html'):
                 to_download.append(
-                    base.ContentFromURL(src=pdf_link, dest=f'{base_path}.pdf', content_type='application/pdf')
+                    base.ContentFromURL(src=links['html'], dest=f'{base_path}_FULL.html', content_type='text/html')
+                )
+
+            if links.get('pdf'):
+                to_download.append(
+                    base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
                 )
             
-            if rtf_link:
+            if links.get('rtf'):
                 to_download.append(
-                    base.ContentFromURL(src=rtf_link, dest=f'{base_path}.rtf', content_type='application/rtf')
+                    base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
                 )
             
             #TJSC will cut connection if too many requests are made
