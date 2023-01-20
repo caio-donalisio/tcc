@@ -178,6 +178,7 @@ class STJMONOClient:
 
   #   return response
 
+  @utils.retryable(max_retries=3)
   def _response_or_retry_rows(self, data):
     import urllib
     
@@ -225,6 +226,7 @@ class STJMONOClient:
     return response
 
 
+  @utils.retryable(max_retries=3)
   def fetch_rows(self, filters, offset):
     return self._response_or_retry_rows(data={**filters, 'i': offset})
 
@@ -282,6 +284,8 @@ class STJMONOChunk(base.Chunk):
     self.docs_per_page   = docs_per_page
     self.limit   = limit
 
+
+  @utils.retryable(max_retries=3)
   def rows(self):
 
     response = self.client.fetch_rows({
@@ -299,6 +303,7 @@ class STJMONOChunk(base.Chunk):
   def page_contents(self, soup):
     
 
+    @utils.retryable(max_retries=3)
     def _get_pdf_urls(doc):
       BASE_PDF_URL = "https://processo.stj.jus.br"
       a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'}) or \
@@ -330,6 +335,8 @@ class STJMONOChunk(base.Chunk):
       pdf_links = [BASE_PDF_URL + utils.find_between(a['href'], start="'", end="'") for a in a_s]
       return pdf_links
 
+
+    @utils.retryable(max_retries=3)
     def get_direct_links(pdf_links: List) -> List:
       direct_links = []
       for pdf_link in pdf_links:
