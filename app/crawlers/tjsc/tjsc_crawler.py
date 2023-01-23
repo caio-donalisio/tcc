@@ -161,6 +161,7 @@ class TJSCCollector(base.ICollector):
             step=1,
             unit='months',
         ))
+        time.sleep(3)
         for start,end in reversed(periods):
             total = self.count({'start_date':start,'end_date':end})
             pages = range(1, 2 + total//RESULTS_PER_PAGE)
@@ -191,9 +192,6 @@ class TJSCChunk(base.Chunk):
     @utils.retryable(sleeptime=31)
     def rows(self):
         to_download = []
-        # result = self.client.fetch(self.filters, self.page)
-        # soup = utils.soup_by_content(result.text)
-        # time.sleep(2)
 
         @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
         def check_if_recaptcha():
@@ -206,27 +204,19 @@ class TJSCChunk(base.Chunk):
         soup = check_if_recaptcha()
         
         for act in soup.find_all('div', class_='resultados'):
-
+            time.sleep(0.51531325)
             links = {}
-        #     if soup.find('img', src=re.compile(r".*imagens/html.png")) and not \
-        # soup.find('img', src=re.compile(r".*imagens/html_desabilitado.png")):
+
             links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
             links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
 
-        #     if soup.find('img', src=re.compile(r".*imagens/pdf.png")) and not \
-        # soup.find('img', src=re.compile(r".*imagens/pdf_desabilitado.png")):
             links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
             links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
             
-        #     if soup.find('img', src=re.compile(r".*imagens/rtf.png")) and not \
-        # soup.find('img', src=re.compile(r".*imagens/rtf_desabilitado.png")):
             links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
             links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
-            # process_code = utils.extract_digits(act.find(text=re.compile('.*Processo\:.*')).next.next.next.text)
             process_code = re.search(r'.*Processo\:\s?([\d\-\.]+)\s.*', act.find('p').text).group(1)
-            # while not re.search(r'[\d\-\.]+', str(process_code)):
-                # process_code = process_code.next
             process_code = utils.extract_digits(process_code)
             
 
@@ -234,15 +224,12 @@ class TJSCChunk(base.Chunk):
             session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
             session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
             
-            # act_id = act.find(onclick=re.compile(r".*abreIntegra.*\(.*\,\'.+\W.*")).get('onclick')
-            # act_id = re.search(r".*abreIntegra.*\(.*\,\'([\w\d]+)\W.*", act_id).group(1)
-
             onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
             ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
             links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
 
 
-            base_path = f'{session_date.year}/{session_date.month}/{session_date.format("DD")}_{process_code}_{act_id}'
+            base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
             
             if links.get('short_html'):
                 to_download.append(
@@ -265,7 +252,7 @@ class TJSCChunk(base.Chunk):
                 )
             
             #TJSC will cut connection if too many requests are made
-            time.sleep(0.5)
+            time.sleep(0.561616136)
 
             to_download.append(base.Content(
                 content=str(act),
