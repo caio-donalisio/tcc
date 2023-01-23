@@ -286,7 +286,7 @@ class TJSCContentHandler(base.ContentHandler):
     content_type = event.content_type
 
 
-    if response.status_code == 200 and len(response.content) > 0:
+    if response.status_code == 200 and len(response.content) > 5_000:
       self.output.save_from_contents(
         filepath=dest,
         contents=response.content,
