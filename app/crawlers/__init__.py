@@ -11,6 +11,7 @@ import app.crawlers.tjmg
 import app.crawlers.tjpr
 import app.crawlers.tjrj
 import app.crawlers.tjrs
+import app.crawlers.tjsc
 import app.crawlers.tjsp
 import app.crawlers.trf1
 import app.crawlers.trf2
