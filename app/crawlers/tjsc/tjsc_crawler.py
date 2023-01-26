@@ -133,7 +133,8 @@ class TJSCClient:
                 data={
                     **get_filters(**filters),
                     'pg':str(page)
-                }
+                },
+                verify=False,
             )
 
         except Exception as e:
