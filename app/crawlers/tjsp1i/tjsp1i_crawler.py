@@ -6,6 +6,7 @@ import re
 from app.crawlers import base, utils, browsers
 import pendulum
 import requests
+import urllib
 from celery_singleton import Singleton
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -15,6 +16,9 @@ from slugify import slugify
 from urllib3.exceptions import InsecureRequestWarning
 from app.crawlers.utils import PleaseRetryException
 
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -324,9 +328,30 @@ class TJSP1IChunk(base.Chunk):
     else:
       return []
 
+  @utils.retryable(message='Could not access pdf page')
+  def get_pdf_link(self, item):
+    links = item.find_all('a', {'title': 'Visualizar Inteiro Teor'})
+    assert len(links) == 1, f"Found {len(links)} links, expected 1."
+    kvs = {k:v for k,v in zip(['cdProcesso', 'cdForo', 'nmAlias', 'cdDoc'],links[0]['name'].split('-'))}
+    search_url = f"https://esaj.tjsp.jus.br/cjpg/obterArquivo.do?cdProcesso={kvs['cdProcesso']}&cdForo={kvs['cdForo']}&nmAlias={kvs['nmAlias']}&cdDocumento={kvs['cdDoc']}"
+    self.browser.get(search_url)
+    WebDriverWait(self.browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//iframe[@src!="processando.html"]')))
+    self.browser.driver.implicitly_wait(20)
+    iframe = self.browser.bsoup().find('iframe')
+    relative_url = re.match(r'.*viewer\.html\?file=(.*)$', iframe['src'])
+    if relative_url is None:
+      raise PleaseRetryException()
+    relative_url = relative_url.group(1)
+    response = requests.get('https://esaj.tjsp.jus.br' + urllib.parse.unquote(relative_url),
+      cookies = self.browser.get_cookie_dict())
+    return response.content
+            
   @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
   utils.PleaseRetryException,))
   def get_row_for_current_page(self):
+    self.browser    = browsers.FirefoxBrowser(headless=False)
+    self.browser.get('https://esaj.tjsp.jus.br/cjpg/')
+
     rows = []
 
     self.client.set_search(self.start_date, self.end_date)
@@ -357,64 +382,48 @@ class TJSP1IChunk(base.Chunk):
 
     # Firstly, get rows that matters
     items = soup.find_all('tr', {'class': 'fundocinza1'})
+    # items = self.client.driver.find_elements(By.XPATH, '//tr[@class="fundocinza1"]')
     if not is_last_page:
       page_records = len(items)
       if page_records == 0:  # Wasn't expecting that but sometimes it happens. Sadly
         raise utils.PleaseRetryException()
 
     for item in items:
+      date = item.find(text=re.compile('.*Data de Disponibilização.*')).next
+      day, month, year = date.strip().split('/')
+
       links = item.find_all('a', {'title': 'Visualizar Inteiro Teor'})
-      assert len(links) > 0
-      #https://esaj.tjsp.jus.br/pastadigital/abrirDocumentoEdt.do?cdProcesso=1H000CP3F0000&cdForo=53&cdDoc=63505649&cdServico=800000&tpOrigem=2&flOrigem=P&nmAlias=PG5JM&ticket=6eEKypkM8iP%2BTBQiprqrIco7DbaRQP0ciU9v3jTQY9CCy4IUZbNOKN4F0xYudKlvfjFBB%2FQz124%2Bkd2vtRDggJElur%2Bk8m8uHYKEq9vnBjyqSA7flGRkiQ6YRolbKx32orUZyUCo5a1rlaKFxYRSXGzFyLvaBGtHXksF3Ak56STuJ1mmIvpWbT0lIu9Af1ogv1vatLMhcNM1DQSRsuEi6A%3D%3D
-      doc_id = links[0]['cdacordao']
-      foro   = links[0]['cdforo']
-      assert doc_id and foro
+      assert len(links) == 1, f"Found {len(links)} links, expected 1."
 
-      # Will parse and store key values on this dict
-      kvs = {}
-      kvs['registro'] = links[0].get_text().strip()
+      num_processo = item.find('span', class_='fonteNegrito').text.strip()
+      kvs = {k:v for k,v in zip(['cdProcesso', 'cdForo', 'nmAlias', 'cdDoc'],links[0]['name'].split('-'))}
+      assert f'{kvs["cdForo"]}{kvs["cdDoc"]}'.isdigit() and kvs["cdProcesso"] and kvs["nmAlias"]
+      doc_id = f"{day}-{links[0]['name']}-{utils.extract_digits(num_processo)}"
 
-      ementa_sem_formatacao_el = item.find_all('div', {'class': 'mensagemSemFormatacao'})
-      assert len(ementa_sem_formatacao_el) == 1
-      ementa_sem_formatacao = ementa_sem_formatacao_el[0].get_text()
-      kvs['ementa_sem_formatacao'] = ementa_sem_formatacao
-
-      fields_el = item.find_all('tr', {'class': 'ementaClass2'})
-      for field in fields_el:
-        # Clear label & values as we built a dict of them
-        label = field.find_all('strong')[0].get_text().strip()
-        label = re.sub(r'$:', '', label)
-
-        # NOTE: Should we replace `<em>` to something else first?
-        value = re.sub(r'\s+', ' ', field.get_text()).strip()
-        value = value.replace(label, '')
-        kvs[slugify(label)] = value.strip()
-
-      _, month, year = kvs['data-do-julgamento'].split('/')
-
-      #
-      pdf_url = f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao={doc_id}&cdForo={foro}'
-      row_content = item.prettify(encoding='cp1252')
-
+      alt_meta_url = f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={kvs['cdProcesso']}&processo.foro={kvs['cdForo']}&processo.numero={num_processo}"
+      
       rows.append([
         base.Content(
-          content=row_content,
-          dest=f'{year}/{month}/doc_{doc_id}.html',
+          content=item.prettify(encoding='cp1252'),
+          dest=f'{year}/{month}/{doc_id}.html',
+          content_type='text/html'
+        ),
+        base.ContentFromURL(
+          src=alt_meta_url,
+          dest=f'{year}/{month}/{doc_id}_alt.html',
           content_type='text/html'
         ),
         base.Content(
-          content=json.dumps(kvs),
-          dest=f'{year}/{month}/doc_{doc_id}.json',
-          content_type='application/json'
-        ),
-        base.ContentFromURL(
-          src=pdf_url,
-          dest=f'{year}/{month}/doc_{doc_id}.pdf',
+          content=self.get_pdf_link(item),
+          dest=f'{year}/{month}/{doc_id}.pdf',
           content_type='application/pdf'
-        )
+        ),
       ])
 
+    self.browser.quit()
     return rows
+
+
 
 
 class TJSP1IHandler(base.ContentHandler):
@@ -438,8 +447,8 @@ class TJSP1IHandler(base.ContentHandler):
       return
     if self.output.exists(content_from_url.dest):
       return
-    for cookie in self.client.request_cookies_browser:
-      self.client.session.cookies.set(cookie['name'], cookie['value'])
+    # for cookie in self.client.request_cookies_browser:
+    #   self.client.session.cookies.set(cookie['name'], cookie['value'])
     return self._download(content_from_url)
 
   @ratelimit.sleep_and_retry
@@ -455,7 +464,7 @@ class TJSP1IHandler(base.ContentHandler):
       verify=False,
       timeout=10)
 
-    if response.headers.get('Content-type') == 'application/pdf;charset=UTF-8':
+    if response.status_code == 200:
       logger.debug(f'GET {content_from_url.src} OK')
       self.output.save_from_contents(
         filepath=content_from_url.dest,
