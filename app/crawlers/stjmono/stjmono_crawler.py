@@ -137,7 +137,7 @@ class STJMONOClient:
     'p': 'true',
     'tp': 'T',
     }
-    response = self.requester.get('https://scon.stj.jus.br/SCON/pesquisar.jsp', 
+    response = self.requester.get('https://scon.stj.jus.br/SCON/pesquisar.jsp',
       params=params, headers=DEFAULT_HEADERS_COUNT)
     return self._count_by_content(response.content)
 
@@ -156,7 +156,7 @@ class STJMONOClient:
   #     f'{self.base_url}/SCON/pesquisar.jsp',
   #     # headers=DEFAULT_HEADERS,
   #     headers={
-  #     **fake_headers.headers.make_header(), 
+  #     **fake_headers.headers.make_header(),
   #     'user-agent':random.choice(fake_useragent.UserAgent(use_external_data=False).data_browsers['chrome'])
   #     },
   #     verify=False,
@@ -181,7 +181,7 @@ class STJMONOClient:
   @utils.retryable(max_retries=3)
   def _response_or_retry_rows(self, data):
     import urllib
-    
+
     response = self.requester.post(
       f'{self.base_url}/SCON/decisoes/toc.jsp',
       headers={
@@ -203,7 +203,7 @@ class STJMONOClient:
     'sec-ch-ua-platform': '"Android"',
  },
 #  {
-#       **fake_headers.headers.make_header(), 
+#       **fake_headers.headers.make_header(),
 #       'user-agent':random.choice(fake_useragent.UserAgent(use_external_data=False).data_browsers['chrome'])
 #       },
       verify=False,
@@ -230,10 +230,17 @@ class STJMONOClient:
   def fetch_rows(self, filters, offset):
     return self._response_or_retry_rows(data={**filters, 'i': offset})
 
-  def _count_by_content(self, content):
+  def _count_by_content(self, content, skip_document_not_found:bool=True):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
-    assert not soup.find('div', {'class':'erroMensagem'})
+    errorMessage = soup.find('div', {'class':'erroMensagem'})
+    if errorMessage:
+      if skip_document_not_found and errorMessage.getText().strip == "Nenhum documento encontrado!":
+        logger.info(f"No documents found for this period. Skipping")
+        return 0
+
+      raise utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
+
     assert info
     return int(utils.extract_digits(info.text))
 
@@ -289,9 +296,9 @@ class STJMONOChunk(base.Chunk):
   def rows(self):
 
     response = self.client.fetch_rows({
-      **self.filters, **{'l': self.docs_per_page, 'numDocsPagina': self.docs_per_page}}, 
+      **self.filters, **{'l': self.docs_per_page, 'numDocsPagina': self.docs_per_page}},
       offset=self.keys['offset'])
-    
+
     soup  = utils.soup_by_content(response.content)
     count = self.client._count_by_content(response.content)
     if count == 0:
@@ -301,7 +308,7 @@ class STJMONOChunk(base.Chunk):
       yield content
 
   def page_contents(self, soup):
-    
+
 
     @utils.retryable(max_retries=3)
     def _get_pdf_urls(doc):
@@ -310,8 +317,8 @@ class STJMONOChunk(base.Chunk):
         doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
       session = requests.Session()
       pdfs_page = utils.get_response(
-        logger, 
-        session, 
+        logger,
+        session,
         utils.find_between(a['href'], start="'", end="'"),
         {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -328,7 +335,7 @@ class STJMONOChunk(base.Chunk):
     'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
-    }, 
+    },
         verify=False
       )
       a_s = utils.soup_by_content(pdfs_page.text).find_all('a', text='Decisão Monocrática')
@@ -361,15 +368,15 @@ class STJMONOChunk(base.Chunk):
       expected_doc_count = len(pdf_urls)
 
       to_download = []
-      
+
       if expected_doc_count == 0:
         logger.warn(f'No document found. {str(doc)[:400]}')
-        continue     
-      
+        continue
+
       #Checks if all num_registros are equal - should be.
       try:
         assert all(
-          utils.get_param_from_url(pdf_urls[0], 'num_registro') == utils.get_param_from_url(url, 'num_registro') 
+          utils.get_param_from_url(pdf_urls[0], 'num_registro') == utils.get_param_from_url(url, 'num_registro')
           for url in pdf_urls)
       except AssertionError:
         logger.error(f'Found links with different num_registro. Skipped. {pdf_urls=}')
@@ -377,10 +384,10 @@ class STJMONOChunk(base.Chunk):
 
       #Número processo
       act_id  = utils.get_param_from_url(pdf_urls[0], 'num_registro')
-      
+
       #Seq
       seq = utils.get_param_from_url(pdf_urls[0], 'sequencial')
-      
+
       #Date
       publication_date = utils.get_param_from_url(pdf_urls[0], 'data')
       date_obj = pendulum.from_format(publication_date, 'YYYYMMDD')
@@ -390,10 +397,10 @@ class STJMONOChunk(base.Chunk):
       componente = utils.get_param_from_url(pdf_urls[0], 'componente')
       if componente != "MON":
         logger.warn(f'Componente is not MON: {act_id=} {componente=} {seq=}')
-      
+
       #Meta Hash
       meta_hash = utils.get_content_hash(doc, [{'name':'p'}])
-      
+
       #Make filename
       filename = f'{year}/{month}/{day}_{componente}_{act_id}_{meta_hash}'
 
@@ -406,7 +413,7 @@ class STJMONOChunk(base.Chunk):
           to_download.append(base.ContentFromURL(
             src=pdf_url, dest=f'{filename}_{n:02}.pdf', content_type='application/pdf')
             )
-            
+
       elif expected_doc_count == 1:
         to_download.append(base.ContentFromURL(
           src=get_direct_links(pdf_urls).pop(), dest=f'{filename}.pdf', content_type='application/pdf')
@@ -415,19 +422,19 @@ class STJMONOChunk(base.Chunk):
     #Get Metadata
       to_download.append(
             base.Content(
-              content=append_metadata(doc, expected_doc_count).prettify(), 
-              dest=f'{filename}.html', 
+              content=append_metadata(doc, expected_doc_count).prettify(),
+              dest=f'{filename}.html',
               content_type='text/html'))
-      
+
       yield to_download
 
 @celery.task(queue='crawlers.stjmono', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def stjmono_task(start_date, end_date, output_uri):
   setup_cloud_logger(logger)
- 
+
   from app.crawlers.logutils import logging_context
-  
+
   with logging_context(crawler='STJMONO'):
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger.info(f'Output: {output}.')
