@@ -48,25 +48,6 @@ DEFAULT_HEADERS_COUNT = {
     'sec-ch-ua-platform': '"Android"',
 }
 
-# {
-#     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-#     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-#     'Cache-Control': 'max-age=0',
-#     'Connection': 'keep-alive',
-#     # 'Cookie': 'f5_cspm=1234; JSESSIONID=W5hlk1-uDQhzLhR66JN3lNdNV5qDgolZorpGTyty.svlp-jboss-01; TS01603393=016a5b3833b3834c7fed9a309c8228bc1a920557481e443674e7e9316852bbd0daad16b56b1994c1eb74f44023598e2fe5cccd88d2; TS0133e456=0132b05847992e906502f2b8833d7a169f0ebe088934c98bf0763a9f29f7d5f055b1392f930b86f7493b394d6d72339819638f17d6a73b2f8f876a142ff729715452a228556f8da23a47c05c892f35379533d91462; _ga=GA1.3.84998084.1664279080; BIGipServerpool_svlp-jboss_scon=1057204416.36895.0000; BIGipServerpool_wserv=1023413514.20480.0000; _gid=GA1.3.1107844980.1673011176; TS01dc523b=016a5b38336cefb0eb88e7ceabe09af8ec89e1be4026faca030645367db23f7858fa343b8ed3d7a6094e1bb1e6566d976957c0e1e0; TS0122e3df=0132b058476d15365f25ba6d43f5b0af647c796990e69ae6548c91554175157ca85409b9576793e9bbcd3bcfbf4e472eb176fcf58ebc5dc9a4459ce136a3d98ccc16891973; TS0165095f=0132b0584735807162bbe8ab6f7337f5364d90a466f643011574ee91c4c5f4c7f32853929651abf57112855968226788ddc91dc689d976b98f8c8d2924baeb7c6eb0f4258624a25404def5a16d5a8ec9701c0c2cad41d0cccc47f112cc222773368f96dbbb; TS01e2b0fb=016a5b3833850a7a591750d7d5c3df75877543384ac77b4a16aafda6071dbe6533f9059f308778de66bc3b08572f87b5f6d09877c3; TS013f88e9=0132b058470d915587f5f9f285593b226b05e62b3634c98bf0763a9f29f7d5f055b1392f93e1a51c5a394448494de52da6ca4628da3fd96db8f2c611bba389bbdcdd9a0974',
-#     'Origin': 'https://scon.stj.jus.br',
-#     'Referer': 'https://scon.stj.jus.br/SCON/',
-#     'Sec-Fetch-Dest': 'document',
-#     'Sec-Fetch-Mode': 'navigate',
-#     'Sec-Fetch-Site': 'same-origin',
-#     'Sec-Fetch-User': '?1',
-#     'Upgrade-Insecure-Requests': '1',
-#     'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Mobile Safari/537.36 Edg/108.0.1462.54',
-#     'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="108", "Microsoft Edge";v="108"',
-#     'sec-ch-ua-mobile': '?1',
-#     'sec-ch-ua-platform': '"Windows"',
-# }
-
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
   return {
@@ -141,43 +122,6 @@ class STJMONOClient:
       params=params, headers=DEFAULT_HEADERS_COUNT)
     return self._count_by_content(response.content)
 
-  # @utils.retryable(max_retries=3)
-  # def fetch(self, filters, offset):
-  #   return self._response_or_retry(data={**filters, 'i': offset})
-
-  # @utils.retryable(max_retries=3)
-  # def get(self, path):
-  #   return self.requester.get(f'{self.base_url}/{path}', verify=False)
-
-  # @utils.retryable(max_retries=3)
-  # def _response_or_retry(self, data):
-  #   import random
-  #   response = self.requester.post(
-  #     f'{self.base_url}/SCON/pesquisar.jsp',
-  #     # headers=DEFAULT_HEADERS,
-  #     headers={
-  #     **fake_headers.headers.make_header(),
-  #     'user-agent':random.choice(fake_useragent.UserAgent(use_external_data=False).data_browsers['chrome'])
-  #     },
-  #     verify=False,
-  #     data=data)
-  #   soup = utils.soup_by_content(response.content)
-
-  #   if soup \
-  #       .find('div', id='idCaptchaLinha'):
-  #     logger.warn('Got captcha -- resetting session.')
-  #     self.reset_session()
-  #     raise utils.PleaseRetryException()
-
-  #   info = soup.find('span', {'class': 'numDocs'}) or \
-  #     soup.find('div', {'class':'erroMensagem'})
-  #   if not info:
-  #     logger.warn('Got invalid page -- reseting session.')
-  #     self.reset_session()
-  #     raise utils.PleaseRetryException()
-
-  #   return response
-
   @utils.retryable(max_retries=3)
   def _response_or_retry_rows(self, data):
     import urllib
@@ -202,10 +146,6 @@ class STJMONOClient:
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
  },
-#  {
-#       **fake_headers.headers.make_header(),
-#       'user-agent':random.choice(fake_useragent.UserAgent(use_external_data=False).data_browsers['chrome'])
-#       },
       verify=False,
       data=data)
     soup = utils.soup_by_content(response.content)
@@ -235,7 +175,7 @@ class STJMONOClient:
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     errorMessage = soup.find('div', {'class':'erroMensagem'})
     if errorMessage:
-      if skip_document_not_found and errorMessage.getText().strip == "Nenhum documento encontrado!":
+      if skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!":
         logger.info(f"No documents found for this period. Skipping")
         return 0
 
