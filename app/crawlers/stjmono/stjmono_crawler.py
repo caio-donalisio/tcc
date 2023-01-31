@@ -150,9 +150,6 @@ class STJMONOClient:
     self.requester.headers = {**headers, 'User-Agent':utils.get_random_useragent()}
     self.requester.get("https://scon.stj.jus.br/SCON/", 
       verify=False)
-      #, 
-      # headers={**DEFAULT_HEADERS, 'User-Agent':utils.get_random_useragent()}, 
-      #verify=False)
 
   @utils.retryable(max_retries=9)
   def count(self, filters):
@@ -168,7 +165,7 @@ class STJMONOClient:
     try:
       self.validate_count_content(response.text)
     except Exception as e:
-      self.reset_session({**DEFAULT_HEADERS_COUNT,'User-Agent': f'{utils.get_random_useragent()}'})
+      self.reset_session({**DEFAULT_COUNT_HEADERS,'User-Agent': f'{utils.get_random_useragent()}'})
       raise utils.PleaseRetryException(e)
     return self._count_by_content(response.content)
 
@@ -182,8 +179,6 @@ class STJMONOClient:
         **DEFAULT_ROWS_HEADERS,
     **{
       'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
-      # jurisprudencia/toc.jsp
-      # 'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
       'User-Agent': f'{utils.get_random_useragent()}',
     },
  },
@@ -217,37 +212,16 @@ class STJMONOClient:
     errorMessage = soup.find('div', {'class':'erroMensagem'})
     if errorMessage:
       if not(skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!"):
-        # logger.info(f"No documents found for this period. Skipping")
-        # return 0
         raise Exception(f'Error message found: {errorMessage.getText()}')
-        #utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
 
     if soup.find(text=re.compile(r'.*CAPTCHA.*')):
       raise Exception('Captcha found - retrying...')
-      # raise utils.PleaseRetryException('Captcha found - retrying...')
 
     if not info:
       raise Exception('Could not load page - retrying...')
-      # utils.PleaseRetryException('Could not load page - retrying...')
-
-    # assert info, 'Missing count info in page'
 
   def _count_by_content(self, content, skip_document_not_found:bool=True):
     soup = utils.soup_by_content(content)
-
-    # info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
-    # errorMessage = soup.find('div', {'class':'erroMensagem'})
-    # if errorMessage:
-    #   if skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!":
-    #     logger.info(f"No documents found for this period. Skipping")
-    #     return 0
-
-    #   raise utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
-
-    # if soup.find(text=re.compile(r'.*CAPTCHA.*')):
-    #   raise utils.PleaseRetryException('Captcha found - retrying...')
-
-    # assert info
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     return int(utils.extract_digits(info.text)) if info else 0
 
