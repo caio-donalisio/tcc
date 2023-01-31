@@ -48,6 +48,26 @@ DEFAULT_HEADERS_COUNT = {
     'sec-ch-ua-platform': '"Android"',
 }
 
+{
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Cookie': 'f5_cspm=1234; f5_cspm=1234; TS01603393=016a5b38336d7ac6eede9c8d8267c94023af712f22dc5b10d29880410f011d92d087b592a77386b9e2d1c50d2bdcdcab23f9ae904f; JSESSIONID=wIQ7mzL8-FJTzckYKyjR_4Ve74NkqekvyXWQ7-PZ.svlp-jboss-02; _ga=GA1.3.84998084.1664279080; BIGipServerpool_svlp-jboss_scon=1073981632.36895.0000; TS01dc523b=016a5b38336cd141233349f5c26912dd4605e38cbe85198559d49b67822e30bfd4a23002890f893a4ba0f066aa327b0fec3a8e123c; _gid=GA1.3.133587927.1675183377; TS01e2b0fb=016a5b3833b9363e28d281774e58d5131ad43853f416e69db8b41f8210869cdc6bf731d1324290deabfaa7921ecda6c16f0668167a; _gat_UA-179972319-1=1; TS00000000076=0845fc7f4bab28003d8ed52e468d739f247fbc4465a19d8a00ac2ab46997662eb2c60bb3ecba79718427c66e1ab0ec2508662da24909d0003032bdb23db4b2c841bdbdefaafbded36472b30b0f7722508631575a7b311f47368e2d939de8116a883ec234960a40099b27eb975a2a965794bb5d1fbcbf3cef46029d6f1dcd17d49be76d5025496455a464486e02b88ddd1377fd19b8b8e8804019fcc13903ac4fdb234a228e160406dd05723ab8dd9dc443eebac281bfd050578f7574a2843f4e0b4dd0b6197382c5cbf9d3c558b6bbf9c103f1f0e63e001715336f52f5c64e3abd9ecb1f11d957f0252abd876a96de5c93a993b4daac27396462fa4aebb8498eabe1036d8cbe58fa; TSPD_101_DID=0845fc7f4bab28003d8ed52e468d739f247fbc4465a19d8a00ac2ab46997662eb2c60bb3ecba79718427c66e1ab0ec2508662da249063800cd32e8441066dce661884794dfa5f6b6f36108135197e6cdb57162f9bc8e90248e28dcbc8faa5cc722cbbe456830380a9ffaf21774075c29; TSPD_101=0845fc7f4bab2800652a15d56ffd57d89c8fad55de6f38ee1cc83d637f84103e727946528f3c0b92c4c09b639147e9100877324789051800b7cb298d324cd56f68668fda86ef7db0fbb886cc9de01f5e; TS49ab854f029=0845fc7f4bab2800f828809f799a150bdca9127579dd0da6478e31c76872b80241ccaa04b1919ba6a5e4096ec537daee; TS214ae949027=0845fc7f4bab2000ffbde6192e9b66a87d8ef19782d62f444161a323212e9bc71967e0c2aeabcfe108706e4bdc1130009651623d78674d2d825a901984620aa408a26c7cee593be977791188e7f9e83f5aaa71832bf771337487d83920f55b17; TS49ab854f077=0845fc7f4bab28000675f7c98f2f3d578671f768d446b4e330693900813113a26ab967699ad6c843e90a2ad1f4a003ed0847368f9c1720005ff9735f47f150d1e15992af448886b0a6671375b80dd4b4878bd81f62160e3f',
+    'Origin': 'https://scon.stj.jus.br',
+    'Referer': 'https://scon.stj.jus.br/SCON/pesquisar.jsp',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.69',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+}
+
 DEFAULT_ROWS_HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
@@ -179,7 +199,9 @@ class STJMONOClient:
       headers={
         **DEFAULT_ROWS_HEADERS,
     **{
-      'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
+      'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
+      # jurisprudencia/toc.jsp
+      # 'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
       'User-Agent': f'{utils.get_random_useragent()}',
     },
  },
@@ -366,11 +388,6 @@ class STJMONOChunk(base.Chunk):
       expected_doc_count = len(pdf_urls)
 
       to_download = []
-
-      if expected_doc_count == 0:
-        logger.warn(f'No document found. {str(doc)[:200]}')
-        raise utils.PleaseRetryException()
-        # continue
 
       #Checks if all num_registros are equal - should be.
       try:
