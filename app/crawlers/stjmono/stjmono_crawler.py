@@ -18,7 +18,7 @@ NOW = pendulum.now().to_datetime_string()
 DATE_FORMAT_1 = 'YYYYMMDD'
 DATE_FORMAT_2 = 'DD/MM/YYYY'
 DEFAULT_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0) Gecko/20100101 Firefox/108.0',
+    'User-Agent': f'{utils.get_random_useragent()}',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
     # 'Accept-Encoding': 'gzip, deflate, br',
@@ -42,11 +42,48 @@ DEFAULT_HEADERS_COUNT = {
     'Sec-Fetch-Site': 'same-origin',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
+    # 'User-Agent': f'{utils.get_random_useragent()}',
     'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
 }
+
+DEFAULT_ROWS_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # 'Cookie': 'JSESSIONID=8kQY3aXD1VPZ5IVbhLjIEDcHd5PB4DuimS_C69Rg.svlp-jboss-01; f5_cspm=1234; TS01603393=016a5b3833a15eb015ace80e186f683e0d04467b8d64f06c40cd51985b9f8c6328151b43f458c077e6f6ff4b42127f5e2d062dbaf7; TS0133e456=0132b058479e24edeb017fcd61d7a6c40e0d80f09d0b0876d8998feb90b4841f679376c6779983dbc5ac7dcc726240293274a69a0929373762048a9354f05df6fe2a716a787abe46efb6a8b8ad448ff82d36fd4d76; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss_scon=1057204416.36895.0000; TS0165095f=0132b0584708a20341834675af853e92538767377a0b0876d8998feb90b4841f679376c677cb0899e28c8335cd81589077f5f3da12090509f59a011eefd3fc1050ec79288776a5df90d6b154f179a90cf6c0e4fec7; _gat_UA-179972319-1=1; TS01e2b0fb=016a5b3833b24ce57067e8b8fa8a67836ad4c20f80da9a4586fa50b6bbcbcceaafaa405cb659531f52fed09424cf514050ebf8cc46; TS013f88e9=0132b05847169820d2b92a82b979afde26ce9a0da20b0876d8998feb90b4841f679376c6771aa4b8338fb5bcd56faeb445b13eccf6181e1e23f590bcbab5606b4c5d5cbd9c',
+    'Origin': 'https://scon.stj.jus.br',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    # 'User-Agent': f'{utils.get_random_useragent()}',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+ }
+
+DEFAULT_PDF_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # 'Cookie': 'JSESSIONID=Ybtm-imnPIJeqZiGx9uh-rDllNlqWJyqbdzaTOLK.svlp-jboss-04; TS01db5b07=0132b058475ed42f31b520f66a8df07be945aea7401e0a42f50d7edc3e19455603d94a47f51e029adcea4130484817e5c6993ad1c7c8589bf12863cdb87e429a4db6b99238; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss=1107536064.36895.0000; TS01dc523b=016a5b38332c4c19b057799de99ca5f3bd713012bd08976a0b9c2abb671b433e8016f7d554cba1585cb21a6878c2d3bd44837db784; TS0122e3df=0132b05847a79700aa622a420bfddca45fd3c10474043731851d155b40f5db36ac99e383b06265acd5e5d5665032eab031c2cd1ee87f84357b7e607e7e32d8f09e91e33bc2; TS01bf01ec=0132b05847d0b78c9f25e170ecf4f14cd87d405d0c8e55c9ad9142f5a25a562f7d5da8ef33c1524c39f907efcd487606600a020d0a57c76c5f37f345c5e6875d7598a6e173; _gat_UA-179972319-1=1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': f'{utils.get_random_useragent()}',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+    
+}
+
 
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
@@ -80,6 +117,8 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
 'ref': '',
   }
 
+import fake_useragent
+
 def get_row_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
   return {
@@ -101,15 +140,19 @@ class STJMONOClient:
   def __init__(self):
     self.base_url  = 'https://scon.stj.jus.br'
     self.requester = requests.Session()
-    self.requester.headers = DEFAULT_HEADERS
+    self.requester.headers = DEFAULT_HEADERS_COUNT
     self.requester.get("https://scon.stj.jus.br/SCON/", verify=False)
 
-  def reset_session(self):
+  def reset_session(self, headers=DEFAULT_HEADERS_COUNT):
     self.requester = requests.Session()
-    self.requester.headers = DEFAULT_HEADERS
-    self.requester.get("https://scon.stj.jus.br/SCON/", verify=False)# headers=DEFAULT_HEADERS, verify=False)
+    self.requester.headers = {**headers, 'User-Agent':utils.get_random_useragent()}
+    self.requester.get("https://scon.stj.jus.br/SCON/", 
+      verify=False)
+      #, 
+      # headers={**DEFAULT_HEADERS, 'User-Agent':utils.get_random_useragent()}, 
+      #verify=False)
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def count(self, filters):
 
     params = {
@@ -119,70 +162,90 @@ class STJMONOClient:
     'tp': 'T',
     }
     response = self.requester.get('https://scon.stj.jus.br/SCON/pesquisar.jsp',
-      params=params, headers=DEFAULT_HEADERS_COUNT)
+      params=params)
+    try:
+      self.validate_count_content(response.text)
+    except Exception as e:
+      self.reset_session({**DEFAULT_HEADERS_COUNT,'User-Agent': f'{utils.get_random_useragent()}'})
+      raise utils.PleaseRetryException(e)
     return self._count_by_content(response.content)
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def _response_or_retry_rows(self, data):
     import urllib
 
     response = self.requester.post(
       f'{self.base_url}/SCON/decisoes/toc.jsp',
       headers={
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-    # 'Cookie': 'JSESSIONID=8kQY3aXD1VPZ5IVbhLjIEDcHd5PB4DuimS_C69Rg.svlp-jboss-01; f5_cspm=1234; TS01603393=016a5b3833a15eb015ace80e186f683e0d04467b8d64f06c40cd51985b9f8c6328151b43f458c077e6f6ff4b42127f5e2d062dbaf7; TS0133e456=0132b058479e24edeb017fcd61d7a6c40e0d80f09d0b0876d8998feb90b4841f679376c6779983dbc5ac7dcc726240293274a69a0929373762048a9354f05df6fe2a716a787abe46efb6a8b8ad448ff82d36fd4d76; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss_scon=1057204416.36895.0000; TS0165095f=0132b0584708a20341834675af853e92538767377a0b0876d8998feb90b4841f679376c677cb0899e28c8335cd81589077f5f3da12090509f59a011eefd3fc1050ec79288776a5df90d6b154f179a90cf6c0e4fec7; _gat_UA-179972319-1=1; TS01e2b0fb=016a5b3833b24ce57067e8b8fa8a67836ad4c20f80da9a4586fa50b6bbcbcceaafaa405cb659531f52fed09424cf514050ebf8cc46; TS013f88e9=0132b05847169820d2b92a82b979afde26ce9a0da20b0876d8998feb90b4841f679376c6771aa4b8338fb5bcd56faeb445b13eccf6181e1e23f590bcbab5606b4c5d5cbd9c',
-    'Origin': 'https://scon.stj.jus.br',
-    'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'same-origin',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
-    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
+        **DEFAULT_ROWS_HEADERS,
+    **{
+      'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
+      'User-Agent': f'{utils.get_random_useragent()}',
+    },
  },
       verify=False,
-      data=data)
+      data=data,)
     soup = utils.soup_by_content(response.content)
 
-    if soup \
-        .find('div', id='idCaptchaLinha'):
+    if soup.find('div', id='idCaptchaLinha') or \
+        soup.find(text=re.compile(r'.*CAPTCHA.*')):
       logger.warn('Got captcha -- reseting session.')
-      self.reset_session()
+      self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
 
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
     if not info:
       logger.warn('Got invalid page -- reseting session.')
-      self.reset_session()
+      self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
-
     return response
 
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def fetch_rows(self, filters, offset):
     return self._response_or_retry_rows(data={**filters, 'i': offset})
 
-  def _count_by_content(self, content, skip_document_not_found:bool=True):
+  @utils.retryable(max_retries=9)
+  def validate_count_content(self, content, skip_document_not_found=True):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     errorMessage = soup.find('div', {'class':'erroMensagem'})
     if errorMessage:
-      if skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!":
-        logger.info(f"No documents found for this period. Skipping")
-        return 0
+      if not(skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!"):
+        # logger.info(f"No documents found for this period. Skipping")
+        # return 0
+        raise Exception(f'Error message found: {errorMessage.getText()}')
+        #utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
 
-      raise utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
+    if soup.find(text=re.compile(r'.*CAPTCHA.*')):
+      raise Exception('Captcha found - retrying...')
+      # raise utils.PleaseRetryException('Captcha found - retrying...')
 
-    assert info
-    return int(utils.extract_digits(info.text))
+    if not info:
+      raise Exception('Could not load page - retrying...')
+      # utils.PleaseRetryException('Could not load page - retrying...')
+
+    # assert info, 'Missing count info in page'
+
+  def _count_by_content(self, content, skip_document_not_found:bool=True):
+    soup = utils.soup_by_content(content)
+
+    # info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
+    # errorMessage = soup.find('div', {'class':'erroMensagem'})
+    # if errorMessage:
+    #   if skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!":
+    #     logger.info(f"No documents found for this period. Skipping")
+    #     return 0
+
+    #   raise utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
+
+    # if soup.find(text=re.compile(r'.*CAPTCHA.*')):
+    #   raise utils.PleaseRetryException('Captcha found - retrying...')
+
+    # assert info
+    info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
+    return int(utils.extract_digits(info.text)) if info else 0
 
 class STJMONOCollector(base.ICollector):
 
@@ -240,46 +303,41 @@ class STJMONOChunk(base.Chunk):
       offset=self.keys['offset'])
 
     soup  = utils.soup_by_content(response.content)
+    self.client.validate_count_content(response.content)
     count = self.client._count_by_content(response.content)
+
     if count == 0:
       return []
     for content in self.page_contents(soup):
       time.sleep(random.random()/2)
       yield content
 
+  @utils.retryable(max_retries=3)
   def page_contents(self, soup):
 
 
     @utils.retryable(max_retries=3)
     def _get_pdf_urls(doc):
       BASE_PDF_URL = "https://processo.stj.jus.br"
-      a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'}) or \
-        doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
+      a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'})
+      a = a or doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
+      # a = a or doc.find('a',attrs={'data-bs-original-title':'Decisão Monocrática Certificada'})
+          
       session = requests.Session()
       pdfs_page = utils.get_response(
         logger,
         session,
         utils.find_between(a['href'], start="'", end="'"),
         {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-    # 'Cookie': 'JSESSIONID=Ybtm-imnPIJeqZiGx9uh-rDllNlqWJyqbdzaTOLK.svlp-jboss-04; TS01db5b07=0132b058475ed42f31b520f66a8df07be945aea7401e0a42f50d7edc3e19455603d94a47f51e029adcea4130484817e5c6993ad1c7c8589bf12863cdb87e429a4db6b99238; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss=1107536064.36895.0000; TS01dc523b=016a5b38332c4c19b057799de99ca5f3bd713012bd08976a0b9c2abb671b433e8016f7d554cba1585cb21a6878c2d3bd44837db784; TS0122e3df=0132b05847a79700aa622a420bfddca45fd3c10474043731851d155b40f5db36ac99e383b06265acd5e5d5665032eab031c2cd1ee87f84357b7e607e7e32d8f09e91e33bc2; TS01bf01ec=0132b05847d0b78c9f25e170ecf4f14cd87d405d0c8e55c9ad9142f5a25a562f7d5da8ef33c1524c39f907efcd487606600a020d0a57c76c5f37f345c5e6875d7598a6e173; _gat_UA-179972319-1=1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
-    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
-    },
+          **DEFAULT_PDF_HEADERS,
+          'User-Agent': f'{utils.get_random_useragent()}'},
         verify=False
       )
       a_s = utils.soup_by_content(pdfs_page.text).find_all('a', text='Decisão Monocrática')
       pdf_links = [BASE_PDF_URL + utils.find_between(a['href'], start="'", end="'") for a in a_s]
+      if not pdf_links:
+        logger.warn(f'No document found. {str(doc)[:200]}')
+        raise utils.PleaseRetryException('No PDFs found - retrying...')
       return pdf_links
 
 
@@ -310,8 +368,9 @@ class STJMONOChunk(base.Chunk):
       to_download = []
 
       if expected_doc_count == 0:
-        logger.warn(f'No document found. {str(doc)[:400]}')
-        continue
+        logger.warn(f'No document found. {str(doc)[:200]}')
+        raise utils.PleaseRetryException()
+        # continue
 
       #Checks if all num_registros are equal - should be.
       try:
