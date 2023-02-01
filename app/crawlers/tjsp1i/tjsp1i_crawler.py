@@ -6,20 +6,15 @@ import re
 from app.crawlers import base, utils, browsers
 import pendulum
 import requests
-import urllib
 from celery_singleton import Singleton
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from slugify import slugify
+from selenium.common.exceptions import WebDriverException
 from urllib3.exceptions import InsecureRequestWarning
 from app.crawlers.utils import PleaseRetryException
 from app.crawlers.tjsp1i.tjsp1i_pdf import TJSP1IDownloader
 
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -226,7 +221,7 @@ class TJSP1IClient:
 
       chrome_options.add_argument("--no-sandbox")
 
-      self.driver = browsers.FirefoxBrowser(headless=False).driver # webdriver. Chrome(options=chrome_options)
+      self.driver = browsers.FirefoxBrowser(headless=True).driver # webdriver. Chrome(options=chrome_options)
       self.driver.implicitly_wait(20)
     else:
       self.driver = webdriver.Remote(
@@ -284,8 +279,6 @@ class TJSP1IClient:
     WebDriverWait(self.driver, 15) \
       .until(EC.presence_of_element_located((By.ID, 'iddadosConsulta.pesquisaLivre')))
 
-    # search_box = self.driver.find_element(By.ID, 'iddadosConsulta.pesquisaLivre')
-    # search_box.send_keys('a ou de ou o')
     start_box = self.driver.find_element(By.ID, 'iddadosConsulta.dtInicio')
     start_box.send_keys(start_)
     end_box = self.driver.find_element(By.ID, 'iddadosConsulta.dtFim')
@@ -333,11 +326,10 @@ class TJSP1IChunk(base.Chunk):
       return []
 
   @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
-  utils.PleaseRetryException,))
+  utils.PleaseRetryException,WebDriverException))
   def get_row_for_current_page(self):
-    self.browser    = browsers.FirefoxBrowser(headless=True)
-    self.browser.get('https://esaj.tjsp.jus.br/cjpg/')
-
+    
+    
     rows = []
 
     self.client.set_search(self.start_date, self.end_date)
@@ -401,14 +393,15 @@ class TJSP1IChunk(base.Chunk):
         )])
 
       if not self.skip_pdf:
-        rows.append(
-        base.Content(
-          content= TJSP1IDownloader('').download_files(item),
-          dest=f'{year}/{month}/{doc_id}.pdf',
-          content_type='application/pdf'
-        ))
+        with browsers.FirefoxBrowser(headless=True) as browser:
+          rows.append(
+          base.Content(
+            content= TJSP1IDownloader('').download_files(browser, item),
+            dest=f'{year}/{month}/{doc_id}.pdf',
+            content_type='application/pdf'
+          ))
 
-    self.browser.quit()
+    # self.browser.quit()
     return rows
 
 
@@ -549,87 +542,3 @@ def tjsp1i_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_c
       tjsp1i_task.delay(*args)
     else:
       tjsp1i_task(*args)
-
-
-@cli.command(name='tjsp1i-validate')
-@click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--count-pending-pdfs', default=False, help='Count pending pdfs', is_flag=True)
-def tjsp1i_validate(start_date, end_date, output_uri, count_pending_pdfs):
-  from app.crawlers.tjsp1i.tjsp1i_utils import list_pending_pdfs
-  from tabulate import tabulate
-  from tqdm import tqdm
-
-  start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-
-  # Read out all avaliable snapshots to assess about completeness of data
-  output     = utils.get_output_strategy_by_path(path=output_uri)
-  repository = base.SnapshotsRepository(output=output)
-
-  results = []
-
-  for start, end in tqdm(list(utils.timely(start_date, end_date, unit='months', step=1))):
-    query_params = {
-      'start_date': start, 'end_date': end
-    }
-    snapshot = base.Snapshot(keys=query_params)
-
-    if repository.exists(snapshot):
-      repository.restore(snapshot)
-      snapshot_info = {
-        key: snapshot.get_value(key)
-        for key in ['records', 'total_records', 'expects', 'done']
-      }
-
-      pending_pdfs_count = 0
-
-      if snapshot_info['done'] == True:
-        logger.debug(f'Snapshot {snapshot.hash} params {start.to_date_string()}-{end.to_date_string()} = {snapshot_info}.')
-
-        # validate pdfs as well.
-        if count_pending_pdfs:
-          prefix = f'{start.year}/{start.month:02d}/'
-          pending_pdfs =\
-            list_pending_pdfs(bucket_name=output._bucket_name, prefix=prefix)
-          pending_pdfs_count = len(list(pending_pdfs))
-          logger.debug(f'Prefix: {prefix} - pending pdfs: {pending_pdfs_count}')
-
-      total_records = (snapshot_info.get('total_records') or 0)
-      expects       = (snapshot_info.get('expects') or 0)
-
-      results.append([
-        start.to_date_string(),
-        end.to_date_string()  ,
-        expects,
-        total_records,
-        total_records - expects,
-        pending_pdfs_count,
-        snapshot_info['done'],
-        snapshot.hash
-      ])
-    else:
-      results.append([
-        start.to_date_string(),
-        end.to_date_string()  ,
-        None,
-        None,
-        None,
-        0,
-        'Unknown',
-        '-',
-      ])
-
-  total_expected = sum([row[2] for row in results if row[2]])
-  total_records  = sum([row[3] for row in results if row[3]])
-  total_pdfs     = sum([row[5] for row in results if row[5]])
-  results.append(['', '', total_expected, total_records, total_records - total_expected, total_pdfs, ''])
-
-  print(tabulate(results, headers=['Start', 'End', 'Expects', 'Records', 'Diff', 'Pending PDFs', 'Finished', 'Snapshot']))

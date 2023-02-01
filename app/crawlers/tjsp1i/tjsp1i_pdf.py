@@ -78,11 +78,16 @@ class TJSP1IDownloader:
     iframe = browser.bsoup().find('iframe')
     relative_url = re.match(r'.*viewer\.html\?file=(.*)$', iframe['src'])
     if relative_url is None:
-      raise utils.PleaseRetryException()
+      raise utils.PleaseRetryException('Could not load PDF from source')
     relative_url = relative_url.group(1)
-    response = requests.get('https://esaj.tjsp.jus.br' + urllib.parse.unquote(relative_url),
-      cookies = browser.get_cookie_dict())
-    # browser.driver.execute(f"window.close()")
+    
+    try:
+      response=requests.get('https://esaj.tjsp.jus.br' + urllib.parse.unquote(relative_url),
+        cookies = browser.get_cookie_dict())
+    except requests.ConnectionError:
+      raise utils.PleaseRetryException('Could not connect to PDF source')
+    
+    
     old_handle, *handles = browser.driver.window_handles
     for handle in handles:
       browser.driver.switch_to.window(handle)
