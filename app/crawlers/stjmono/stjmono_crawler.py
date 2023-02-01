@@ -18,7 +18,7 @@ NOW = pendulum.now().to_datetime_string()
 DATE_FORMAT_1 = 'YYYYMMDD'
 DATE_FORMAT_2 = 'DD/MM/YYYY'
 DEFAULT_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0) Gecko/20100101 Firefox/108.0',
+    'User-Agent': f'{utils.get_random_useragent()}',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
     # 'Accept-Encoding': 'gzip, deflate, br',
@@ -31,7 +31,7 @@ DEFAULT_HEADERS = {
     'Sec-Fetch-Site': 'cross-site',
 }
 
-DEFAULT_HEADERS_COUNT = {
+DEFAULT_COUNT_HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
     'Connection': 'keep-alive',
@@ -42,11 +42,50 @@ DEFAULT_HEADERS_COUNT = {
     'Sec-Fetch-Site': 'same-origin',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
+    # 'User-Agent': f'{utils.get_random_useragent()}',
     'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
 }
+
+DEFAULT_ROWS_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    # 'Cookie': 'f5_cspm=1234; f5_cspm=1234; TS01603393=016a5b38336d7ac6eede9c8d8267c94023af712f22dc5b10d29880410f011d92d087b592a77386b9e2d1c50d2bdcdcab23f9ae904f; JSESSIONID=wIQ7mzL8-FJTzckYKyjR_4Ve74NkqekvyXWQ7-PZ.svlp-jboss-02; _ga=GA1.3.84998084.1664279080; BIGipServerpool_svlp-jboss_scon=1073981632.36895.0000; TS01dc523b=016a5b38336cd141233349f5c26912dd4605e38cbe85198559d49b67822e30bfd4a23002890f893a4ba0f066aa327b0fec3a8e123c; _gid=GA1.3.133587927.1675183377; TS01e2b0fb=016a5b3833b9363e28d281774e58d5131ad43853f416e69db8b41f8210869cdc6bf731d1324290deabfaa7921ecda6c16f0668167a; TS00000000076=0845fc7f4bab28003d8ed52e468d739f247fbc4465a19d8a00ac2ab46997662eb2c60bb3ecba79718427c66e1ab0ec2508662da24909d0003032bdb23db4b2c841bdbdefaafbded36472b30b0f7722508631575a7b311f47368e2d939de8116a883ec234960a40099b27eb975a2a965794bb5d1fbcbf3cef46029d6f1dcd17d49be76d5025496455a464486e02b88ddd1377fd19b8b8e8804019fcc13903ac4fdb234a228e160406dd05723ab8dd9dc443eebac281bfd050578f7574a2843f4e0b4dd0b6197382c5cbf9d3c558b6bbf9c103f1f0e63e001715336f52f5c64e3abd9ecb1f11d957f0252abd876a96de5c93a993b4daac27396462fa4aebb8498eabe1036d8cbe58fa; TSPD_101_DID=0845fc7f4bab28003d8ed52e468d739f247fbc4465a19d8a00ac2ab46997662eb2c60bb3ecba79718427c66e1ab0ec2508662da249063800cd32e8441066dce661884794dfa5f6b6f36108135197e6cdb57162f9bc8e90248e28dcbc8faa5cc722cbbe456830380a9ffaf21774075c29; TSPD_101=0845fc7f4bab2800652a15d56ffd57d89c8fad55de6f38ee1cc83d637f84103e727946528f3c0b92c4c09b639147e9100877324789051800b7cb298d324cd56f68668fda86ef7db0fbb886cc9de01f5e; TS214ae949027=0845fc7f4bab2000767954b5cc469979b1ba4fb2434d9d479b721d1e1b921964eb5a2bdbda2a899d08464f6c0e11300069b8afa39881be7ad1fc8fe7966d1f0566a512e28aadac3f7db5983933503878e5290a8baa6642f0a8841dad7e36118c; TS49ab854f077=0845fc7f4bab28000217ac9b3613cebe70c4a9f31656167e3c8ca25b2d9855b7fc7d7cae0c7d09909f96572f358161ae08e58e1bb6172000950d2b5ca97208f4e15992af448886b0c4abf4b457e6c883d58e535e3755f291',
+    'Origin': 'https://scon.stj.jus.br',
+    'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    # 'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.69',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+}
+
+DEFAULT_PDF_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # 'Cookie': 'JSESSIONID=Ybtm-imnPIJeqZiGx9uh-rDllNlqWJyqbdzaTOLK.svlp-jboss-04; TS01db5b07=0132b058475ed42f31b520f66a8df07be945aea7401e0a42f50d7edc3e19455603d94a47f51e029adcea4130484817e5c6993ad1c7c8589bf12863cdb87e429a4db6b99238; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss=1107536064.36895.0000; TS01dc523b=016a5b38332c4c19b057799de99ca5f3bd713012bd08976a0b9c2abb671b433e8016f7d554cba1585cb21a6878c2d3bd44837db784; TS0122e3df=0132b05847a79700aa622a420bfddca45fd3c10474043731851d155b40f5db36ac99e383b06265acd5e5d5665032eab031c2cd1ee87f84357b7e607e7e32d8f09e91e33bc2; TS01bf01ec=0132b05847d0b78c9f25e170ecf4f14cd87d405d0c8e55c9ad9142f5a25a562f7d5da8ef33c1524c39f907efcd487606600a020d0a57c76c5f37f345c5e6875d7598a6e173; _gat_UA-179972319-1=1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': f'{utils.get_random_useragent()}',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+    
+}
+
 
 def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
@@ -80,6 +119,8 @@ def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
 'ref': '',
   }
 
+import fake_useragent
+
 def get_row_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
   return {
@@ -101,15 +142,16 @@ class STJMONOClient:
   def __init__(self):
     self.base_url  = 'https://scon.stj.jus.br'
     self.requester = requests.Session()
-    self.requester.headers = DEFAULT_HEADERS
+    self.requester.headers = DEFAULT_COUNT_HEADERS
     self.requester.get("https://scon.stj.jus.br/SCON/", verify=False)
 
-  def reset_session(self):
+  def reset_session(self, headers=DEFAULT_COUNT_HEADERS):
     self.requester = requests.Session()
-    self.requester.headers = DEFAULT_HEADERS
-    self.requester.get("https://scon.stj.jus.br/SCON/", verify=False)# headers=DEFAULT_HEADERS, verify=False)
+    self.requester.headers = {**headers, 'User-Agent':utils.get_random_useragent()}
+    self.requester.get("https://scon.stj.jus.br/SCON/", 
+      verify=False)
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def count(self, filters):
 
     params = {
@@ -119,70 +161,69 @@ class STJMONOClient:
     'tp': 'T',
     }
     response = self.requester.get('https://scon.stj.jus.br/SCON/pesquisar.jsp',
-      params=params, headers=DEFAULT_HEADERS_COUNT)
+      params=params)
+    try:
+      self.validate_count_content(response.text)
+    except Exception as e:
+      self.reset_session({**DEFAULT_COUNT_HEADERS,'User-Agent': f'{utils.get_random_useragent()}'})
+      raise utils.PleaseRetryException(e)
     return self._count_by_content(response.content)
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def _response_or_retry_rows(self, data):
     import urllib
 
     response = self.requester.post(
       f'{self.base_url}/SCON/decisoes/toc.jsp',
       headers={
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-    # 'Cookie': 'JSESSIONID=8kQY3aXD1VPZ5IVbhLjIEDcHd5PB4DuimS_C69Rg.svlp-jboss-01; f5_cspm=1234; TS01603393=016a5b3833a15eb015ace80e186f683e0d04467b8d64f06c40cd51985b9f8c6328151b43f458c077e6f6ff4b42127f5e2d062dbaf7; TS0133e456=0132b058479e24edeb017fcd61d7a6c40e0d80f09d0b0876d8998feb90b4841f679376c6779983dbc5ac7dcc726240293274a69a0929373762048a9354f05df6fe2a716a787abe46efb6a8b8ad448ff82d36fd4d76; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss_scon=1057204416.36895.0000; TS0165095f=0132b0584708a20341834675af853e92538767377a0b0876d8998feb90b4841f679376c677cb0899e28c8335cd81589077f5f3da12090509f59a011eefd3fc1050ec79288776a5df90d6b154f179a90cf6c0e4fec7; _gat_UA-179972319-1=1; TS01e2b0fb=016a5b3833b24ce57067e8b8fa8a67836ad4c20f80da9a4586fa50b6bbcbcceaafaa405cb659531f52fed09424cf514050ebf8cc46; TS013f88e9=0132b05847169820d2b92a82b979afde26ce9a0da20b0876d8998feb90b4841f679376c6771aa4b8338fb5bcd56faeb445b13eccf6181e1e23f590bcbab5606b4c5d5cbd9c',
-    'Origin': 'https://scon.stj.jus.br',
-    'Referer': f'https://scon.stj.jus.br/SCON/pesquisar.jsp?data={urllib.parse.quote_plus(data["data"])}&b=DTXT&p=true&tp=T',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'same-origin',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
-    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
+        **DEFAULT_ROWS_HEADERS,
+    **{
+      'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
+      'User-Agent': f'{utils.get_random_useragent()}',
+    },
  },
       verify=False,
-      data=data)
+      data=data,)
     soup = utils.soup_by_content(response.content)
 
-    if soup \
-        .find('div', id='idCaptchaLinha'):
+    if soup.find('div', id='idCaptchaLinha') or \
+        soup.find(text=re.compile(r'.*CAPTCHA.*')):
       logger.warn('Got captcha -- reseting session.')
-      self.reset_session()
+      self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
 
     info = soup.find('span', {'class': 'numDocs'}) or \
       soup.find('div', {'class':'erroMensagem'})
     if not info:
       logger.warn('Got invalid page -- reseting session.')
-      self.reset_session()
+      self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
-
     return response
 
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=9)
   def fetch_rows(self, filters, offset):
     return self._response_or_retry_rows(data={**filters, 'i': offset})
 
-  def _count_by_content(self, content, skip_document_not_found:bool=True):
+  @utils.retryable(max_retries=9)
+  def validate_count_content(self, content, skip_document_not_found=True):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     errorMessage = soup.find('div', {'class':'erroMensagem'})
     if errorMessage:
-      if skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!":
-        logger.info(f"No documents found for this period. Skipping")
-        return 0
+      if not(skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!"):
+        raise Exception(f'Error message found: {errorMessage.getText()}')
 
-      raise utils.PleaseRetryException(f"Error message found: {errorMessage.getText()}")
+    if soup.find(text=re.compile(r'.*CAPTCHA.*')):
+      raise Exception('Captcha found - retrying...')
 
-    assert info
-    return int(utils.extract_digits(info.text))
+    if not info:
+      raise Exception('Could not load page - retrying...')
+
+  def _count_by_content(self, content, skip_document_not_found:bool=True):
+    soup = utils.soup_by_content(content)
+    info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
+    return int(utils.extract_digits(info.text)) if info else 0
 
 class STJMONOCollector(base.ICollector):
 
@@ -240,46 +281,41 @@ class STJMONOChunk(base.Chunk):
       offset=self.keys['offset'])
 
     soup  = utils.soup_by_content(response.content)
+    self.client.validate_count_content(response.content)
     count = self.client._count_by_content(response.content)
+
     if count == 0:
       return []
     for content in self.page_contents(soup):
       time.sleep(random.random()/2)
       yield content
 
+  @utils.retryable(max_retries=3)
   def page_contents(self, soup):
 
 
     @utils.retryable(max_retries=3)
     def _get_pdf_urls(doc):
       BASE_PDF_URL = "https://processo.stj.jus.br"
-      a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'}) or \
-        doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
+      a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'})
+      a = a or doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
+      # a = a or doc.find('a',attrs={'data-bs-original-title':'Decisão Monocrática Certificada'})
+          
       session = requests.Session()
       pdfs_page = utils.get_response(
         logger,
         session,
         utils.find_between(a['href'], start="'", end="'"),
         {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-    # 'Cookie': 'JSESSIONID=Ybtm-imnPIJeqZiGx9uh-rDllNlqWJyqbdzaTOLK.svlp-jboss-04; TS01db5b07=0132b058475ed42f31b520f66a8df07be945aea7401e0a42f50d7edc3e19455603d94a47f51e029adcea4130484817e5c6993ad1c7c8589bf12863cdb87e429a4db6b99238; _ga=GA1.3.84998084.1664279080; _gid=GA1.3.209578465.1674152937; BIGipServerpool_svlp-jboss=1107536064.36895.0000; TS01dc523b=016a5b38332c4c19b057799de99ca5f3bd713012bd08976a0b9c2abb671b433e8016f7d554cba1585cb21a6878c2d3bd44837db784; TS0122e3df=0132b05847a79700aa622a420bfddca45fd3c10474043731851d155b40f5db36ac99e383b06265acd5e5d5665032eab031c2cd1ee87f84357b7e607e7e32d8f09e91e33bc2; TS01bf01ec=0132b05847d0b78c9f25e170ecf4f14cd87d405d0c8e55c9ad9142f5a25a562f7d5da8ef33c1524c39f907efcd487606600a020d0a57c76c5f37f345c5e6875d7598a6e173; _gat_UA-179972319-1=1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.55',
-    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
-    'sec-ch-ua-mobile': '?1',
-    'sec-ch-ua-platform': '"Android"',
-    },
+          **DEFAULT_PDF_HEADERS,
+          'User-Agent': f'{utils.get_random_useragent()}'},
         verify=False
       )
       a_s = utils.soup_by_content(pdfs_page.text).find_all('a', text='Decisão Monocrática')
       pdf_links = [BASE_PDF_URL + utils.find_between(a['href'], start="'", end="'") for a in a_s]
+      if not pdf_links:
+        logger.warn(f'No document found. {str(doc)[:200]}')
+        raise utils.PleaseRetryException('No PDFs found - retrying...')
       return pdf_links
 
 
@@ -308,10 +344,6 @@ class STJMONOChunk(base.Chunk):
       expected_doc_count = len(pdf_urls)
 
       to_download = []
-
-      if expected_doc_count == 0:
-        logger.warn(f'No document found. {str(doc)[:400]}')
-        continue
 
       #Checks if all num_registros are equal - should be.
       try:

@@ -13,8 +13,10 @@ import requests
 import time
 import urllib.request
 import wrapt
+import random
 
-from app.crawlers import base
+from fake_useragent import UserAgent
+from app.crawlers import base, headers
 from app.crawlers.logconfig import logger
 from app.crawlers.storage import get_bucket_ref
 
@@ -581,3 +583,12 @@ def run_pending_tasks(task: Callable, pendings: list, max_workers: int = 4, **kw
     executor.shutdown()
     if len(batch):
       task(batch, input_uri, pbar)
+
+
+def get_random_useragent():
+  try:
+    # raise Exception
+    return random.choice(random.choice(list(UserAgent().data_browsers.values())))
+  except Exception:
+    return random.choice(headers.POSSIBLE_USER_AGENTS)
+
