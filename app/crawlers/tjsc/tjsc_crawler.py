@@ -268,7 +268,7 @@ class TJSCContentHandler(base.ContentHandler):
   def __init__(self, output):
     self.output = output
 
-  @utils.retryable()
+  @utils.retryable(max_retries=9)
   def _handle_url_event(self, event : base.ContentFromURL):
     if self.output.exists(event.dest):
       return
@@ -277,6 +277,7 @@ class TJSCContentHandler(base.ContentHandler):
       response = requests.get(event.src,
         allow_redirects=True,
         verify=False,
+        timeout=10,
 )
     except:
       raise utils.PleaseRetryException()
@@ -287,7 +288,7 @@ class TJSCContentHandler(base.ContentHandler):
     content_type = event.content_type
 
 
-    if response.status_code == 200 and len(response.content) > 5_000:
+    if response.status_code == 200 and len(response.content) > 0:
       self.output.save_from_contents(
         filepath=dest,
         contents=response.content,
