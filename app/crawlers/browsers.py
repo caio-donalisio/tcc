@@ -41,6 +41,12 @@ class FirefoxBrowser:
             desired_capabilities=DesiredCapabilities.FIREFOX
         )
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+      self.driver.quit()
+  
   def get(self, url, wait_for=(By.TAG_NAME, 'body')):
     # TODO: HANDLE: Exception has occurred: TimeoutException -- Message: TimedPromise timed out after 300000 ms
     self.driver.get(url)

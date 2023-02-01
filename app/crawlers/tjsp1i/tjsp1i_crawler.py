@@ -15,6 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from slugify import slugify
 from urllib3.exceptions import InsecureRequestWarning
 from app.crawlers.utils import PleaseRetryException
+from app.crawlers.tjsp1i.tjsp1i_pdf import TJSP1IDownloader
 
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -56,6 +57,7 @@ class TJSP1I(base.ICollector):
     # Will store number of records+pages based on parameters
     # This will avoid hitting the site to figure out the number of pages.
     use_cache = self.options.get('skip_cache', False) == False
+    skip_pdf  = self.options.get('skip_pdf', False)
 
     cache_repository = cache_store = None
     if use_cache:
@@ -100,6 +102,7 @@ class TJSP1I(base.ICollector):
           client=self.client,
           start_date=start_date,
           end_date=end_date,
+          skip_pdf=skip_pdf,
           page=page,
           expects=number_of_records)
 
@@ -313,11 +316,12 @@ class TJSP1IClient:
 
 class TJSP1IChunk(base.Chunk):
 
-  def __init__(self, keys, prefix, client, start_date, end_date, page, expects):
+  def __init__(self, keys, prefix, client, start_date, end_date, skip_pdf, page, expects):
     super(TJSP1IChunk, self).__init__(keys, prefix)
     self.client     = client
     self.start_date = start_date
     self.end_date   = end_date
+    self.skip_pdf   = skip_pdf
     self.page       = page
     self.expects    = expects
 
@@ -328,28 +332,10 @@ class TJSP1IChunk(base.Chunk):
     else:
       return []
 
-  @utils.retryable(message='Could not access pdf page')
-  def get_pdf_link(self, item):
-    links = item.find_all('a', {'title': 'Visualizar Inteiro Teor'})
-    assert len(links) == 1, f"Found {len(links)} links, expected 1."
-    kvs = {k:v for k,v in zip(['cdProcesso', 'cdForo', 'nmAlias', 'cdDoc'],links[0]['name'].split('-'))}
-    search_url = f"https://esaj.tjsp.jus.br/cjpg/obterArquivo.do?cdProcesso={kvs['cdProcesso']}&cdForo={kvs['cdForo']}&nmAlias={kvs['nmAlias']}&cdDocumento={kvs['cdDoc']}"
-    self.browser.get(search_url)
-    WebDriverWait(self.browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//iframe[@src!="processando.html"]')))
-    self.browser.driver.implicitly_wait(20)
-    iframe = self.browser.bsoup().find('iframe')
-    relative_url = re.match(r'.*viewer\.html\?file=(.*)$', iframe['src'])
-    if relative_url is None:
-      raise PleaseRetryException()
-    relative_url = relative_url.group(1)
-    response = requests.get('https://esaj.tjsp.jus.br' + urllib.parse.unquote(relative_url),
-      cookies = self.browser.get_cookie_dict())
-    return response.content
-            
   @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
   utils.PleaseRetryException,))
   def get_row_for_current_page(self):
-    self.browser    = browsers.FirefoxBrowser(headless=False)
+    self.browser    = browsers.FirefoxBrowser(headless=True)
     self.browser.get('https://esaj.tjsp.jus.br/cjpg/')
 
     rows = []
@@ -382,7 +368,7 @@ class TJSP1IChunk(base.Chunk):
 
     # Firstly, get rows that matters
     items = soup.find_all('tr', {'class': 'fundocinza1'})
-    # items = self.client.driver.find_elements(By.XPATH, '//tr[@class="fundocinza1"]')
+    
     if not is_last_page:
       page_records = len(items)
       if page_records == 0:  # Wasn't expecting that but sometimes it happens. Sadly
@@ -412,13 +398,15 @@ class TJSP1IChunk(base.Chunk):
           src=alt_meta_url,
           dest=f'{year}/{month}/{doc_id}_alt.html',
           content_type='text/html'
-        ),
+        )])
+
+      if not self.skip_pdf:
+        rows.append(
         base.Content(
-          content=self.get_pdf_link(item),
+          content= TJSP1IDownloader('').download_files(item),
           dest=f'{year}/{month}/{doc_id}.pdf',
           content_type='application/pdf'
-        ),
-      ])
+        ))
 
     self.browser.quit()
     return rows
@@ -496,9 +484,9 @@ def tjsp1i_task(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cach
     }
 
     client  = TJSP1IClient(browser=browser)
-    handler = TJSP1IHandler(output=output, client=client, skip_pdf=skip_pdf)
+    handler = TJSP1IHandler(output=output, client=client)
 
-    collector = TJSP1I(params=query_params, output=output, client=client, skip_cache=skip_cache)
+    collector = TJSP1I(params=query_params, output=output, client=client, skip_cache=skip_cache, skip_pdf=skip_pdf)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(

@@ -404,7 +404,7 @@ def trf1_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
     return
 
   while startDate <= endDate:
-    print(f"TRF5 - Collecting {startDate.format('YYYY/MM')}...")
+    print(f"TRF1 - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
     for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)

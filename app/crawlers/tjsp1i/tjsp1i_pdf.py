@@ -1,99 +1,94 @@
 import logging
 import random
 import time
-
-from app.crawlers import base, utils
+import re
+from app.crawlers import base, browsers, utils
+import requests
 import click
+import time
 import pendulum
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
-from app.crawlers.tjsp1i.tjsp1i_crawler import TJSP1IClient
 from app.crawlers.tjsp1i.tjsp1i_utils import list_pending_pdfs
 from app.crawlers.logconfig import logger_factory
+import concurrent.futures
+import urllib
+from bs4 import BeautifulSoup
+
+
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
 
 logger = logger_factory('tjsp1i-pdf')
 
+MAX_WORKERS=15
 
 class TJSP1IDownloader:
 
-  def __init__(self, client, output):
-    self._client = client
+  def __init__(self, output):
+    # self._client = client
     self._output = output
+    # self.browser = browsers.FirefoxBrowser(headless=False)
 
+  @utils.retryable(retryable_exceptions=Exception, message='Browser error')
   def download(self, items, pbar=None):
-    import concurrent.futures
-    import time
-    self._client.signin()
-    self._client.set_search(
-      start_date=pendulum.DateTime(2020, 1, 1),
-      end_date=pendulum.DateTime(2020, 1, 31),
-    )
-    self._client.close()
 
-    interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
       last_run = None
-      for item in items:
-        # request sync
-        now = time.time()
-        if last_run is not None:
-          since = now - last_run
-          if since < interval:
-            jitter     = random.uniform(.5, 1.2)
-            sleep_time = (interval - since) + jitter
-            time.sleep(sleep_time)
+      try:
+        with browsers.FirefoxBrowser(headless=True) as browser:
+          for item in items:
+            pdf_content = self.download_files(browser, BeautifulSoup(item.content,'html.parser'))
 
-        response = self._get_response(item)
-        if pbar:
-          pbar.update(1)
+            if pbar:
+              pbar.update(1)
 
-        # up async
-        if response:
-          last_run = time.time()
-          futures.append(executor.submit(self._handle_upload, item, response))
+            # up async
+            if pdf_content:
+              futures.append(executor.submit(self._handle_upload, item, pdf_content))
 
-      for future in concurrent.futures.as_completed(futures):
-        future.result()
+        for future in concurrent.futures.as_completed(futures):
+          future.result()
+      except:
+        raise utils.PleaseRetryException()
 
-  @utils.retryable(max_retries=3)
-  def _get_response(self, content_from_url):
-    logger.debug(f'GET {content_from_url.src}')
-    for cookie in self._client.request_cookies_browser:
-      self._client.session.cookies.set(cookie['name'], cookie['value'])
+  def _handle_upload(self, item, pdf_content):
+    logger.debug(f'GET {item} UPLOAD')
 
-    if self._output.exists(content_from_url.dest):
-      return None
-
-    response = self._client.session.get(content_from_url.src,
-      headers=self._client.header_generator.generate(),
-      allow_redirects=True,
-      verify=False,
-      timeout=10)
-    if 'application/pdf' in response.headers.get('Content-type'):
-      logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
-      return response
-    elif 'text/html' in response.headers.get('Content-type') and \
-      'Não foi possível exibir a decisão solicitada.' in response.text:
-      logger.warn(f'PDF for {content_from_url.src} not available.')
-    else:
-      logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')
-      logger.warn(
-        f"Got {response.status_code} when fetching {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
-      raise utils.PleaseRetryException()
-
-  def _handle_upload(self, content_from_url, response):
-    logger.debug(f'GET {content_from_url.src} UPLOAD')
-
-    if len(response.content) > 0:
+    if pdf_content and len(pdf_content) > 100:
       self._output.save_from_contents(
-          filepath=content_from_url.dest,
-          contents=response.content,
-          content_type=content_from_url.content_type)
+          filepath=f"{item.dest}.pdf",
+          contents=pdf_content,
+          content_type='application/pdf')
     else:
-      logger.warn(
-        f"Got 0 bytes for {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
+      logger.warn(f"Got empty document for {item.dest}.pdf")
 
+  @utils.retryable(message='Could not access pdf page')
+  def download_files(self, browser, row):
+    links = row.find_all('a', {'title': 'Visualizar Inteiro Teor'})
+    assert len(links) == 1, f"Found {len(links)} links, expected 1."
+    kvs = {k:v for k,v in zip(['cdProcesso', 'cdForo', 'nmAlias', 'cdDoc'],links[0]['name'].split('-'))}
+    search_url = f"https://esaj.tjsp.jus.br/cjpg/obterArquivo.do?cdProcesso={kvs['cdProcesso']}&cdForo={kvs['cdForo']}&nmAlias={kvs['nmAlias']}&cdDocumento={kvs['cdDoc']}"
+    browser.driver.execute_script(f"window.open('{search_url}')")
+    browser.switch_to_window(1)
+    WebDriverWait(browser.driver, 20).until(EC.presence_of_element_located((By.XPATH, '//iframe[@src!="processando.html"]')))
+    browser.driver.implicitly_wait(20)
+    iframe = browser.bsoup().find('iframe')
+    relative_url = re.match(r'.*viewer\.html\?file=(.*)$', iframe['src'])
+    if relative_url is None:
+      raise utils.PleaseRetryException()
+    relative_url = relative_url.group(1)
+    response = requests.get('https://esaj.tjsp.jus.br' + urllib.parse.unquote(relative_url),
+      cookies = browser.get_cookie_dict())
+    # browser.driver.execute(f"window.close()")
+    old_handle, *handles = browser.driver.window_handles
+    for handle in handles:
+      browser.driver.switch_to.window(handle)
+      browser.driver.close()
+    browser.driver.switch_to.window(old_handle)
+    return response.content
 
 @celery.task(name='tjsp1i.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=3)
@@ -102,97 +97,70 @@ def tjsp1i_download_task(items, output_uri):
 
   time.sleep(random.uniform(5., 15.))
 
-  output     = utils.get_output_strategy_by_path(path=output_uri)
-  client     = TJSP1IClient()
-  downloader = TJSP1IDownloader(client=client, output=output)
+  output = utils.get_output_strategy_by_path(path=output_uri)
+  downloader = TJSP1IDownloader(output)
 
   tqdm_out = utils.TqdmToLogger(logger, level=logging.INFO)
 
+
   with tqdm(total=len(items), file=tqdm_out) as pbar:
-    downloader.download(
-      [
-        base.ContentFromURL(
-          src=item['url'],
-          dest=item['dest'],
-          content_type='application/pdf'
+    to_download = []
+
+    for item in items:
+      to_download.append(
+        base.Content(
+          content=item['row'],
+          dest=item['dest'])
         )
-        for item in items
-      ],
-      pbar
-    )
+      downloader.download(to_download, pbar)
 
 
 def tjsp1i_download(items, output_uri, pbar):
   output     = utils.get_output_strategy_by_path(path=output_uri)
-  client     = TJSP1IClient()
-  downloader = TJSP1IDownloader(client=client, output=output)
-  downloader.download(
-    [
-      base.ContentFromURL(
-        src=item['url'],
-        dest=item['dest'],
-        content_type='application/pdf'
-      )
-      for item in items
-    ],
-    pbar
-  )
-
+  downloader = TJSP1IDownloader(output=output)
+  to_download = []
+  for _, item in enumerate(items):
+    to_download.append(
+        base.Content(
+          content=item['row'],
+          dest=item['dest'],
+          content_type='text/html')
+        )
+  downloader.download(to_download, pbar)
 
 @cli.command(name='tjsp1i-pdf')
-@click.option('--prefix')
+@click.option('--start-date',
+  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
+@click.option('--end-date'  ,
+  default=utils.DefaultDates.NOW.strftime("%Y-%m"),
+  help='Format YYYY-MM.',
+)
 @click.option('--input-uri'   , help='Input URI')
 @click.option('--dry-run'     , default=False, is_flag=True)
 @click.option('--local'       , default=False, is_flag=True)
 @click.option('--count'       , default=False, is_flag=True)
-def tjsp1i_pdf_command(input_uri, prefix, dry_run, local, count):
+def tjsp1i_pdf_command(input_uri, start_date, end_date, dry_run, local, count):
   batch  = []
   output = utils.get_output_strategy_by_path(path=input_uri)
+  startDate = pendulum.parse(start_date)
+  endDate = pendulum.parse(end_date)
 
   if count:
     total = 0
-    for _ in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
+    while startDate <= endDate:
+      for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+        total += 1
+      startDate = startDate.add(months=1)
     print('Total files to download', total)
     return
 
-  # for testing purposes
-  if local:
-    import concurrent.futures
-
-    from tqdm import tqdm
-
-    # just to count
+  while startDate <= endDate:
+    print(f"TJSP1I - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
+    for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)
 
-    with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
-      futures  = []
-      for pending in pendings:
-        if not dry_run:
-          batch.append(pending)
-          if len(batch) >= 100:
-            futures.append(executor.submit(tjsp1i_download, batch, input_uri, pbar))
-            time.sleep(random.uniform(5., 8.))
-            batch = []
-
-    print("Tasks distributed -- waiting for results")
-    for future in concurrent.futures.as_completed(futures):
-      future.result()
-    executor.shutdown()
-    if len(batch):
-      tjsp1i_download(batch, input_uri, pbar)
-
-  else:
-    total = 0
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
-      batch.append(pending)
-      if len(batch) >= 100:
-        print("Task", tjsp1i_download_task.delay(batch, input_uri))
-        batch = []
-    if len(batch):
-      print("Task", tjsp1i_download_task.delay(batch, input_uri))
-    print('Total files to download', total)
+    utils.run_pending_tasks(tjsp1i_download, pendings, input_uri=input_uri, dry_run=dry_run)
+    startDate = startDate.add(months=1)
