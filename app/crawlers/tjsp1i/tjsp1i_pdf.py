@@ -31,14 +31,14 @@ class TJSP1IDownloader:
     self._output = output
     # self.browser = browsers.FirefoxBrowser(headless=False)
 
-  @utils.retryable(retryable_exceptions=Exception, message='Browser error')
+  @utils.retryable(max_retries=5, sleeptime=2, retryable_exceptions=Exception, message='Browser error')
   def download(self, items, pbar=None):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures  = []
       last_run = None
       try:
-        with browsers.FirefoxBrowser(headless=True) as browser:
+        with browsers.FirefoxBrowser(headless=False) as browser:
           for item in items:
             pdf_content = self.download_files(browser, BeautifulSoup(item.content,'html.parser'))
 
@@ -51,8 +51,8 @@ class TJSP1IDownloader:
 
         for future in concurrent.futures.as_completed(futures):
           future.result()
-      except:
-        raise utils.PleaseRetryException()
+      except Exception as e:
+        raise utils.PleaseRetryException('Selenium crashed')
 
   def _handle_upload(self, item, pdf_content):
     logger.debug(f'GET {item} UPLOAD')
