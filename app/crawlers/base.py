@@ -381,14 +381,17 @@ class ContentHandler:
       contents=event.content,
       content_type=event.content_type)
 
+  @utils.retryable()
   def _handle_url_event(self, event : ContentFromURL):
     if self.output.exists(event.dest):
       return
 
-    response = requests.get(event.src,
-      allow_redirects=True,
-      verify=False)
-
+    try:
+      response = requests.get(event.src,
+        allow_redirects=True,
+        verify=False)
+    except:
+      raise utils.PleaseRetryException()
     if response.status_code == 404:
       return
 

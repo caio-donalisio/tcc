@@ -13,8 +13,10 @@ import requests
 import time
 import urllib.request
 import wrapt
+import random
 
-from app.crawlers import base
+from fake_useragent import UserAgent
+from app.crawlers import base, headers
 from app.crawlers.logconfig import logger
 from app.crawlers.storage import get_bucket_ref
 
@@ -352,13 +354,13 @@ def get_pdf_hash(pdf_content: bytes,
 
 
 @retryable(max_retries=9)
-def get_response(logger, session, url, headers):
+def get_response(logger, session, url, headers, verify=True, timeout=15):
   """Gets response and checks if response object has status code 200, throws Retry exception if not"""
   response = session.get(
-      url=url, headers=headers)
+      url=url, headers=headers, verify=verify, timeout=timeout)
   if response.status_code != 200:
-    logger.warn(f"Response <{response.status_code}> - {response.url}")
-    raise PleaseRetryException()
+      logger.warn(f"Response <{response.status_code}> - {response.url}")
+      raise PleaseRetryException()
   else:
     return response
 
@@ -581,3 +583,12 @@ def run_pending_tasks(task: Callable, pendings: list, max_workers: int = 4, **kw
     executor.shutdown()
     if len(batch):
       task(batch, input_uri, pbar)
+
+
+def get_random_useragent():
+  try:
+    # raise Exception
+    return random.choice(random.choice(list(UserAgent().data_browsers.values())))
+  except Exception:
+    return random.choice(headers.POSSIBLE_USER_AGENTS)
+

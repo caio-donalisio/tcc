@@ -252,17 +252,16 @@ class TJRJChunk(base.Chunk):
     extra_contents = []
 
     if fetch_all_pdfs:
-      documents = data_result.get('InteiroTeor', [])
-      if documents:
-        for document in documents:
-          gedid = document['ArqGED']
-          pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
-          pdf_filename = f'{act_id}-{gedid}'
-          pdf_filepath = utils.get_filepath(
-              date=str(updated_at), filename=pdf_filename, extension='pdf')
-          extra_contents.append(base.ContentFromURL(
-            src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
-          ))
+      documents = data_result.get('InteiroTeor', []) or []
+      for document in documents:
+        gedid = document['ArqGED']
+        pdf_url = f'{GED_URL}/default.aspx?GEDID={gedid}'
+        pdf_filename = f'{act_id}-{gedid}'
+        pdf_filepath = utils.get_filepath(
+            date=str(updated_at), filename=pdf_filename, extension='pdf')
+        extra_contents.append(base.ContentFromURL(
+          src=pdf_url, dest=pdf_filepath, content_type='application/pdf'
+        ))
 
     return [
       base.Content(content=self._dump(data_result), dest=filepath,
