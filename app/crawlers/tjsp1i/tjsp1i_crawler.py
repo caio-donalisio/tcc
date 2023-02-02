@@ -42,11 +42,6 @@ class TJSP1I(base.ICollector):
   def chunks(self):
     ranges = list(utils.timely(
       self.params['start_date'], self.params['end_date'], unit='days', step=1))
-
-
-    # Will store number of records+pages based on parameters
-    # This will avoid hitting the site to figure out the number of pages.
-    # use_cache = self.options.get('skip_cache', False) == False
     skip_pdf  = self.options.get('skip_pdf', False)
 
     # cache_repository = cache_store = None
@@ -230,32 +225,27 @@ class TJSP1IChunk(base.Chunk):
       assert f'{kvs["cdForo"]}{kvs["cdDoc"]}'.isdigit() and kvs["cdProcesso"] and kvs["nmAlias"]
       doc_id = f"{day}-{links[0]['name']}-{utils.extract_digits(num_processo)}"
 
-      # alt_meta_url = f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={kvs['cdProcesso']}&processo.foro={kvs['cdForo']}&processo.numero={num_processo}"
+      alt_meta_url = f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={kvs['cdProcesso']}&processo.foro={kvs['cdForo']}&processo.numero={num_processo}"
       
-      rows.append([
-        base.Content(
+      rows.append(
+       [base.Content(
           content=item.prettify(encoding='cp1252'),
           dest=f'{year}/{month}/{doc_id}.html',
           content_type='text/html'
-        ),
-        # base.ContentFromURL(
-        #   src=alt_meta_url,
-        #   dest=f'{year}/{month}/{doc_id}_SEC.html',
-        #   content_type='text/html'
-        # )
-        ]
-        )
+        )])
 
       if not self.skip_pdf:
         with browsers.FirefoxBrowser(headless=True) as browser:
-          rows.append(
+          rows.append([base.ContentFromURL(
+            src=alt_meta_url,
+            dest=f'{year}/{month}/{doc_id}_SEC.html',
+            content_type='text/html'
+          ),
           base.Content(
             content= TJSP1IDownloader('').download_files(browser, item),
             dest=f'{year}/{month}/{doc_id}.pdf',
             content_type='application/pdf'
-          ))
-
-    # self.browser.quit()
+          )])
     return rows
 
 
