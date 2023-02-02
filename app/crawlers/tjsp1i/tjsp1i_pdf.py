@@ -164,7 +164,7 @@ def tjsp1i_pdf_command(input_uri, start_date, end_date, dry_run, local, count, m
     return
 
   while startDate <= endDate:
-    print(f"TJSP1I - Collecting {startDate.format('YYYY/MM')}...")
+    print(f"TJSP1I - Collecting PDFs {startDate.format('YYYY/MM')}...")
     pendings = []
     counter = 0 
     for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):

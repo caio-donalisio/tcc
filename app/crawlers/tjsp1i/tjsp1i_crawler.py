@@ -230,7 +230,7 @@ class TJSP1IChunk(base.Chunk):
       assert f'{kvs["cdForo"]}{kvs["cdDoc"]}'.isdigit() and kvs["cdProcesso"] and kvs["nmAlias"]
       doc_id = f"{day}-{links[0]['name']}-{utils.extract_digits(num_processo)}"
 
-      alt_meta_url = f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={kvs['cdProcesso']}&processo.foro={kvs['cdForo']}&processo.numero={num_processo}"
+      # alt_meta_url = f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={kvs['cdProcesso']}&processo.foro={kvs['cdForo']}&processo.numero={num_processo}"
       
       rows.append([
         base.Content(
@@ -238,11 +238,12 @@ class TJSP1IChunk(base.Chunk):
           dest=f'{year}/{month}/{doc_id}.html',
           content_type='text/html'
         ),
-        base.ContentFromURL(
-          src=alt_meta_url,
-          dest=f'{year}/{month}/{doc_id}_alt.html',
-          content_type='text/html'
-        )]
+        # base.ContentFromURL(
+        #   src=alt_meta_url,
+        #   dest=f'{year}/{month}/{doc_id}_SEC.html',
+        #   content_type='text/html'
+        # )
+        ]
         )
 
       if not self.skip_pdf:
