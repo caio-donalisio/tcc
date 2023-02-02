@@ -112,6 +112,7 @@ class TJSP1IClientPlain:
     response = self.session.get('https://esaj.tjsp.jus.br/cjpg/pesquisar.do',
       headers=self.headers,
       verify=False,
+      timeout=30,
       params={
     'conversationId': '',
     'dadosConsulta.pesquisaLivre': '',
