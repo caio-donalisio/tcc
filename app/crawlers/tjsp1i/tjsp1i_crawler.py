@@ -59,7 +59,7 @@ class TJSP1I(base.ICollector):
       #   number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
       # else:
       number_of_records = self.client.set_search(start_date, end_date)
-      number_of_pages   = math.ceil(number_of_records / 20)
+      number_of_pages   = math.ceil(number_of_records / 10)
 
       #   if cache_store:
       #     cache_store.set_value(cache_key.hash, {
@@ -70,7 +70,7 @@ class TJSP1I(base.ICollector):
       #     })
       #     cache_repository.commit(cache_store)
 
-      for page in range(1, number_of_pages + 3):
+      for page in range(1, number_of_pages + 5):
         chunk_params = {
           'start_date': start_date.to_date_string(),
           'end_date'  : end_date.to_date_string(),
@@ -177,15 +177,16 @@ class TJSP1IChunk(base.Chunk):
     else:
       return []
 
-  @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
+  @utils.retryable(max_retries=6, sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
   utils.PleaseRetryException))
   def get_row_for_current_page(self):
     
     
     rows = []
 
-    # self.client.set_search(self.start_date, self.end_date)
-
+    if self.page % 150 == 0:
+      self.client.set_search(self.start_date, self.end_date)
+    
     text = self.client.get_search_results(page=self.page)
     soup = utils.soup_by_content(text)
 
@@ -203,15 +204,16 @@ class TJSP1IChunk(base.Chunk):
     if len(current_page_links) == 1:
       assert self.page == int(current_page_links[0].get_text().strip())
 
-    is_last_page = len(soup.find_all('a', {'title': 'Próxima página'})) == 0
-
-    # Firstly, get rows that matters
+    results_text = soup.find('td', attrs={'bgcolor':'#EEEEEE'}).text
+    low, high, expected = re.search(r'[\s\n]*Resultados[\s\n]*(\d+) a (\d+)[\s\n]*de[\s\n]*(\d+)[\s\n]*$',results_text).groups()
+    is_last_page = int(low) > int(expected)
     items = soup.find_all('tr', {'class': 'fundocinza1'})
     
     if not is_last_page:
       page_records = len(items)
       if page_records == 0:  # Wasn't expecting that but sometimes it happens. Sadly
-        raise utils.PleaseRetryException()
+        self.client.set_search(self.start_date, self.end_date)
+        raise utils.PleaseRetryException(f"Trying to recollect {self.page} {self.start_date.format('YYYY-MM-DD')}")
 
     for item in items:
       date = item.find(text=re.compile('.*Data de Disponibilização.*')).next
