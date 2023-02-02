@@ -160,7 +160,7 @@ class STF:
     return response.json()
 
 
-@celery.task(queue='name', rate_limit='2/h', default_retry_delay=30 * 60,
+@celery.task(name='crawlers.stf', rate_limit='2/h', default_retry_delay=30 * 60,
              autoretry_for=(Exception,))
 def stf_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
@@ -189,9 +189,10 @@ def stf_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
 @click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
 @click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
-def stf_command(start_date, end_date, output_uri, pdf_async, skip_pdf, enqueue):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf)
-  if enqueue:
-    stf_task.delay(*args)
+@click.option('--split-tasks',
+  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def stf_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(stf_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    stf_task(*args)
+    stf_task(*kwargs)

@@ -106,8 +106,8 @@ def carf_task(**kwargs):
         output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
         logger.info(f'Output: {output}.')
 
-        start_date = kwargs.get('start_date') + ' 00:00:00'
-        end_date = kwargs.get('end_date') + ' 23:59:59'
+        start_date = kwargs.get('start_date', '') + ' 00:00:00'
+        end_date = kwargs.get('end_date', '') + ' 23:59:59'
 
         date_format = 'YYYY-MM-DD HH:mm:ss'
 
@@ -149,16 +149,6 @@ def carf_task(**kwargs):
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def carf_command(**kwargs):
   if kwargs.get('enqueue'):
-    if kwargs.get('split_tasks'):
-      start_date = pendulum.parse(kwargs.get('start_date'))
-      end_date = pendulum.parse(kwargs.get('end_date'))
-      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-        task_id = carf_task.delay(
-          start_date=start.to_date_string(),
-          end_date=end.to_date_string(),
-          output_uri=kwargs.get('output_uri'))
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      carf_task.delay(**kwargs)
+    utils.enqueue_tasks(carf_task, kwargs.get('split_tasks'), **kwargs)
   else:
     carf_task(**kwargs)

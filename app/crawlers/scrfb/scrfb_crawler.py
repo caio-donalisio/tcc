@@ -55,7 +55,7 @@ class SCRFBClient:
         count_tag = soup.find('ul', attrs={'class':'pagination total-regs-encontrados'})
         if count_tag:
             count = re.search(r'\s*Total de atos localizados:\s*(\d+)[\s\n].*',count_tag.text)
-            count = int(count.group(1))
+            count = int(count.group(1)) if count else 0
         else:
             count = 0
         return count
@@ -190,7 +190,9 @@ class SCRFBChunk(base.Chunk):
             soup = utils.soup_by_content(response.text)
             pdf_link = soup.find('a', text=lambda text: text and 'pdf' in text)
             pdf_url = f'{base_url}/{pdf_link["href"]}' if pdf_link else None
-            return response.text,pdf_url
+            return response.text, pdf_url
+
+        return None, None
 
 @celery.task(name='crawlers.scrfb', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
@@ -242,24 +244,8 @@ def scrfb_task(**kwargs):
 @click.option('--count-only',
     default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def scrfb_command(**kwargs):
-  # VALIDATE URI
-  if COURT_NAME.lower() not in kwargs.get('output_uri').lower():
-      if not click.confirm(
-          (f"Name of court {COURT_NAME.upper()} not found in the "
-            f"URI {kwargs.get('output_uri')}. REALLY PROCEED?"),default=False):
-          logger.info('Operation canceled - wrong URI')
-          return
   if kwargs.get('enqueue'):
     if kwargs.get('split_tasks'):
-      start_date = pendulum.parse(kwargs.get('start_date'))
-      end_date = pendulum.parse(kwargs.get('end_date'))
-      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-        task_id = scrfb_task.delay(
-          start_date=start.to_date_string(),
-          end_date=end.to_date_string(),
-          output_uri=kwargs.get('output_uri'))
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      scrfb_task.delay(**kwargs)
+      utils.enqueue_tasks(scrfb_task, kwargs.get('split_tasks'), **kwargs)
   else:
     scrfb_task(**kwargs)

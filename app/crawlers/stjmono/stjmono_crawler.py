@@ -83,7 +83,7 @@ DEFAULT_PDF_HEADERS = {
     'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
-    
+
 }
 
 
@@ -148,7 +148,7 @@ class STJMONOClient:
   def reset_session(self, headers=DEFAULT_COUNT_HEADERS):
     self.requester = requests.Session()
     self.requester.headers = {**headers, 'User-Agent':utils.get_random_useragent()}
-    self.requester.get("https://scon.stj.jus.br/SCON/", 
+    self.requester.get("https://scon.stj.jus.br/SCON/",
       verify=False)
 
   @utils.retryable(max_retries=9)
@@ -300,7 +300,7 @@ class STJMONOChunk(base.Chunk):
       a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'})
       a = a or doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
       # a = a or doc.find('a',attrs={'data-bs-original-title':'Decisão Monocrática Certificada'})
-          
+
       session = requests.Session()
       pdfs_page = utils.get_response(
         logger,
@@ -400,7 +400,7 @@ class STJMONOChunk(base.Chunk):
 
       yield to_download
 
-@celery.task(queue='crawlers.stjmono', default_retry_delay=5 * 60,
+@celery.task(name='crawlers.stjmono', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def stjmono_task(start_date, end_date, output_uri):
   setup_cloud_logger(logger)
@@ -437,19 +437,8 @@ def stjmono_task(start_date, end_date, output_uri):
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def stjmono_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
-  if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
-        task_id = stjmono_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      stjmono_task.delay(*args)
+def stjmono_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(stjmono_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    stjmono_task(*args)
+    stjmono_task(*kwargs)
