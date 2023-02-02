@@ -7,15 +7,9 @@ from app.crawlers import base, utils, browsers
 import pendulum
 import requests
 from celery_singleton import Singleton
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import WebDriverException
 from urllib3.exceptions import InsecureRequestWarning
 from app.crawlers.utils import PleaseRetryException
 from app.crawlers.tjsp1i.tjsp1i_pdf import TJSP1IDownloader
-
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -38,7 +32,8 @@ class TJSP1I(base.ICollector):
     self.options = (options or {})
 
   def setup(self):
-    self.client.signin()
+    ...
+    #self.client.signin()
 
   def teardown(self):
     if self.client:
@@ -51,39 +46,34 @@ class TJSP1I(base.ICollector):
 
     # Will store number of records+pages based on parameters
     # This will avoid hitting the site to figure out the number of pages.
-    use_cache = self.options.get('skip_cache', False) == False
+    # use_cache = self.options.get('skip_cache', False) == False
     skip_pdf  = self.options.get('skip_pdf', False)
 
-    cache_repository = cache_store = None
-    if use_cache:
-      cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
-      cache_store      = base.HashedKeyValue(keys={
-        'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
-      if cache_repository.exists(cache_store):
-        cache_repository.restore(cache_store)
+    # cache_repository = cache_store = None
+    # if use_cache:
+    #   cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
+    #   cache_store      = base.HashedKeyValue(keys={
+    #     'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
+    #   if cache_repository.exists(cache_store):
+    #     cache_repository.restore(cache_store)
 
     for start_date, end_date in reversed(ranges):
-      cache_key = base.HashedKeyValue(keys={  # just to compute the hash
-        'start_date': start_date.to_date_string(),
-        'end_date'  : end_date.to_date_string()
-      })
+      # if cache_store and \
+      #   cache_key.hash in cache_store.state:
+      #   number_of_records = cache_store.state[cache_key.hash]['number_of_records']
+      #   number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
+      # else:
+      number_of_records = self.client.set_search(start_date, end_date)
+      number_of_pages   = math.ceil(number_of_records / 20)
 
-      if cache_store and \
-        cache_key.hash in cache_store.state:
-        number_of_records = cache_store.state[cache_key.hash]['number_of_records']
-        number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
-      else:
-        number_of_records = self.client.set_search(start_date, end_date)
-        number_of_pages   = math.ceil(number_of_records / 20)
-
-        if cache_store:
-          cache_store.set_value(cache_key.hash, {
-            'number_of_records': number_of_records,
-            'number_of_pages'  : number_of_pages,
-            'start_date'       : start_date.to_date_string(),
-            'end_date'         : end_date.to_date_string()
-          })
-          cache_repository.commit(cache_store)
+      #   if cache_store:
+      #     cache_store.set_value(cache_key.hash, {
+      #       'number_of_records': number_of_records,
+      #       'number_of_pages'  : number_of_pages,
+      #       'start_date'       : start_date.to_date_string(),
+      #       'end_date'         : end_date.to_date_string()
+      #     })
+      #     cache_repository.commit(cache_store)
 
       for page in range(1, number_of_pages + 3):
         chunk_params = {
@@ -119,79 +109,52 @@ class TJSP1IClientPlain:
     self.session = requests.Session()
     self.headers = self.header_generator.generate()
 
-  def signin(self):
-    username = os.getenv('TJSP_USERNAME')
-    password = os.getenv('TJSP_PASSWORD')
-    assert username and password
-    response =\
-      self.session.post('http://esaj.tjsp.jus.br/sajcas/login?service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fj_spring_cas_security_check',
-        headers=self.headers,
-        allow_redirects=True,
-        verify=False,
-        data={
-          'username': username,
-          'password': password
-        })
-    return response
-
-  @utils.retryable(max_retries=9)  # type: ignore
+  @utils.retryable(max_retries=9, retryable_exceptions=Exception)  # type: ignore
   def set_search(self, start_date, end_date):
     start_ = '{day}/{month}/{year}'.format(day=start_date.day, month=start_date.month, year=start_date.year)
     end_   = '{day}/{month}/{year}'.format(day=end_date.day  , month=end_date.month, year=end_date.year)
 
-    response = self.session.post('http://esaj.tjsp.jus.br/cjsg/pesquisar.do',#http://esaj.tjsp.jus.br/cjsg/resultadoCompleta.do',
+    response = self.session.get('https://esaj.tjsp.jus.br/cjpg/pesquisar.do',
       headers=self.headers,
       verify=False,
-      data={
-        'conversationId': '',
-        'dados.buscaInteiroTeor': '',
-        'dados.pesquisarComSinonimos': 'S',
-        'dados.buscaEmenta': '',
-        'dados.nuProcOrigem': '',
-        'dados.nuRegistro': '',
-        'agenteSelectedEntitiesList': '',
-        'contadoragente':  0,
-        'contadorMaioragente':  0,
-        'codigoCr': '',
-        'codigoTr': '',
-        'nmAgente': '',
-        'juizProlatorSelectedEntitiesList': '',
-        'contadorjuizProlator':  0,
-        'contadorMaiorjuizProlator':  0,
-        'codigoJuizCr': '',
-        'codigoJuizTr': '',
-        'nmJuiz': '',
-        'classesTreeSelection.values': '',
-        'classesTreeSelection.text': '',
-        'assuntosTreeSelection.values': '',
-        'assuntosTreeSelection.text': '',
-        'comarcaSelectedEntitiesList': '',
-        'contadorcomarca':  0,
-        'contadorMaiorcomarca':  0,
-        'cdComarca': '',
-        'nmComarca': '',
-        'secoesTreeSelection.values': '',
-        'secoesTreeSelection.text': '',
-        'dados.dtJulgamentoInicio': '',
-        'dados.dtJulgamentoFim': '',
-        'dados.dtPublicacaoInicio': start_,
-        'dados.dtPublicacaoFim': end_,
-        'dados.origensSelecionadas': 'T',
-        'tipoDecisaoSelecionados':  'A',
-        'dados.ordenarPor': 'dtPublicacao'
-      })
+      params={
+    'conversationId': '',
+    'dadosConsulta.pesquisaLivre': '',
+    'tipoNumero': 'UNIFICADO',
+    'numeroDigitoAnoUnificado': '',
+    'foroNumeroUnificado': '',
+    'dadosConsulta.nuProcesso': '',
+    'dadosConsulta.nuProcessoAntigo': '',
+    'classeTreeSelection.values': '',
+    'classeTreeSelection.text': '',
+    'assuntoTreeSelection.values': '',
+    'assuntoTreeSelection.text': '',
+    'agenteSelectedEntitiesList': '',
+    'contadoragente': '0',
+    'contadorMaioragente': '0',
+    'cdAgente': '',
+    'nmAgente': '',
+    'dadosConsulta.dtInicio': start_,
+    'dadosConsulta.dtFim': end_,
+    'varasTreeSelection.values': '',
+    'varasTreeSelection.text': '',
+    'dadosConsulta.ordenacao': 'DESC',
+    })
     assert response.status_code == 200
+    soup = utils.soup_by_content(response.text)
+    return self.count_records(soup)
 
-    elements = utils.soup_by_content(response.text) \
-      .find_all('input', {'id': 'totalResultadoAba-A'})
-    assert len(elements) == 1
-    records = elements[0]['value']
-    return int(records)
+  def count_records(self, soup):
+    try:
+      count_text = soup.find(text=re.compile('.*[rR]esultado.*')).parent.text
+      count = re.search(r".*de (\d+)[\s\n]*$" ,count_text).group(1)
+    except AttributeError:
+      count = 0
+    return int(count)
 
   @utils.retryable(max_retries=9)  # type: ignore
   def get_search_results(self, page):
-    # url = f'http://esaj.tjsp.jus.br/cjsg/trocaDePagina.do?tipoDeDecisao=A&pagina={page}&conversationId='
-    url = f'http://esaj.tjsp.jus.br/cjsg/pesquisar.do?tipoDeDecisao=A&pagina={page}&conversationId='
+    url = f'https://esaj.tjsp.jus.br/cjpg/trocarDePagina.do?pagina={page}&conversationId='
     response = self.session.get(
       url,
       verify=False,
@@ -200,112 +163,6 @@ class TJSP1IClientPlain:
 
   def close(self):
     pass
-
-
-class TJSP1IClient:
-
-  def __init__(self, **options):
-    self.header_generator = utils.HeaderGenerator(
-      origin='https://esaj.tjsp.jus.br', xhr=False)
-    self.session = requests.Session()
-    self.request_cookies_browser = []
-    self.options = (options or {})
-
-    env = os.getenv('ENV', 'development')
-
-    if env == "development":
-      chrome_options = Options()
-
-      if not self.options.get('browser', False):
-        chrome_options.add_argument("--headless")
-
-      chrome_options.add_argument("--no-sandbox")
-
-      self.driver = browsers.FirefoxBrowser(headless=True).driver # webdriver. Chrome(options=chrome_options)
-      self.driver.implicitly_wait(20)
-    else:
-      self.driver = webdriver.Remote(
-        command_executor=os.getenv('SELENIUM_HUB_URI', 'http://selenium-hub:4444/wd/hub'),
-        desired_capabilities=DesiredCapabilities.CHROME
-      )
-
-  def signin(self):
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.webdriver.support.ui import WebDriverWait
-
-    self.driver.get(('https://esaj.tjsp.jus.br/sajcas/login?service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fj_spring_cas_security_check'))
-    WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.ID, 'usernameForm')))
-
-    username = os.getenv('TJSP_USERNAME')
-    assert username
-    password = os.getenv('TJSP_PASSWORD')
-    assert password
-
-    user_name = self.driver.find_element(By.ID, 'usernameForm')
-    user_name.send_keys(username)
-
-    WebDriverWait(self.driver, 15) \
-      .until(EC.presence_of_element_located((By.ID, 'passwordForm')))
-    user_name = self.driver.find_element(By.ID, 'passwordForm')
-    user_name.send_keys(password)
-    self.driver.find_element(By.ID, 'pbEntrar').click()
-
-    WebDriverWait(self.driver, 15) \
-      .until(EC.presence_of_element_located((By.CLASS_NAME, 'esajTabelaServico')))
-
-    self.request_cookies_browser = self.driver.get_cookies()
-
-  @utils.retryable(max_retries=9)  # type: ignore
-  def get_search_results(self, page):
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
-
-    url = f'https://esaj.tjsp.jus.br/cjpg/trocarDePagina.do?pagina={page}&conversationId='
-    self.driver.get(url)
-    WebDriverWait(self.driver, 15) \
-      .until(EC.presence_of_element_located((By.ID, 'divDadosResultado')))
-    return self.driver.page_source
-
-  @utils.retryable(max_retries=9)  # type: ignore
-  def set_search(self, start_date, end_date):
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
-
-    start_ = '{day}/{month}/{year}'.format(day=start_date.day, month=start_date.month, year=start_date.year)
-    end_   = '{day}/{month}/{year}'.format(day=end_date.day  , month=end_date.month, year=end_date.year)
-
-    self.driver.get('https://esaj.tjsp.jus.br/cjpg/pesquisar.do?')
-    WebDriverWait(self.driver, 15) \
-      .until(EC.presence_of_element_located((By.ID, 'iddadosConsulta.pesquisaLivre')))
-
-    start_box = self.driver.find_element(By.ID, 'iddadosConsulta.dtInicio')
-    start_box.send_keys(start_)
-    end_box = self.driver.find_element(By.ID, 'iddadosConsulta.dtFim')
-    end_box.send_keys(end_)
-    WebDriverWait(self.driver, 15) \
-      .until(EC.presence_of_element_located((By.ID, 'pbSubmit')))
-
-    search_button = self.driver.find_element(By.ID, 'pbSubmit')
-    search_button.click()
-
-    WebDriverWait(self.driver, 15).until(EC.presence_of_element_located((By.ID, 'resultados')))
-
-    # Refresh cookies -- they might rotate or do something else...
-    self.request_cookies_browser = self.driver.get_cookies()
-
-    # Get number of elements --  will use to validate page changes
-    elements = utils.soup_by_content(self.driver.page_source) \
-      .find_all('td', {'bgcolor': '#EEEEEE'})
-    elements = [tag for tag in elements if 'Resultados' in tag.text]
-    assert len(elements) == 2
-    records = int(re.search(r'.*de (\d+).*',elements[0].text).group(1))
-    return int(records)
-
-  def close(self):
-    if self.driver:
-      self.driver.quit()
-
 
 class TJSP1IChunk(base.Chunk):
 
@@ -326,24 +183,19 @@ class TJSP1IChunk(base.Chunk):
       return []
 
   @utils.retryable(max_retries=10., sleeptime=.5, ignore_if_exceeds=True, retryable_exceptions=(
-  utils.PleaseRetryException,WebDriverException))
+  utils.PleaseRetryException))
   def get_row_for_current_page(self):
     
     
     rows = []
 
-    self.client.set_search(self.start_date, self.end_date)
+    # self.client.set_search(self.start_date, self.end_date)
 
     text = self.client.get_search_results(page=self.page)
     soup = utils.soup_by_content(text)
 
     # Check whether the page matches the expected count of elements and page number.
-    count_elements = utils.soup_by_content(self.client.driver.page_source) \
-      .find_all('td', {'bgcolor': '#EEEEEE'})
-    count_elements = [tag for tag in count_elements if 'Resultados' in tag.text]
-    assert len(count_elements) == 2
-    records = int(re.search(r'.*de (\d+).*',count_elements[0].text).group(1))
-    
+    records = self.client.count_records(soup)
     margin = 100. * abs(1 - (records / self.expects)) if self.expects > 0 else 0
     if margin >= 1.:
       logger.warn("page {page} was expecting {expects} got {records} (considers a margin of error) (start_date: {start_date}, end_date: {end_date})".format(
@@ -390,7 +242,8 @@ class TJSP1IChunk(base.Chunk):
           src=alt_meta_url,
           dest=f'{year}/{month}/{doc_id}_alt.html',
           content_type='text/html'
-        )])
+        )]
+        )
 
       if not self.skip_pdf:
         with browsers.FirefoxBrowser(headless=True) as browser:
@@ -476,7 +329,7 @@ def tjsp1i_task(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cach
       'start_date': start_date, 'end_date': end_date
     }
 
-    client  = TJSP1IClient(browser=browser)
+    client  = TJSP1IClientPlain()
     handler = TJSP1IHandler(output=output, client=client)
 
     collector = TJSP1I(params=query_params, output=output, client=client, skip_cache=skip_cache, skip_pdf=skip_pdf)
