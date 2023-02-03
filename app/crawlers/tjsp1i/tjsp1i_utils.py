@@ -2,6 +2,7 @@ import pathlib
 
 from app.crawlers import utils
 from google.cloud import storage
+import random
 
 client = storage.Client()
 
@@ -22,7 +23,9 @@ def list_pending_pdfs(bucket_name, prefix):
       pdfs[path.stem] = path.parent
 
   bucket = client.get_bucket(bucket_name)
-  for name, parent in metas.items():
+  meta_items = list(metas.items())
+  random.shuffle(meta_items)
+  for name, parent in meta_items:
     if name not in pdfs:
       yield  {
         'row':bucket.get_blob(f'{parent}/{name}.html').download_as_string(),

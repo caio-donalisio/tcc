@@ -36,7 +36,7 @@ class TJSP1IDownloader:
       futures  = []
       last_run = None
       try:
-        with browsers.FirefoxBrowser(headless=False) as browser:
+        with browsers.FirefoxBrowser(headless=True) as browser:
           for item in items:
             pdf_content = self.download_files(browser, BeautifulSoup(item.content,'html.parser'))
 
