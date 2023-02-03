@@ -33,7 +33,6 @@ class TJSP1I(base.ICollector):
 
   def setup(self):
     ...
-    #self.client.signin()
 
   def teardown(self):
     if self.client:
@@ -44,31 +43,11 @@ class TJSP1I(base.ICollector):
       self.params['start_date'], self.params['end_date'], unit='days', step=1))
     skip_pdf  = self.options.get('skip_pdf', False)
 
-    # cache_repository = cache_store = None
-    # if use_cache:
-    #   cache_repository = base.HashedKeyValueRepository(output=self.output, prefix='.cache')
-    #   cache_store      = base.HashedKeyValue(keys={
-    #     'start_date': self.params['start_date'], 'end_date': self.params['end_date']})
-    #   if cache_repository.exists(cache_store):
-    #     cache_repository.restore(cache_store)
 
     for start_date, end_date in reversed(ranges):
-      # if cache_store and \
-      #   cache_key.hash in cache_store.state:
-      #   number_of_records = cache_store.state[cache_key.hash]['number_of_records']
-      #   number_of_pages   = cache_store.state[cache_key.hash]['number_of_pages']
-      # else:
       number_of_records = self.client.set_search(start_date, end_date)
       number_of_pages   = math.ceil(number_of_records / 10)
 
-      #   if cache_store:
-      #     cache_store.set_value(cache_key.hash, {
-      #       'number_of_records': number_of_records,
-      #       'number_of_pages'  : number_of_pages,
-      #       'start_date'       : start_date.to_date_string(),
-      #       'end_date'         : end_date.to_date_string()
-      #     })
-      #     cache_repository.commit(cache_store)
 
       for page in range(1, number_of_pages + 5):
         chunk_params = {
