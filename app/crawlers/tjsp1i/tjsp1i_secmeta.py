@@ -45,7 +45,7 @@ class TJSP1IDownloader:
           pbar.update(1)
 
         # up async
-        if response.content:
+        if response and response.content:
           futures.append(executor.submit(self._handle_upload, item, response))
 
       for future in concurrent.futures.as_completed(futures):
@@ -69,12 +69,12 @@ class TJSP1IDownloader:
     # for cookie in self._client.request_cookies_browser:
     #   self._client.session.cookies.set(cookie['name'], cookie['value'])
 
-    if self._output.exists(content_from_url.dest):
+    if self._output.exists(f"{content_from_url.dest}_SEC"):
       return None
 
     # response = utils.get_response()
     if 'text/html' in response.headers.get('Content-type'):
-      # logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
+      logger.debug(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
       return response
     else:
       logger.info(f'Code {response.status_code} for URL {content_from_url.src}.')

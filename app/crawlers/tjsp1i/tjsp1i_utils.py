@@ -3,6 +3,7 @@ import pathlib
 from app.crawlers import utils
 from google.cloud import storage
 import random
+import re
 
 client = storage.Client()
 
@@ -42,12 +43,11 @@ def list_pending_secmetas(bucket_name, prefix):
     if name.endswith(".html") and not name.endswith("SEC.html"):
       metas[path.stem] = path.parent
     if name.endswith("SEC.html"):
-      secmetas[path.stem] = path.parent
+      secmetas[re.sub(r'_SEC$','',path.stem)] = path.parent
 
-  bucket = client.get_bucket(bucket_name)
   for name, parent in metas.items():
     if name not in secmetas:
       _, cdProcesso, cdForo, __, ___, numProcesso  = name.split('-')
       yield {'url':f"https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo={cdProcesso}&processo.foro={cdForo}&processo.numero={numProcesso}",
-         'dest': f'{parent}/{name}.pdf'
+         'dest': f'{parent}/{name}'
       }
