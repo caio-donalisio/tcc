@@ -182,14 +182,20 @@ class TJSP1IChunk(base.Chunk):
   utils.PleaseRetryException))
   def get_row_for_current_page(self):
     
-    
     rows = []
-
-    if self.page % 150 == 0:
-      self.client.set_search(self.start_date, self.end_date)
     
     text = self.client.get_search_results(page=self.page)
     soup = utils.soup_by_content(text)
+
+    # Tries to remake search and unexpire session
+    if soup.find('div', text=re.compile(r'.*Sessão Expirada.*')):
+      self.client.set_search(self.start_date, self.end_date)
+      text = self.client.get_search_results(page=self.page)
+      soup = utils.soup_by_content(text)
+      # Checks if session is still expired
+      if soup.find('div', text=re.compile(r'.*Sessão Expirada.*')):
+        raise PleaseRetryException('Unexpected expired session')
+    
 
     # Check whether the page matches the expected count of elements and page number.
     records = self.client.count_records(soup)
