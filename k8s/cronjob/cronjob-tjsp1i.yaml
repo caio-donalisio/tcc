@@ -16,7 +16,69 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "python", "-m", "app.commands", "tjsp1i", "--output-uri", "gs://inspira-production-buckets-tjsp1i" ]
+            command: [ "python", "-m", "app.commands", "tjsp1i", "--output-uri", "gs://inspira-production-buckets-tjsp1i","--skip-pdf"]
+            envFrom:
+            - secretRef:
+                name: crawler-env
+            volumeMounts:
+            - mountPath: "/etc/gcloud"
+              name: gcp-credentials
+          restartPolicy: Never
+          volumes:
+          - name: gcp-credentials
+            secret:
+              secretName: crawlers-credentials
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tjsp1i-pdf-crawler
+  namespace: crawlers
+spec:
+  schedule: "10 6 */2 * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: crawler
+            image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
+            imagePullPolicy: IfNotPresent
+            command: [ "python", "-m", "app.commands", "tjsp1i-pdf", "--input-uri", "gs://inspira-production-buckets-tjsp1i" ]
+            envFrom:
+            - secretRef:
+                name: crawler-env
+            volumeMounts:
+            - mountPath: "/etc/gcloud"
+              name: gcp-credentials
+          restartPolicy: Never
+          volumes:
+          - name: gcp-credentials
+            secret:
+              secretName: crawlers-credentials
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tjsp1i-secmeta-crawler
+  namespace: crawlers
+spec:
+  schedule: "10 6 */2 * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: crawler
+            image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
+            imagePullPolicy: IfNotPresent
+            command: [ "python", "-m", "app.commands", "tjsp1i-secmeta", "--input-uri", "gs://inspira-production-buckets-tjsp1i" ]
             envFrom:
             - secretRef:
                 name: crawler-env
