@@ -29,7 +29,7 @@ class TJSP1IDownloader:
     self._output = output
     # self.browser = browsers.FirefoxBrowser(headless=False)
 
-  @utils.retryable(max_retries=5, sleeptime=2, retryable_exceptions=Exception, message='Browser error')
+  @utils.retryable(max_retries=5, sleeptime=1.1, retryable_exceptions=Exception, message='Browser error')
   def download(self, items, pbar=None):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -50,7 +50,7 @@ class TJSP1IDownloader:
         for future in concurrent.futures.as_completed(futures):
           future.result()
       except Exception as e:
-        raise utils.PleaseRetryException('Selenium crashed')
+        raise utils.PleaseRetryException(f'Selenium crashed - {e}')
 
   def _handle_upload(self, item, pdf_content):
     logger.debug(f'GET {item} UPLOAD')
@@ -63,7 +63,7 @@ class TJSP1IDownloader:
     else:
       logger.warn(f"Got empty document for {item.dest}.pdf")
 
-  @utils.retryable(message='Could not access pdf page')
+  @utils.retryable(sleeptime=1.1, message='Could not access pdf page', ignore_if_exceeds=True)
   def download_files(self, browser, row):
     links = row.find_all('a', {'title': 'Visualizar Inteiro Teor'})
     assert len(links) == 1, f"Found {len(links)} links, expected 1."
@@ -71,6 +71,9 @@ class TJSP1IDownloader:
     search_url = f"https://esaj.tjsp.jus.br/cjpg/obterArquivo.do?cdProcesso={kvs['cdProcesso']}&cdForo={kvs['cdForo']}&nmAlias={kvs['nmAlias']}&cdDocumento={kvs['cdDoc']}"
     browser.driver.execute_script(f"window.open('{search_url}')")
     browser.switch_to_window(1)
+    browser.driver.implicitly_wait(30)
+    if browser.bsoup().find('li', text=re.compile('.*Todos os documentos dependentes ou apensos foram omitidos para o processo\..*')):
+      raise utils.PleaseRetryException(f'Documents not available for {search_url} - retrying anyway...')
     WebDriverWait(browser.driver, 30).until(EC.presence_of_element_located((By.XPATH, '//iframe[@src!="processando.html"]')))
     browser.driver.implicitly_wait(30)
     iframe = browser.bsoup().find('iframe')
