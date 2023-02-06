@@ -37,14 +37,23 @@ DEFAULT_HEADERS = {
     # 'TE': 'trailers',
 }
 
-
-
-# response = requests.post(
-#     'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do?&categoria=acordaos&categoria=acma&categoria=recurso',
-#     cookies=cookies,
-#     headers=headers,
-#     data=data,
-# )
+DOWNLOAD_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # 'Cookie': 'JSESSIONID=72DC72D9050FC324EAA6B2B444228270; _ga_M10DPR56QV=GS1.1.1675107176.6.0.1675107752.0.0.0; _ga=GA1.3.1806411352.1673869367; _gid=GA1.3.2051174715.1675714634; _gat=1',
+    'Referer': 'https://busca.tjsc.jus.br/jurisprudencia/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.78',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+}
 
 def get_filters(start_date, end_date, **kwargs):
     return {
@@ -72,32 +81,6 @@ def get_filters(start_date, end_date, **kwargs):
     ],
     'faceta': 'false',
 }
-#     {
-#     'q': '',
-#     'only_ementa': '',
-#     'qualquer': '',
-#     'excluir': '',
-#     'prox1': '',
-#     'prox2': '',
-#     'proxc': '',
-#     'frase': '',
-#     'classe': '',
-#     'juizProlator': '',
-#     'origem': '',
-#     'relator': '',
-#     'radio_campo': 'ementa',
-#     'faceta': 'true',
-#     'busca': 'avancada',
-#     'datainicial': start_date.format(SEARCH_DATE_FORMAT),
-#     'datafinal': end_date.format(SEARCH_DATE_FORMAT),
-#     'nuProcesso': '',
-#     'ps': '50',
-#     'sort': 'dtJulgamento desc',
-# }
-
-
-class NoProcessNumberError(Exception):
-    pass
 
 class TJSCClient:
 
@@ -135,10 +118,11 @@ class TJSCClient:
                     'pg':str(page)
                 },
                 verify=False,
+                timeout=10,
             )
 
         except Exception as e:
-            logger.error(f"page fetch error params: {filters}")
+            logger.error(f"page fetch error params: {filters} {e}")
             raise e
 
 
@@ -199,13 +183,13 @@ class TJSCChunk(base.Chunk):
             result = self.client.fetch(self.filters, self.page)
             soup = utils.soup_by_content(result.text)
             if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
-                raise utils.PleaseRetryException()
+                raise utils.PleaseRetryException('Found ReCaptcha')
             return soup
         
         soup = check_if_recaptcha()
         
         for act in soup.find_all('div', class_='resultados'):
-            time.sleep(0.51531325)
+            time.sleep(0.2456)
             links = {}
 
             links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
@@ -253,13 +237,12 @@ class TJSCChunk(base.Chunk):
                 )
             
             #TJSC will cut connection if too many requests are made
-            time.sleep(0.561616136)
+            time.sleep(0.261616136)
 
             to_download.append(base.Content(
                 content=str(act),
                 dest=f'{base_path}.html',
                 content_type='text/html'))
-
 
             yield to_download
 
@@ -268,25 +251,25 @@ class TJSCContentHandler(base.ContentHandler):
   def __init__(self, output):
     self.output = output
 
-  @utils.retryable(max_retries=9)
+  @utils.retryable(max_retries=9, sleeptime=1.1)
   def _handle_url_event(self, event : base.ContentFromURL):
     if self.output.exists(event.dest):
       return
 
     try:
       response = requests.get(event.src,
-        allow_redirects=True,
+        allow_redirects=False,
+        headers = DOWNLOAD_HEADERS,
         verify=False,
-        timeout=10,
+        timeout=5.1,
 )
-    except:
-      raise utils.PleaseRetryException()
+    except Exception as e:
+      raise utils.PleaseRetryException(f'Could not download: {event.dest} {e}')
     if response.status_code == 404:
       return
 
     dest = event.dest
     content_type = event.content_type
-
 
     if response.status_code == 200 and len(response.content) > 0:
       self.output.save_from_contents(
@@ -306,9 +289,9 @@ def tjsc_task(**kwargs):
         logger.info(f'Output: {output}.')
 
         start_date = kwargs.get('start_date')
-        start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)#.format(SEARCH_DATE_FORMAT)
+        start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)
         end_date = kwargs.get('end_date')
-        end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)#.format(SEARCH_DATE_FORMAT)
+        end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)
 
         query_params = {
             'start_date':start_date,
