@@ -473,22 +473,11 @@ def tjmg_task(**kwargs):
   help='Format YYYY-MM-DD.',
 )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
                 default='days', help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 def tjmg_command(**kwargs):
-    if kwargs.get('enqueue'):
-        if kwargs.get('split_tasks'):
-            start_date = pendulum.parse(kwargs.get('start_date'))
-            end_date = pendulum.parse(kwargs.get('end_date'))
-            for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-                task_id = tjmg_task.delay(
-                    start_date=start.to_date_string(),
-                    end_date=end.to_date_string(),
-                    output_uri=kwargs.get('output_uri'))
-                print(
-                    f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-        else:
-            tjmg_task.delay(**kwargs)
-    else:
-        tjmg_task(**kwargs)
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(tjmg_task, kwargs.get('split_tasks'), **kwargs)
+  else:
+    tjmg_task(*kwargs)

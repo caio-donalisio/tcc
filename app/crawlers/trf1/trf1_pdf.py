@@ -337,7 +337,7 @@ class TRF1Downloader:
       else:
           raise utils.PleaseRetryException()
 
-@celery.task(name='trf1.pdf', autoretry_for=(Exception,),
+@celery.task(name='crawlers.trf1.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=3)
 def trf1_download_task(items, output_uri):
   from tqdm import tqdm

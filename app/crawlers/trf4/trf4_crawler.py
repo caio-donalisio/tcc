@@ -503,22 +503,11 @@ def trf4_task(start_date, end_date, output_uri):
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
-  if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
-        task_id = trf4_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      trf4_task.delay(*args)
+def trf4_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(trf4_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    trf4_task(*args)
+    trf4_task(*kwargs)
 
 
 @cli.command(name='trf4-seq')

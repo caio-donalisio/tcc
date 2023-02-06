@@ -187,19 +187,8 @@ def titsp_task(start_date, end_date, output_uri):
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def titsp_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
-  if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
-        task_id = titsp_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      titsp_task.delay(*args)
+def titsp_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(titsp_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    titsp_task(*args)
+    titsp_task(*kwargs)

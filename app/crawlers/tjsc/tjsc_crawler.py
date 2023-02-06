@@ -11,7 +11,7 @@ import time
 logger = logger_factory('tjsc')
 
 COURT_NAME = 'tjsc'
-RESULTS_PER_PAGE = 50  
+RESULTS_PER_PAGE = 50
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
@@ -201,9 +201,9 @@ class TJSCChunk(base.Chunk):
             if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
                 raise utils.PleaseRetryException()
             return soup
-        
+
         soup = check_if_recaptcha()
-        
+
         for act in soup.find_all('div', class_='resultados'):
             time.sleep(0.51531325)
             links = {}
@@ -213,25 +213,25 @@ class TJSCChunk(base.Chunk):
 
             links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
             links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
-            
+
             links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
             links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
             process_code = re.search(r'.*Processo\:\s?([\d\-\.]+)\s.*', act.find('p').text).group(1)
             process_code = utils.extract_digits(process_code)
-            
+
 
             assert process_code and 25 > len(process_code) > 5
             session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
             session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
-            
+
             onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
             ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
             links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
 
 
             base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
-            
+
             if links.get('short_html'):
                 to_download.append(
                     base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
@@ -246,12 +246,12 @@ class TJSCChunk(base.Chunk):
                 to_download.append(
                     base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
                 )
-            
+
             if links.get('rtf'):
                 to_download.append(
                     base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
                 )
-            
+
             #TJSC will cut connection if too many requests are made
             time.sleep(0.561616136)
 
@@ -341,24 +341,7 @@ def tjsc_task(**kwargs):
 @click.option('--split-tasks',
     default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def tjsc_command(**kwargs):
-  # VALIDATE URI
-  if COURT_NAME.lower() not in kwargs.get('output_uri').lower():
-      if not click.confirm(
-          (f"Name of court {COURT_NAME.upper()} not found in the "
-            f"URI {kwargs.get('output_uri')}. REALLY PROCEED?"),default=False):
-          logger.info('Operation canceled - wrong URI')
-          return
   if kwargs.get('enqueue'):
-    if kwargs.get('split_tasks'):
-      start_date = pendulum.parse(kwargs.get('start_date'))
-      end_date = pendulum.parse(kwargs.get('end_date'))
-      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-        task_id = tjsc_task.delay(
-          start_date=start.to_date_string(),
-          end_date=end.to_date_string(),
-          output_uri=kwargs.get('output_uri'))
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjsc_task.delay(**kwargs)
+    utils.enqueue_tasks(tjsc_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    tjsc_task(**kwargs)
+    tjsc_task(*kwargs)

@@ -352,24 +352,7 @@ def tjpr_task(**kwargs):
 @click.option('--count-only',
     default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def tjpr_command(**kwargs):
-  # VALIDATE URI
-  if COURT_NAME.lower() not in kwargs.get('output_uri').lower():
-      if not click.confirm(
-          (f"Name of court {COURT_NAME.upper()} not found in the "
-            f"URI {kwargs.get('output_uri')}. REALLY PROCEED?"),default=False):
-          logger.info('Operation canceled - wrong URI')
-          return
   if kwargs.get('enqueue'):
-    if kwargs.get('split_tasks'):
-      start_date = pendulum.parse(kwargs.get('start_date'))
-      end_date = pendulum.parse(kwargs.get('end_date'))
-      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-        task_id = tjpr_task.delay(
-          start_date=start.to_date_string(),
-          end_date=end.to_date_string(),
-          output_uri=kwargs.get('output_uri'))
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjpr_task.delay(**kwargs)
+    utils.enqueue_tasks(tjpr_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    tjpr_task(**kwargs)
+    tjpr_task(*kwargs)

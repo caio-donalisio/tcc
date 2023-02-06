@@ -180,7 +180,7 @@ class CMTSPDownloader:
       response = requests.get(PDF_URL, cookies=cookies, headers=headers)
       return response.content
 
-@celery.task(queue='cmtsp.pdf', autoretry_for=(Exception,),
+@celery.task(name='crawlers.cmtsp.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=3)
 def cmtsp_download_task(items, output_uri):
   from tqdm import tqdm

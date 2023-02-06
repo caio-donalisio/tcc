@@ -193,19 +193,8 @@ def tjba_task(start_date, end_date, output_uri):
 @click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def tjba_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
-  if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
-        task_id = tjba_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjba_task.delay(*args)
+def tjba_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(tjba_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    tjba_task(*args)
+    tjba_task(*kwargs)

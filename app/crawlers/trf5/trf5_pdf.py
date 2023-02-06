@@ -332,7 +332,7 @@ class TRF5Downloader:
       )
 
 
-@celery.task(name='trf5.pdf', autoretry_for=(Exception,),
+@celery.task(name='crawlers.trf5.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=6)
 def trf5_download_task(items, output_uri):
   from tqdm import tqdm

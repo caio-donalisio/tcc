@@ -524,29 +524,11 @@ def tjsp_task_download_from_prev_days(output_uri, max_prev_days=1):
 @click.option('--browser'   , default=False, help='Open browser'          , is_flag=True)
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def tjsp_command(start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache, enqueue, browser, split_tasks):
-  args = (start_date, end_date, output_uri, pdf_async, skip_pdf, skip_cache, browser)
-  if split_tasks:
-    start_date, end_date =\
-      pendulum.parse(start_date), pendulum.parse(end_date)
-    for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
-      if enqueue:
-        task_id = tjsp_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri, pdf_async, skip_pdf, skip_cache, browser)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-      else:
-        print(f"running with params {start.to_date_string()} {end.to_date_string()}")
-        tjsp_task(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri, pdf_async, skip_pdf, skip_cache, browser)
+def tjsp_command(**kwargs):
+  if kwargs.get('enqueue'):
+    utils.enqueue_tasks(tjsp_task, kwargs.get('split_tasks'), **kwargs)
   else:
-    if enqueue:
-      tjsp_task.delay(*args)
-    else:
-      tjsp_task(*args)
+    tjsp_task(*kwargs)
 
 
 @cli.command(name='tjsp-validate')

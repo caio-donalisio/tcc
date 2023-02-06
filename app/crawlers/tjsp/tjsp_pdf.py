@@ -95,7 +95,7 @@ class TJSPDownloader:
         f"Got 0 bytes for {content_from_url.src}. Content-type: {response.headers.get('Content-type')}.")
 
 
-@celery.task(name='tjsp.pdf', autoretry_for=(Exception,),
+@celery.task(name='crawlers.tjsp.pdf', autoretry_for=(Exception,),
              default_retry_delay=60, max_retries=3)
 def tjsp_download_task(items, output_uri):
   from tqdm import tqdm
