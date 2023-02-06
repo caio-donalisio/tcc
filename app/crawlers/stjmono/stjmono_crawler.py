@@ -407,7 +407,7 @@ def stjmono_task(start_date, end_date, output_uri):
 
   from app.crawlers.logutils import logging_context
 
-  with logging_context(crawler='STJMONO'):
+  with logging_context(crawler='stjmono'):
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger.info(f'Output: {output}.')
 
