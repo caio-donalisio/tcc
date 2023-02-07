@@ -1,6 +1,6 @@
 import pathlib
 
-from app.crawlers import  utils
+from app.crawlers import utils
 from google.cloud import storage
 client = storage.Client()
 
@@ -11,9 +11,10 @@ def list_all(bucket_name, prefix):
   for blob in bucket.list_blobs(prefix=prefix):
     yield blob.name
 
+
 def list_pending_pdfs(bucket_name, prefix):
   htmls = {}
-  pdfs  = {}
+  pdfs = {}
 
   for name in list_all(bucket_name, prefix):
     path = pathlib.Path(name)
@@ -27,7 +28,7 @@ def list_pending_pdfs(bucket_name, prefix):
 
   for name, parent in htmls.items():
     if name not in pdfs:
-      
-      yield {'row':bucket.get_blob(f'{parent}/{name}.html').download_as_string(),
-          'dest': f'{parent}/{name}'
-      }
+
+      yield {'row': bucket.get_blob(f'{parent}/{name}.html').download_as_string(),
+             'dest': f'{parent}/{name}'
+             }

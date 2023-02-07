@@ -13,9 +13,10 @@ redis_backend_health_check_interval = int(os.getenv("CELERY_REDIS_HEALTH_CHECK_I
 result_backend_transport_options = {}
 broker_transport_options = {}
 
-if master_name := os.getenv("CELERY_REDIS_BROKER_MASTER_NAME"):
-    result_backend_transport_options["master_name"] = master_name
-    broker_transport_options["master_name"] = master_name
+if master_name:
+  = os.getenv("CELERY_REDIS_BROKER_MASTER_NAME"):
+  result_backend_transport_options["master_name"] = master_name
+  broker_transport_options["master_name"] = master_name
 
 OUTPUT_URI = os.getenv("OUTPUT_URI", "/data")
 

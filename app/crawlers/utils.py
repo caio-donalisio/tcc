@@ -359,8 +359,8 @@ def get_response(logger, session, url, headers, verify=True, timeout=15):
   response = session.get(
       url=url, headers=headers, verify=verify, timeout=timeout)
   if response.status_code != 200:
-      logger.warn(f"Response <{response.status_code}> - {response.url}")
-      raise PleaseRetryException()
+    logger.warn(f"Response <{response.status_code}> - {response.url}")
+    raise PleaseRetryException()
   else:
     return response
 
@@ -592,7 +592,8 @@ def get_random_useragent():
   except Exception:
     return random.choice(headers.POSSIBLE_USER_AGENTS)
 
-def enqueue_tasks(task:Callable, split_tasks:Optional[str] = None, **kwargs):
+
+def enqueue_tasks(task: Callable, split_tasks: Optional[str] = None, **kwargs):
   from copy import deepcopy
 
   if split_tasks:

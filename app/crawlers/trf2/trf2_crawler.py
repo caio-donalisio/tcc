@@ -1,3 +1,7 @@
+from app.crawlers.logconfig import logger_factory
+from app.celery_run import celery_app as celery
+from app.crawler_cli import cli
+import click
 import time
 import requests
 import pendulum
@@ -15,11 +19,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-import click
-from app.crawler_cli import cli
-from app.celery_run import celery_app as celery
-from app.crawlers.logconfig import logger_factory
-
 
 class TRF2:
   def __init__(self, params, output, logger, **options):
@@ -28,7 +27,7 @@ class TRF2:
     self.logger = logger
     self.options = (options or {})
     self.header_generator = utils.HeaderGenerator(
-      origin='https://www10.trf2.jus.br', xhr=True)
+        origin='https://www10.trf2.jus.br', xhr=True)
     self.session = requests.Session()
     self.browser = browsers.FirefoxBrowser(headless=True)
 
@@ -44,7 +43,7 @@ class TRF2:
       with tqdm(total=total_records, file=tqdm_out) as pbar:
         for chunk in self.chunks():
           if chunk.commited():
-            chunk_records  = chunk.get_value('records')
+            chunk_records = chunk.get_value('records')
             records_fetch += chunk_records
             pbar.set_postfix(chunk.params)
             pbar.update(chunk_records)
@@ -56,9 +55,9 @@ class TRF2:
           for doc_short, doc_full, pdf in chunk.rows():
             chunk_records += 1
             futures.extend([
-              executor.submit(self.persist, doc_short, content_type='text/html'),
-              executor.submit(self.persist, doc_full , content_type='text/html'),
-              executor.submit(self.handle_pdf, pdf)
+                executor.submit(self.persist, doc_short, content_type='text/html'),
+                executor.submit(self.persist, doc_full, content_type='text/html'),
+                executor.submit(self.handle_pdf, pdf)
             ])
 
           for future in concurrent.futures.as_completed(futures):
@@ -75,9 +74,9 @@ class TRF2:
 
   def persist(self, doc, **kwargs):
     self.output.save_from_contents(
-      filepath=doc['dest'],
-      contents=doc['source'],
-      **kwargs)
+        filepath=doc['dest'],
+        contents=doc['source'],
+        **kwargs)
 
   def handle_pdf(self, pdf):
     from app.crawlers.tasks import download_from_url
@@ -85,14 +84,14 @@ class TRF2:
       return
 
     download_args = dict(
-      url=pdf['url'],
-      dest=pdf['dest'],
-      output_uri=self.output.uri,
-      headers=self.header_generator.generate(),
-      content_type='application/pdf',
-      write_mode='wb',
-      ignore_not_found=True,
-      override=False)
+        url=pdf['url'],
+        dest=pdf['dest'],
+        output_uri=self.output.uri,
+        headers=self.header_generator.generate(),
+        content_type='application/pdf',
+        write_mode='wb',
+        ignore_not_found=True,
+        override=False)
 
     if self.options.get('skip_pdf', False) is False:
       if self.options.get('pdf_async', False):
@@ -102,11 +101,11 @@ class TRF2:
 
   def chunks(self):
     ranges = list(utils.timely(
-      self.params['start_date'], self.params['end_date'], unit='days', step=3))
+        self.params['start_date'], self.params['end_date'], unit='days', step=3))
     for start_date, end_date in reversed(ranges):
       chunk_params = {
-        'start_date': start_date.to_date_string(),
-        'end_date'  : end_date.to_date_string()
+          'start_date': start_date.to_date_string(),
+          'end_date': end_date.to_date_string()
       }
       yield utils.Chunk(params=chunk_params, output=self.output,
                         rows_generator=self.rows(start_date=start_date, end_date=end_date))
@@ -114,8 +113,8 @@ class TRF2:
   def rows(self, start_date, end_date):
     # Check whether we can trust pagination
     base_query = {
-      'start_date': start_date.start_of('day').to_date_string(),
-      'end_date'  : end_date.start_of('day').to_date_string()
+        'start_date': start_date.start_of('day').to_date_string(),
+        'end_date': end_date.start_of('day').to_date_string()
     }
     page = self._get_search_page_for_query({**base_query, 'offset': 0})
 
@@ -123,7 +122,7 @@ class TRF2:
     if total > 900:
       count = 0
       for filters in page.filters():
-        query   = {'extra_query_params': filters['query_param'], **base_query}
+        query = {'extra_query_params': filters['query_param'], **base_query}
         partial = 0
         for row in self.rows_paginated(query):
           partial += 1
@@ -158,21 +157,21 @@ class TRF2:
         doc_title = result.find_all('span', {'class': 'number_link'}, resursive=False)
         assert len(doc_title) == 1
         # as we can trust this doc_id to be unique -- check whether the content is the same.
-        doc_id   = slugify(doc_title[0].get_text())
+        doc_id = slugify(doc_title[0].get_text())
         filename =\
-          f"{doc_id}__{hashlib.sha1(item_html.encode()).hexdigest()}"
+            f"{doc_id}__{hashlib.sha1(item_html.encode()).hexdigest()}"
 
         doc_short = {
-          'source': result.prettify(encoding='cp1252'),
-          'dest'  :  f'{year}/{month}/{filename}.html',
+            'source': result.prettify(encoding='cp1252'),
+            'dest':  f'{year}/{month}/{filename}.html',
         }
         doc_full = {
-          'source': '',
-          'dest'  :  f'{year}/{month}/{filename}_full.html',
+            'source': '',
+            'dest':  f'{year}/{month}/{filename}_full.html',
         }
         pdf = {
-          'url'   : None,
-          'dest'  :  f'{year}/{month}/{filename}.pdf',
+            'url': None,
+            'dest':  f'{year}/{month}/{filename}.pdf',
         }
 
         links = result.find_all('a', {'class': 'font_bold'})
@@ -212,12 +211,12 @@ class TRF2:
   def count(self):
     total = 0
     for start_date, end_date in \
-      utils.timely(self.params['start_date'], self.params['end_date'], unit='years', step=1):
+            utils.timely(self.params['start_date'], self.params['end_date'], unit='years', step=1):
       total += self._get_search_page_for_query(query={
-        'start_date': start_date.start_of('day').to_date_string(),
-        'end_date'  : end_date.start_of('day').to_date_string(),
-        'offset'    : 0}) \
-      .count()
+          'start_date': start_date.start_of('day').to_date_string(),
+          'end_date': end_date.start_of('day').to_date_string(),
+          'offset': 0}) \
+          .count()
     return total
 
   def _get_search_page_for_query(self, query):
@@ -230,8 +229,8 @@ class SearchPageSelenium:
     self.browser = browser
     self._text = self._perform_query(query)
     self._soup = utils.soup_by_content(self._text)
-    self._uls  =\
-      self._soup.find_all('ul', {'class': 'ul-resultados'})
+    self._uls =\
+        self._soup.find_all('ul', {'class': 'ul-resultados'})
 
   @utils.retryable(max_retries=3)   # type: ignore
   def _perform_query(self, query):
@@ -244,26 +243,23 @@ class SearchPageSelenium:
       self.logger.debug(f'Using `extra_query_params` filters..')
 
     query_url = 'https://www10.trf2.jus.br/consultas/?proxystylesheet=v2_index&getfields=*&entqr=3&lr=lang_pt&ie=UTF-8&oe=UTF-8&requiredfields=(-sin_proces_sigilo_judici:s).(-sin_sigilo_judici:s)&sort=date:A:S:d1&entsp=a&adv=1&base=JP-TRF&ulang=&access=p&entqrm=0&wc=200&wc_mc=0&ud=1&client=v2_index&filter=0&as_q=inmeta:DataDispo:daterange:{start_date}..{end_date}&q={q}&start={offset}&num=1&site=v2_jurisprudencia'.format(
-      start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'], q=q_string)
+        start_date=query['start_date'], end_date=query['end_date'], offset=query['offset'], q=q_string)
 
     self.browser.get(query_url)
     WebDriverWait(self.browser.driver, 60) \
-      .until(EC.presence_of_element_located((By.ID, 'resultados')))
+        .until(EC.presence_of_element_located((By.ID, 'resultados')))
     self.click_to_show_ementas()
     return self.browser.page_source()
 
   @utils.retryable()
   def click_to_show_ementas(self):
-    select_objects = self.browser.driver.find_elements(By.XPATH,'//*[text()="Ver texto completo"]')
+    select_objects = self.browser.driver.find_elements(By.XPATH, '//*[text()="Ver texto completo"]')
     for n, link in enumerate(select_objects):
       self.browser.driver.implicitly_wait(10)
       self.browser.driver.execute_script("arguments[0].scrollIntoView(true);", link)
       link.click()
       self.browser.driver.implicitly_wait(10)
-    self.browser.driver.execute_script("window.scrollTo(0,99999999)");
-
-
-
+    self.browser.driver.execute_script("window.scrollTo(0,99999999)")
 
   @property
   def text(self):
@@ -278,7 +274,7 @@ class SearchPageSelenium:
 
   def has_next(self):
     last_page_link =\
-      self._soup.find_all('a', {'class': 'pagination-link'}, string='Último')
+        self._soup.find_all('a', {'class': 'pagination-link'}, string='Último')
     return len(last_page_link) > 0
 
   def results(self):
@@ -293,10 +289,10 @@ class SearchPageSelenium:
     more_button = self._soup.find(id=MORE_BUTTON_ID)
     if more_button:
       self.browser.driver.execute_script("arguments[0].scrollIntoView(true);",
-        self.browser.driver.find_element(By.ID, MORE_BUTTON_ID))
+                                         self.browser.driver.find_element(By.ID, MORE_BUTTON_ID))
       self.browser.click(more_button)
       WebDriverWait(self.browser.driver, 60) \
-        .until(EC.visibility_of_element_located((By.ID, "less_attr_3")))
+          .until(EC.visibility_of_element_located((By.ID, "less_attr_3")))
 
       # the update instance-level source
       self._text = self.browser.page_source()
@@ -308,7 +304,7 @@ class SearchPageSelenium:
         if qs.get('q'):
           params = qs['q'][0].split(' ')
           return [v.strip().split('=')[-1]
-            for v in params if 'inmeta:DescOrgaoJulgador' in v]
+                  for v in params if 'inmeta:DescOrgaoJulgador' in v]
 
     divs = self._soup.find_all('div', {'class': 'filtros_dyNav'})
     all_params = []
@@ -334,35 +330,38 @@ class SearchPageSelenium:
              autoretry_for=(Exception,))
 def trf2_task(start_date, end_date, output_uri, pdf_async, skip_pdf):
   start_date, end_date =\
-    pendulum.parse(start_date), pendulum.parse(end_date)
+      pendulum.parse(start_date), pendulum.parse(end_date)
 
   output = utils.get_output_strategy_by_path(path=output_uri)
   logger = logger_factory('trf2')
   logger.info(f'Output: {output}.')
 
   crawler = TRF2(params={
-    'start_date': start_date, 'end_date': end_date
+      'start_date': start_date, 'end_date': end_date
   }, output=output, logger=logger, pdf_async=pdf_async, skip_pdf=skip_pdf)
   crawler.run()
 
 
 @cli.command(name='trf2')
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--pdf-async' , default=False, help='Download PDFs async'   , is_flag=True)
-@click.option('--skip-pdf'  , default=False, help='Skip PDF download'     , is_flag=True)
-@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+@click.option('--pdf-async', default=False, help='Download PDFs async', is_flag=True)
+@click.option('--skip-pdf', default=False, help='Skip PDF download', is_flag=True)
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def trf2_command(**kwargs):
   if kwargs.get('enqueue'):
-    utils.enqueue_tasks(trf2_task, kwargs.get('split_tasks'), **kwargs)
+    del (kwargs['enqueue'])
+    split_tasks = kwargs.get('split_tasks', None)
+    del (kwargs['split_tasks'])
+    utils.enqueue_tasks(trf2_task, split_tasks, **kwargs)
   else:
     trf2_task(*kwargs)
