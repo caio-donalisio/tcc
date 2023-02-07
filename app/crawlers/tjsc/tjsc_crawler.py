@@ -201,7 +201,7 @@ class TJSCChunk(base.Chunk):
             links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
             links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
-            process_code = re.search(r'.*Processo\:\s?([\d\-\.]+)\s.*', act.find('p').text).group(1)
+            process_code = re.search(r'.*Processo\:\s?([\d\-\.\/]+)\s.*', act.find('p').text).group(1)
             process_code = utils.extract_digits(process_code)
             
 
