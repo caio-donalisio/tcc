@@ -297,7 +297,7 @@ class ChunkRunner:
     self.logger = logger
     self.min_snapshot_interval = 30  # secs
 
-  def run(self, snapshot: Snapshot = None):
+  def run(self, snapshot: Optional[Snapshot] = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
     hashmap = {}
