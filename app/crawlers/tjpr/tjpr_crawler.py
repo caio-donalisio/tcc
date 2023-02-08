@@ -357,10 +357,10 @@ def tjpr_task(**kwargs):
 @click.option('--count-only',
               default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def tjpr_command(**kwargs):
-  if kwargs.get('enqueue'):
-    del (kwargs['enqueue'])
-    split_tasks = kwargs.get('split_tasks', None)
-    del (kwargs['split_tasks'])
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
+  if enqueue:
     utils.enqueue_tasks(tjpr_task, split_tasks, **kwargs)
   else:
-    tjpr_task(*kwargs)
+    tjpr_task(**kwargs)

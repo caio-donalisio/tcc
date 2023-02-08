@@ -210,17 +210,20 @@ class STJMONOClient:
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     errorMessage = soup.find('div', {'class': 'erroMensagem'})
-    if errorMessage:
-      if not (skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!"):
-        raise Exception(f'Error message found: {errorMessage.getText()}')
 
     if soup.find(text=re.compile(r'.*CAPTCHA.*')):
       raise Exception('Captcha found - retrying...')
 
-    if not info:
+    filterWithDocs = True
+    if errorMessage:
+      filterWithDocs = not (errorMessage.getText().strip() == "Nenhum documento encontrado!")
+      if filterWithDocs and not skip_document_not_found:
+        raise Exception(f'Error message found: {errorMessage.getText()}')
+
+    if filterWithDocs and not info:
       raise Exception('Could not load page - retrying...')
 
-  def _count_by_content(self, content, skip_document_not_found: bool = True):
+  def _count_by_content(self, content):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     return int(utils.extract_digits(info.text)) if info else 0
@@ -238,29 +241,29 @@ class STJMONOCollector(base.ICollector):
         self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
+    import time
     ranges = list(utils.timely(
         self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
+    docs_per_page = 50
     for start_date, end_date in reversed(ranges):
       filters = get_row_filters(start_date, end_date)
       count = self.client.count(filters)
 
-      docs_per_page = 50
-      for offset in range(0, count + 1, docs_per_page):
-        offset = docs_per_page if not offset else offset + 1
+      for page in range(0, count, docs_per_page):
+        offset = docs_per_page if not page else page + 1
         keys =\
             {'start_date': start_date.to_date_string(),
              'end_date': end_date.to_date_string(),
-             'offset': offset if offset else docs_per_page,
-             'limit': count + 1}
+             'offset': offset,
+             'limit': count}
 
-        import time
         time.sleep(1.5)
         yield STJMONOChunk(keys=keys,
                            client=self.client,
                            filters=filters,
                            docs_per_page=docs_per_page,
-                           limit=count + 1,
+                           limit=count,
                            prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
@@ -437,10 +440,10 @@ def stjmono_task(start_date, end_date, output_uri):
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def stjmono_command(**kwargs):
-  if kwargs.get('enqueue'):
-    del (kwargs['enqueue'])
-    split_tasks = kwargs.get('split_tasks', None)
-    del (kwargs['split_tasks'])
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
+  if enqueue:
     utils.enqueue_tasks(stjmono_task, split_tasks, **kwargs)
   else:
-    stjmono_task(*kwargs)
+    stjmono_task(**kwargs)

@@ -206,10 +206,10 @@ def trf5_task(**kwargs):
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 @click.option('--skip-full',    default=False,    help='Collects metadata only', is_flag=True)
 def trf5_command(**kwargs):
-  if kwargs.get('enqueue'):
-    del (kwargs['enqueue'])
-    split_tasks = kwargs.get('split_tasks', None)
-    del (kwargs['split_tasks'])
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
+  if enqueue:
     utils.enqueue_tasks(trf5_task, split_tasks, **kwargs)
   else:
-    trf5_task(*kwargs)
+    trf5_task(**kwargs)

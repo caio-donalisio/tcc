@@ -238,10 +238,10 @@ def trf1_task(**kwargs):
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 @click.option('--skip-pdf', default=False, help='Skips pdf collection, collects only metadata', is_flag=True)
 def trf1_command(**kwargs):
-  if kwargs.get('enqueue'):
-    del (kwargs['enqueue'])
-    split_tasks = kwargs.get('split_tasks', None)
-    del (kwargs['split_tasks'])
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
+  if enqueue:
     utils.enqueue_tasks(trf1_task, split_tasks, **kwargs)
   else:
-    trf1_task(*kwargs)
+    trf1_task(**kwargs)
