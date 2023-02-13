@@ -258,14 +258,14 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  def __init__(self, executor, handler, repository : ChunksRepository, runner_options: Dict):
+  def __init__(self, executor, handler, repository : ChunksRepository, skip_cache):
     self.executor   = executor
     self.handler    = handler
     self.repository = repository
-    self.runner_options = runner_options
+    self.skip_cache = skip_cache
 
   def process(self, chunk) -> ChunkResult:
-    if self.repository.commited(chunk) and not self.runner_options.get('skip_cache', False):
+    if self.repository.commited(chunk) and not self.skip_cache:
       self.repository.restore(chunk)
       return ChunkResult(updates=chunk.get_value('records'))
 
@@ -291,19 +291,19 @@ class FutureChunkProcessor(IChunkProcessor):
 class ChunkRunner:
 
   def __init__(self, collector : ICollector, processor : IChunkProcessor,
-      repository : SnapshotsRepository, logger, runner_options: Dict):
+      repository : SnapshotsRepository, logger, skip_cache):
     self.collector  = collector
     self.processor  = processor
     self.repository = repository
     self.logger     = logger
-    self.runner_options = runner_options
+    self.skip_cache = skip_cache
     self.min_snapshot_interval = 30  # secs
 
   def run(self, snapshot: Optional[Snapshot] = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
     hashmap = {}
-    if snapshot and self.repository.exists(snapshot) and not self.runner_options.get('skip_cache', False):
+    if snapshot and self.repository.exists(snapshot) and not self.skip_cache:
       self.repository.restore(snapshot)
       chunks = snapshot.get_value('chunks')
       if chunks:
@@ -411,15 +411,16 @@ class ContentHandler:
           content_type=content_type)
 
 
-def get_default_runner(collector, output, handler, logger, runner_options, **kwargs):
+def get_default_runner(collector, output, handler, logger, **kwargs):
   import concurrent.futures
   executor = concurrent.futures.ThreadPoolExecutor(max_workers=kwargs.get('max_workers', 2))
+  skip_cache = kwargs.get('skip_cache', False)
 
   chunks_repository = ChunksRepository(output=output)
 
   processor =\
     FutureChunkProcessor(executor=executor,
-      handler=handler, repository=chunks_repository, runner_options=runner_options)
+      handler=handler, repository=chunks_repository, skip_cache=skip_cache)
 
   snapshots_repository = SnapshotsRepository(output=output)
   runner = ChunkRunner(
@@ -427,7 +428,7 @@ def get_default_runner(collector, output, handler, logger, runner_options, **kwa
     processor=processor,
     repository=snapshots_repository,
     logger=logger,
-    runner_options=runner_options,
+    skip_cache = skip_cache,
   )
 
   return runner

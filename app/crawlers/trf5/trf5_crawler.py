@@ -173,8 +173,6 @@ def trf5_task(**kwargs):
             'end_date': end_date,
             'skip_full': kwargs.get('skip_full'),
         }
-    runner_options = {'skip_cache':kwargs.get('skip_cache')}
-
     collector = TRF5Collector(
         client=TRF5Client(),
         filters=filters
@@ -189,7 +187,7 @@ def trf5_task(**kwargs):
         handler=handler,
         logger=logger,
         max_workers=8,
-        runner_options=runner_options) \
+        skip_cache=kwargs.get('skip_cache', False)) \
         .run(snapshot=snapshot)
 
 
