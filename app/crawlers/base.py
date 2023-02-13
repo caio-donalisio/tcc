@@ -12,7 +12,7 @@ from typing import Optional
 
 from tqdm import tqdm
 from bs4 import BeautifulSoup
-from typing import Any
+from typing import Any, Dict
 
 
 class BaseCrawler:
@@ -259,13 +259,14 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  def __init__(self, executor, handler, repository : ChunksRepository):
+  def __init__(self, executor, handler, repository : ChunksRepository, runner_options: Dict):
     self.executor   = executor
     self.handler    = handler
     self.repository = repository
+    self.runner_options = runner_options
 
   def process(self, chunk) -> ChunkResult:
-    if self.repository.commited(chunk):
+    if self.repository.commited(chunk) and not self.runner_options.get('skip_cache', False):
       self.repository.restore(chunk)
       return ChunkResult(updates=chunk.get_value('records'))
 
@@ -410,7 +411,7 @@ class ContentHandler:
         content_type=content_type)
 
 
-def get_default_runner(collector, output, handler, logger, **kwargs):
+def get_default_runner(collector, output, handler, logger, runner_options, **kwargs):
   import concurrent.futures
   executor = concurrent.futures.ThreadPoolExecutor(max_workers=kwargs.get('max_workers', 2))
 
@@ -418,7 +419,7 @@ def get_default_runner(collector, output, handler, logger, **kwargs):
 
   processor =\
     FutureChunkProcessor(executor=executor,
-      handler=handler, repository=chunks_repository)
+      handler=handler, repository=chunks_repository, runner_options=runner_options)
 
   snapshots_repository = SnapshotsRepository(output=output)
   runner = ChunkRunner(

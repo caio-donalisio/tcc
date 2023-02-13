@@ -29,7 +29,7 @@ DEFAULT_HEADERS = {
     'sec-ch-ua-platform': '"Windows"',
 }
 
-def merged_with_default_filters(start_date, end_date, skip_full):
+def merged_with_default_filters(start_date, end_date, **kwargs):
     return {
         'draw': '1',
         'columns[0][data]': 'codigoDocumento',
@@ -172,6 +172,7 @@ def trf5_task(**kwargs):
             'end_date': end_date,
             'skip_full': kwargs.get('skip_full'),
         }
+        runner_options = {'skip_cache':kwargs.get('skip_cache')}
 
         collector = TRF5Collector(
             client=TRF5Client(),
@@ -179,13 +180,15 @@ def trf5_task(**kwargs):
         )
         handler   = base.ContentHandler(output=output)
         snapshot = base.Snapshot(keys=filters)
+        
 
         base.get_default_runner(
             collector=collector,
             output=output,
             handler=handler,
             logger=logger,
-            max_workers=8) \
+            max_workers=8,
+            runner_options=runner_options) \
             .run(snapshot=snapshot)
 
 
@@ -203,6 +206,7 @@ def trf5_task(**kwargs):
 @click.option('--split-tasks',
   default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 @click.option('--skip-full' ,    default=False,    help='Collects metadata only'  , is_flag=True)
+@click.option('--skip-cache' ,    default=False,    help='Starts collection from the beginning'  , is_flag=True)
 def trf5_command(**kwargs):
   if kwargs.get('enqueue'):
     if kwargs.get('split_tasks'):
