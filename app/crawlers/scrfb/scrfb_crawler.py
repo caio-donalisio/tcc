@@ -56,7 +56,9 @@ class SCRFBClient:
     count_tag = soup.find('ul', attrs={'class': 'pagination total-regs-encontrados'})
     if count_tag:
       count = re.search(r'\s*Total de atos localizados:\s*(\d+)[\s\n].*', count_tag.text)
-      count = int(count.group(1)) if count else 0
+      if not count:
+        raise Exception('Failed to fetch count of documents')
+      count = int(count.group(1))
     else:
       count = 0
     return count
@@ -189,9 +191,13 @@ class SCRFBChunk(base.Chunk):
     aux_url = '/link.action'
     response = requests.get(f'{base_url}{aux_url}', params={
         'visao': 'anotado', 'idAto': act_id})
+
+    def check_pdf_in_text(text) -> bool:
+      return text and 'pdf' in text
+
     if response.status_code == 200:
       soup = utils.soup_by_content(response.text)
-      pdf_link = soup.find('a', text=lambda text: text and 'pdf' in text)
+      pdf_link = soup.find('a', text=check_pdf_in_text)
       pdf_url = f'{base_url}/{pdf_link["href"]}' if pdf_link else None
       return response.text, pdf_url
 
