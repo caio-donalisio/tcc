@@ -33,7 +33,7 @@ def store(path, contents):
 def store_on_gs(path, contents):
   urlparts = urlparse(path)
   bucket_name = urlparts.netloc
-  blob_name   = urlparts.path.lstrip('/')
+  blob_name = urlparts.path.lstrip('/')
   bucket = get_bucket_ref(bucket_name)
   blob = bucket.blob(blob_name)
   blob.upload_from_string(contents)

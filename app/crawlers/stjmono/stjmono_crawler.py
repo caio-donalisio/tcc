@@ -1,3 +1,4 @@
+import fake_useragent
 import re
 import pendulum
 import click
@@ -83,89 +84,89 @@ DEFAULT_PDF_HEADERS = {
     'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
     'sec-ch-ua-mobile': '?1',
     'sec-ch-ua-platform': '"Android"',
-    
+
 }
 
 
-def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
+def get_filters(start_date: pendulum.DateTime, end_date: pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
   return {
-# 'pesquisaAmigavel':'+%3Cb%3EPublica%E7%E3o%3A+01%2F02%2F2022+a+01%2F03%2F2022%3C%2Fb%3E',
-'acao': 'pesquisar',
-'novaConsulta': 'true',
-# 'i': 1,
-'b': 'DTXT',
-'livre': '',
-'filtroPorOrgao': '',
-'filtroPorMinistro': '',
-'filtroPorNota': '',
-'data': date_filter,
-'operador': 'e',
-'p': 'true',
-'tp': 'T',
-'processo': '',
-'classe': '',
-'uf': '',
-'relator': '',
-'dtpb': date_filter,
-'dtpb1':start_date.format(DATE_FORMAT_2),
-'dtpb2':end_date.format(DATE_FORMAT_2),
-'dtde': '',
-'dtde1': '',
-'dtde2': '',
-'orgao': '',
-'ementa': '',
-'nota': '',
-'ref': '',
+      # 'pesquisaAmigavel':'+%3Cb%3EPublica%E7%E3o%3A+01%2F02%2F2022+a+01%2F03%2F2022%3C%2Fb%3E',
+      'acao': 'pesquisar',
+      'novaConsulta': 'true',
+      # 'i': 1,
+      'b': 'DTXT',
+      'livre': '',
+      'filtroPorOrgao': '',
+      'filtroPorMinistro': '',
+      'filtroPorNota': '',
+      'data': date_filter,
+      'operador': 'e',
+      'p': 'true',
+      'tp': 'T',
+      'processo': '',
+      'classe': '',
+      'uf': '',
+      'relator': '',
+      'dtpb': date_filter,
+      'dtpb1': start_date.format(DATE_FORMAT_2),
+      'dtpb2': end_date.format(DATE_FORMAT_2),
+      'dtde': '',
+      'dtde1': '',
+      'dtde2': '',
+      'orgao': '',
+      'ementa': '',
+      'nota': '',
+      'ref': '',
   }
 
-import fake_useragent
 
-def get_row_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
+def get_row_filters(start_date: pendulum.DateTime, end_date: pendulum.DateTime):
   date_filter = f'@DTPB >= "{start_date.format(DATE_FORMAT_1)}" E @DTPB <= "{end_date.format(DATE_FORMAT_1)}"'
   return {
-    'numDocsPagina': '50',
-    'tipo_visualizacao': '',
-    'filtroPorNota': '',
-    'ref': '',
-    'p': 'true',
-    'b': 'DTXT',
-    'data': date_filter,
-    # 'i': '11',
-    # 'l': '10',
-    'tp': 'T',
-    'operador': 'E',
-}
+      'numDocsPagina': '50',
+      'tipo_visualizacao': '',
+      'filtroPorNota': '',
+      'ref': '',
+      'p': 'true',
+      'b': 'DTXT',
+      'data': date_filter,
+      # 'i': '11',
+      # 'l': '10',
+      'tp': 'T',
+      'operador': 'E',
+  }
+
 
 class STJMONOClient:
 
   def __init__(self):
-    self.base_url  = 'https://scon.stj.jus.br'
+    self.base_url = 'https://scon.stj.jus.br'
     self.requester = requests.Session()
     self.requester.headers = DEFAULT_COUNT_HEADERS
     self.requester.get("https://scon.stj.jus.br/SCON/", verify=False)
 
   def reset_session(self, headers=DEFAULT_COUNT_HEADERS):
     self.requester = requests.Session()
-    self.requester.headers = {**headers, 'User-Agent':utils.get_random_useragent()}
-    self.requester.get("https://scon.stj.jus.br/SCON/", 
-      verify=False)
+    self.requester.headers = {**headers, 'User-Agent': utils.get_random_useragent()}
+    self.requester.get("https://scon.stj.jus.br/SCON/",
+                       verify=False)
 
   @utils.retryable(max_retries=9)
   def count(self, filters):
 
     params = {
-    'data': filters['data'],
-    'b': 'DTXT',
-    'p': 'true',
-    'tp': 'T',
+        'data': filters['data'],
+        'b': 'DTXT',
+        'p': 'true',
+        'tp': 'T',
     }
     response = self.requester.get('https://scon.stj.jus.br/SCON/pesquisar.jsp',
-      params=params)
+                                  params=params)
     try:
       self.validate_count_content(response.text)
     except Exception as e:
-      self.reset_session({**DEFAULT_COUNT_HEADERS,'User-Agent': f'{utils.get_random_useragent()}'})
+      self.reset_session({**DEFAULT_COUNT_HEADERS, 'User-Agent': f'{utils.get_random_useragent()}'})
       raise utils.PleaseRetryException(e)
     return self._count_by_content(response.content)
 
@@ -174,32 +175,31 @@ class STJMONOClient:
     import urllib
 
     response = self.requester.post(
-      f'{self.base_url}/SCON/decisoes/toc.jsp',
-      headers={
-        **DEFAULT_ROWS_HEADERS,
-    **{
-      'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
-      'User-Agent': f'{utils.get_random_useragent()}',
-    },
- },
-      verify=False,
-      data=data,)
+        f'{self.base_url}/SCON/decisoes/toc.jsp',
+        headers={
+            **DEFAULT_ROWS_HEADERS,
+            **{
+                'Referer': 'https://scon.stj.jus.br/SCON/jurisprudencia/toc.jsp',
+                'User-Agent': f'{utils.get_random_useragent()}',
+            },
+        },
+        verify=False,
+        data=data,)
     soup = utils.soup_by_content(response.content)
 
     if soup.find('div', id='idCaptchaLinha') or \
-        soup.find(text=re.compile(r'.*CAPTCHA.*')):
+            soup.find(text=re.compile(r'.*CAPTCHA.*')):
       logger.warn('Got captcha -- reseting session.')
       self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
 
     info = soup.find('span', {'class': 'numDocs'}) or \
-      soup.find('div', {'class':'erroMensagem'})
+        soup.find('div', {'class': 'erroMensagem'})
     if not info:
       logger.warn('Got invalid page -- reseting session.')
       self.reset_session(DEFAULT_ROWS_HEADERS)
       raise utils.PleaseRetryException()
     return response
-
 
   @utils.retryable(max_retries=9)
   def fetch_rows(self, filters, offset):
@@ -209,78 +209,81 @@ class STJMONOClient:
   def validate_count_content(self, content, skip_document_not_found=True):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
-    errorMessage = soup.find('div', {'class':'erroMensagem'})
-    if errorMessage:
-      if not(skip_document_not_found and errorMessage.getText().strip() == "Nenhum documento encontrado!"):
-        raise Exception(f'Error message found: {errorMessage.getText()}')
+    errorMessage = soup.find('div', {'class': 'erroMensagem'})
 
     if soup.find(text=re.compile(r'.*CAPTCHA.*')):
       raise Exception('Captcha found - retrying...')
 
-    if not info:
+    filterWithDocs = True
+    if errorMessage:
+      filterWithDocs = not (errorMessage.getText().strip() == "Nenhum documento encontrado!")
+      if filterWithDocs and not skip_document_not_found:
+        raise Exception(f'Error message found: {errorMessage.getText()}')
+
+    if filterWithDocs and not info:
       raise Exception('Could not load page - retrying...')
 
-  def _count_by_content(self, content, skip_document_not_found:bool=True):
+  def _count_by_content(self, content):
     soup = utils.soup_by_content(content)
     info = soup.find('span', text=re.compile(r'.*monocrátic.*'))
     return int(utils.extract_digits(info.text)) if info else 0
 
+
 class STJMONOCollector(base.ICollector):
 
-  def __init__(self, client : STJMONOClient, query : dict, **options):
-    self.client  = client
-    self.query   = query
+  def __init__(self, client: STJMONOClient, query: dict, **options):
+    self.client = client
+    self.query = query
     self.options = (options or {})
 
   def count(self) -> int:
     return self.client.count(get_filters(
-      self.query['start_date'], self.query['end_date']))
+        self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
+    import time
     ranges = list(utils.timely(
-      self.query['start_date'], self.query['end_date'], unit='days', step=1))
+        self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
+    docs_per_page = 50
     for start_date, end_date in reversed(ranges):
       filters = get_row_filters(start_date, end_date)
-      count   = self.client.count(filters)
+      count = self.client.count(filters)
 
-      docs_per_page = 50
-      for offset in range(0, count + 1, docs_per_page):
-        offset = docs_per_page if not offset else offset + 1
+      for page in range(0, count, docs_per_page):
+        offset = docs_per_page if not page else page + 1
         keys =\
-          {'start_date' : start_date.to_date_string(),
-            'end_date'  : end_date.to_date_string(),
-            'offset'    : offset if offset else docs_per_page,
-            'limit'     : count + 1}
+            {'start_date': start_date.to_date_string(),
+             'end_date': end_date.to_date_string(),
+             'offset': offset,
+             'limit': count}
 
-        import time
         time.sleep(1.5)
         yield STJMONOChunk(keys=keys,
-          client=self.client,
-          filters=filters,
-          docs_per_page=docs_per_page,
-          limit=count + 1,
-          prefix=f'{start_date.year}/{start_date.month:02d}/')
+                           client=self.client,
+                           filters=filters,
+                           docs_per_page=docs_per_page,
+                           limit=count,
+                           prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class STJMONOChunk(base.Chunk):
 
   def __init__(self, keys, client, filters, docs_per_page, limit, prefix):
     super(STJMONOChunk, self).__init__(keys, prefix)
-    self.client  = client
+    self.client = client
     self.filters = filters
-    self.docs_per_page   = docs_per_page
-    self.limit   = limit
-
+    self.docs_per_page = docs_per_page
+    self.limit = limit
 
   @utils.retryable(max_retries=3)
   def rows(self):
 
     response = self.client.fetch_rows({
-      **self.filters, **{'l': self.docs_per_page, 'numDocsPagina': self.docs_per_page}},
-      offset=self.keys['offset'])
+        **self.filters, **{'l': self.docs_per_page, 'numDocsPagina': self.docs_per_page}},
+        offset=self.keys['offset'])
 
-    soup  = utils.soup_by_content(response.content)
+    soup = utils.soup_by_content(response.content)
     self.client.validate_count_content(response.content)
     count = self.client._count_by_content(response.content)
 
@@ -293,23 +296,22 @@ class STJMONOChunk(base.Chunk):
   @utils.retryable(max_retries=3)
   def page_contents(self, soup):
 
-
     @utils.retryable(max_retries=3)
     def _get_pdf_urls(doc):
       BASE_PDF_URL = "https://processo.stj.jus.br"
-      a = doc.find('a',attrs={'title':'Decisão Monocrática Certificada'})
-      a = a or doc.find('a',attrs={'original-title':'Decisão Monocrática Certificada'})
+      a = doc.find('a', attrs={'title': 'Decisão Monocrática Certificada'})
+      a = a or doc.find('a', attrs={'original-title': 'Decisão Monocrática Certificada'})
       # a = a or doc.find('a',attrs={'data-bs-original-title':'Decisão Monocrática Certificada'})
-          
+
       session = requests.Session()
       pdfs_page = utils.get_response(
-        logger,
-        session,
-        utils.find_between(a['href'], start="'", end="'"),
-        {
-          **DEFAULT_PDF_HEADERS,
-          'User-Agent': f'{utils.get_random_useragent()}'},
-        verify=False
+          logger,
+          session,
+          utils.find_between(a['href'], start="'", end="'"),
+          {
+              **DEFAULT_PDF_HEADERS,
+              'User-Agent': f'{utils.get_random_useragent()}'},
+          verify=False
       )
       a_s = utils.soup_by_content(pdfs_page.text).find_all('a', text='Decisão Monocrática')
       pdf_links = [BASE_PDF_URL + utils.find_between(a['href'], start="'", end="'") for a in a_s]
@@ -317,7 +319,6 @@ class STJMONOChunk(base.Chunk):
         logger.warn(f'No document found. {str(doc)[:200]}')
         raise utils.PleaseRetryException('No PDFs found - retrying...')
       return pdf_links
-
 
     @utils.retryable(max_retries=3)
     def get_direct_links(pdf_links: List) -> List:
@@ -332,7 +333,7 @@ class STJMONOChunk(base.Chunk):
       return direct_links
 
     def append_metadata(doc, doc_count):
-      new_tag=bs4.Tag(name='div', attrs={'class':'expected-count'})
+      new_tag = bs4.Tag(name='div', attrs={'class': 'expected-count'})
       new_tag.append(f'Number of expected documents: {doc_count}')
       doc.insert(1, new_tag)
       return doc
@@ -345,111 +346,104 @@ class STJMONOChunk(base.Chunk):
 
       to_download = []
 
-      #Checks if all num_registros are equal - should be.
+      # Checks if all num_registros are equal - should be.
       try:
         assert all(
-          utils.get_param_from_url(pdf_urls[0], 'num_registro') == utils.get_param_from_url(url, 'num_registro')
-          for url in pdf_urls)
+            utils.get_param_from_url(pdf_urls[0], 'num_registro') == utils.get_param_from_url(url, 'num_registro')
+            for url in pdf_urls)
       except AssertionError:
         logger.error(f'Found links with different num_registro. Skipped. {pdf_urls=}')
         continue
 
-      #Número processo
-      act_id  = utils.get_param_from_url(pdf_urls[0], 'num_registro')
+      # Número processo
+      act_id = utils.get_param_from_url(pdf_urls[0], 'num_registro')
 
-      #Seq
+      # Seq
       seq = utils.get_param_from_url(pdf_urls[0], 'sequencial')
 
-      #Date
+      # Date
       publication_date = utils.get_param_from_url(pdf_urls[0], 'data')
       date_obj = pendulum.from_format(publication_date, 'YYYYMMDD')
       day, month, year = date_obj.format('DD'), date_obj.format('MM'), date_obj.format('YYYY')
 
-      #Componente
+      # Componente
       componente = utils.get_param_from_url(pdf_urls[0], 'componente')
       if componente != "MON":
         logger.warn(f'Componente is not MON: {act_id=} {componente=} {seq=}')
 
-      #Meta Hash
-      meta_hash = utils.get_content_hash(doc, [{'name':'p'}])
+      # Meta Hash
+      meta_hash = utils.get_content_hash(doc, [{'name': 'p'}])
 
-      #Make filename
+      # Make filename
       filename = f'{year}/{month}/{day}_{componente}_{act_id}_{meta_hash}'
 
       time.sleep(0.3)
 
-      #Get PDF data
+      # Get PDF data
       if expected_doc_count > 1:
         logger.warn(f'Found {expected_doc_count} documents, expected 1. {act_id=}')
         for n, pdf_url in enumerate(get_direct_links(pdf_urls), start=1):
           to_download.append(base.ContentFromURL(
-            src=pdf_url, dest=f'{filename}_{n:02}.pdf', content_type='application/pdf')
-            )
+              src=pdf_url, dest=f'{filename}_{n:02}.pdf', content_type='application/pdf')
+          )
 
       elif expected_doc_count == 1:
         to_download.append(base.ContentFromURL(
-          src=get_direct_links(pdf_urls).pop(), dest=f'{filename}.pdf', content_type='application/pdf')
-          )
+            src=get_direct_links(pdf_urls).pop(), dest=f'{filename}.pdf', content_type='application/pdf')
+        )
 
-    #Get Metadata
+    # Get Metadata
       to_download.append(
-            base.Content(
+          base.Content(
               content=append_metadata(doc, expected_doc_count).prettify(),
               dest=f'{filename}.html',
               content_type='text/html'))
 
       yield to_download
 
-@celery.task(queue='crawlers.stjmono', default_retry_delay=5 * 60,
+
+@celery.task(name='crawlers.stjmono', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
 def stjmono_task(start_date, end_date, output_uri):
   setup_cloud_logger(logger)
 
   from app.crawlers.logutils import logging_context
 
-  with logging_context(crawler='STJMONO'):
+  with logging_context(crawler='stjmono'):
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger.info(f'Output: {output}.')
 
     start_date, end_date =\
-      pendulum.parse(start_date), pendulum.parse(end_date)
+        pendulum.parse(start_date), pendulum.parse(end_date)
 
     query_params = {'start_date': start_date, 'end_date': end_date}
     collector = STJMONOCollector(client=STJMONOClient(), query=query_params)
-    handler   = base.ContentHandler(output=output)
+    handler = base.ContentHandler(output=output)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(
         collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
-      .run(snapshot=snapshot)
+        .run(snapshot=snapshot)
 
 
 @cli.command(name='stjmono')
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def stjmono_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def stjmono_command(**kwargs):
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
   if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
-        task_id = stjmono_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      stjmono_task.delay(*args)
+    utils.enqueue_tasks(stjmono_task, split_tasks, **kwargs)
   else:
-    stjmono_task(*args)
+    stjmono_task(**kwargs)

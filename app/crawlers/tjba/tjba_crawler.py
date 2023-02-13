@@ -17,27 +17,27 @@ with open('app/crawlers/tjba/query.graphql', 'r') as f:
   graphql_query = gql(f.read())
 
 
-def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
+def get_filters(start_date: pendulum.DateTime, end_date: pendulum.DateTime):
   return {
-    'assunto': '',
-    'orgaos': [],
-    'relatores': [],
-    'classes': [],
-    'dataInicial': start_date.start_of('day').to_iso8601_string(),
-    'dataFinal': end_date.end_of('day').to_iso8601_string(),
-    'segundoGrau': True,
-    'turmasRecursais': True,
-    'tipoAcordaos': True,
-    'tipoDecisoesMonocraticas': False,
-    'ordenadoPor': 'dataPublicacao'
+      'assunto': '',
+      'orgaos': [],
+      'relatores': [],
+      'classes': [],
+      'dataInicial': start_date.start_of('day').to_iso8601_string(),
+      'dataFinal': end_date.end_of('day').to_iso8601_string(),
+      'segundoGrau': True,
+      'turmasRecursais': True,
+      'tipoAcordaos': True,
+      'tipoDecisoesMonocraticas': False,
+      'ordenadoPor': 'dataPublicacao'
   }
 
 
 class TJBAClient:
   def __init__(self):
-    self.transport  = RequestsHTTPTransport(
-      url="https://jurisprudenciaws.tjba.jus.br/graphql",
-      verify=False, retries=3, timeout=60)
+    self.transport = RequestsHTTPTransport(
+        url="https://jurisprudenciaws.tjba.jus.br/graphql",
+        verify=False, retries=3, timeout=60)
     self.gql_client = Client(transport=self.transport)
 
   @utils.retryable(max_retries=3)
@@ -49,9 +49,9 @@ class TJBAClient:
   def fetch(self, filters, page_number=0, items_per_page=10):
     try:
       params = {
-        'decisaoFilter': filters,
-        'pageNumber': page_number,
-        'itemsPerPage': items_per_page,
+          'decisaoFilter': filters,
+          'pageNumber': page_number,
+          'itemsPerPage': items_per_page,
       }
       return self.gql_client.execute(graphql_query, variable_values=params)
     except Exception as e:
@@ -63,7 +63,7 @@ class TJBAClient:
     item_count = self.count(filters)
     page_count = math.ceil(item_count / items_per_page)
     return Paginator(self, filters=filters, item_count=item_count, page_count=page_count,
-      items_per_page=items_per_page)
+                     items_per_page=items_per_page)
 
 
 class Paginator:
@@ -84,7 +84,7 @@ class Paginator:
 
   def page(self, number):
     return self.client.fetch(
-      filters=self._filters, page_number=number, items_per_page=self._items_per_page)
+        filters=self._filters, page_number=number, items_per_page=self._items_per_page)
 
   def __repr__(self):
     return f'Paginator(item_count={self._item_count}, page_count={self._page_count})'
@@ -92,42 +92,42 @@ class Paginator:
 
 class TJBACollector(base.ICollector):
 
-  def __init__(self, client : TJBAClient, query : dict, **options):
-    self.client  = client
-    self.query   = query
+  def __init__(self, client: TJBAClient, query: dict, **options):
+    self.client = client
+    self.query = query
     self.options = (options or {})
 
   def count(self) -> int:
     return self.client.count(get_filters(
-      self.query['start_date'], self.query['end_date']))
+        self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
     ranges = list(utils.timely(
-      self.query['start_date'], self.query['end_date'], unit='days', step=1))
+        self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
     for start_date, end_date in reversed(ranges):
       filters = get_filters(start_date, end_date)
       keys =\
-        {'start_date': start_date.to_date_string(),
-         'end_date'  : end_date.to_date_string(),
-         'total': self.client.count(filters)}
+          {'start_date': start_date.to_date_string(),
+           'end_date': end_date.to_date_string(),
+           'total': self.client.count(filters)}
 
       yield TJBAChunk(keys=keys,
-        client=self.client,
-        filters=filters,
-        prefix=f'{start_date.year}/{start_date.month:02d}/')
+                      client=self.client,
+                      filters=filters,
+                      prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class TJBAChunk(base.Chunk):
 
   def __init__(self, keys, client, filters, prefix):
     super(TJBAChunk, self).__init__(keys, prefix)
-    self.client  = client
+    self.client = client
     self.filters = filters
 
   @utils.retryable(max_retries=3)
   def rows(self):
-    count  = self.client.count(self.filters)
+    count = self.client.count(self.filters)
     if count == 0:
       return
 
@@ -136,20 +136,19 @@ class TJBAChunk(base.Chunk):
     for record in result['filter']['decisoes']:
       published_at = pendulum.parse(record['dataPublicacao'])
       doc_hash = record['hash']
-      doc_id   = record['id']
+      doc_id = record['id']
 
-      base_path   = f'{published_at.year}/{published_at.month:02d}'
+      base_path = f'{published_at.year}/{published_at.month:02d}'
       dest_record = f"{base_path}/doc_{doc_id}_{doc_hash}.json"
       dest_report = f"{base_path}/doc_{doc_id}_{doc_hash}_report"
-      report_url  =\
-        f'https://jurisprudenciaws.tjba.jus.br/inteiroTeor/{doc_hash}'
-
+      report_url =\
+          f'https://jurisprudenciaws.tjba.jus.br/inteiroTeor/{doc_hash}'
 
       if doc_hash is not None:
         yield [
-          base.Content(content=json.dumps(record), dest=dest_record,
-            content_type='application/json'),
-          base.ContentFromURL(src=report_url, dest=dest_report)
+            base.Content(content=json.dumps(record), dest=dest_record,
+                         content_type='application/json'),
+            base.ContentFromURL(src=report_url, dest=dest_report)
         ]
       else:
         logger.warn(f'Inteiro not available for {base_path=} {doc_id=}')
@@ -168,44 +167,36 @@ def tjba_task(start_date, end_date, output_uri):
     logger.info(f'Output: {output}.')
 
     start_date, end_date =\
-      pendulum.parse(start_date), pendulum.parse(end_date)
+        pendulum.parse(start_date), pendulum.parse(end_date)
 
     query_params = {'start_date': start_date, 'end_date': end_date}
     collector = TJBACollector(client=TJBAClient(), query=query_params)
-    handler   = base.ContentHandler(output=output)
+    handler = base.ContentHandler(output=output)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(
         collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
-      .run(snapshot=snapshot)
+        .run(snapshot=snapshot)
 
 
 @cli.command(name='tjba')
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def tjba_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def tjba_command(**kwargs):
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
   if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
-        task_id = tjba_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjba_task.delay(*args)
+    utils.enqueue_tasks(tjba_task, split_tasks, **kwargs)
   else:
-    tjba_task(*args)
+    tjba_task(**kwargs)

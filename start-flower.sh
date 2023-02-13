@@ -1,2 +1,2 @@
 #!/bin/sh
-celery -A tasks flower --port=5555 --detach
+celery -A app.celery_run.celery_app flower --port=5555 --detach

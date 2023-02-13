@@ -26,10 +26,10 @@ class TRF4(base.BaseCrawler):
     super(TRF4, self).__init__(params, output, logger, **options)
     self.requester = requests.Session()
     self.header_generator = utils.HeaderGenerator(
-      origin='https://jurisprudencia.trf4.jus.br', xhr=False)
+        origin='https://jurisprudencia.trf4.jus.br', xhr=False)
     self.referendaries = None
-    self.orgs          = None
-    self.classes       = None
+    self.orgs = None
+    self.classes = None
 
   def run_for_seq(self, start, end):
     ids = []
@@ -40,7 +40,7 @@ class TRF4(base.BaseCrawler):
     params = {}
 
     partition_size = 50
-    partitions  = [ids[i:i + partition_size] for i in range(0, len(ids), partition_size)]
+    partitions = [ids[i:i + partition_size] for i in range(0, len(ids), partition_size)]
     logger.info(f'Partitions {len(partitions)}.')
 
     def rows_generator(pagination, params, records):
@@ -50,73 +50,73 @@ class TRF4(base.BaseCrawler):
     for partition in partitions:
       records = len(partition)
       pagination = {
-        'total': records,
-        'vetPaginacao': ','.join(partition)
+          'total': records,
+          'vetPaginacao': ','.join(partition)
       }
 
       chunk = utils.Chunk(
-        params={'ids': ','.join(partition)},
-        output=self.output,
-        rows_generator=rows_generator(pagination, params, records),
-        prefix=f'by_ids/')
+          params={'ids': ','.join(partition)},
+          output=self.output,
+          rows_generator=rows_generator(pagination, params, records),
+          prefix=f'by_ids/')
       chunks.append(chunk)
 
     runner = base.Runner(
-      chunks_generator=chunks,
-      row_to_futures=self.handle,
-      total_records=len(ids),
-      logger=logger,
-      max_workers=6,
+        chunks_generator=chunks,
+        row_to_futures=self.handle,
+        total_records=len(ids),
+        logger=logger,
+        max_workers=6,
     )
     runner.run()
 
   def run(self):
     total_records = self.count(params=self._get_query_params(
-      dataIni=self.params['start_date'].strftime(DATE_FORMAT),
-      dataFim=self.params['end_date'].strftime(DATE_FORMAT),
-      docsPagina=10
+        dataIni=self.params['start_date'].strftime(DATE_FORMAT),
+        dataFim=self.params['end_date'].strftime(DATE_FORMAT),
+        docsPagina=10
     ))
 
     # range of ids cause some might be deleted changed on their base
     self.referendaries = self._get_referendaries()
-    max_referendary_id   = max([int(c) for c in self.referendaries])
+    max_referendary_id = max([int(c) for c in self.referendaries])
     self.referendaries = [str(cls) for cls in range(1, max_referendary_id + 1)]
 
     # same for organizations
-    self.orgs     = self._get_orgs()
-    max_orgs_id   = max([int(c) for c in self.orgs])
-    self.orgs     = [str(cls) for cls in range(1, max_orgs_id + 1)]
+    self.orgs = self._get_orgs()
+    max_orgs_id = max([int(c) for c in self.orgs])
+    self.orgs = [str(cls) for cls in range(1, max_orgs_id + 1)]
 
     # classes as well
-    self.classes  = self._get_classes()
-    max_cls_id    = max([int(c) for c in self.classes])
-    self.classes  = [str(cls) for cls in range(1, max_cls_id + 10)]
+    self.classes = self._get_classes()
+    max_cls_id = max([int(c) for c in self.classes])
+    self.classes = [str(cls) for cls in range(1, max_cls_id + 10)]
 
     total_filtered = sum([
-      self.count(params=self._get_query_params(
-        arrorgaos=org,
-        dataIni=self.params['start_date'].strftime(DATE_FORMAT),
-        dataFim=self.params['end_date'].strftime(DATE_FORMAT),
-        docsPagina=10
-      )) for org in self.orgs
+        self.count(params=self._get_query_params(
+            arrorgaos=org,
+            dataIni=self.params['start_date'].strftime(DATE_FORMAT),
+            dataFim=self.params['end_date'].strftime(DATE_FORMAT),
+            docsPagina=10
+        )) for org in self.orgs
     ])
 
     if total_records != total_filtered:
       with sentry_sdk.push_scope() as scope:
         scope.set_extra('crawler', 'TRF4')
         scope.set_extra('total_unfiltered', total_records)
-        scope.set_extra('total_filtered'  , total_filtered)
+        scope.set_extra('total_filtered', total_filtered)
         scope.set_extra('params', self.params)
         sentry_sdk.capture_message('Count does not match', 'warning')
         logger.warn(
-          f'Count does not match. Expecting {total_records} got {total_filtered}.')
+            f'Count does not match. Expecting {total_records} got {total_filtered}.')
 
     runner = base.Runner(
-      chunks_generator=self.chunks(),
-      row_to_futures=self.handle,
-      total_records=total_records,
-      logger=logger,
-      max_workers=6,
+        chunks_generator=self.chunks(),
+        row_to_futures=self.handle,
+        total_records=total_records,
+        logger=logger,
+        max_workers=6,
     )
     runner.run()
 
@@ -126,19 +126,19 @@ class TRF4(base.BaseCrawler):
     for event in events:
       if isinstance(event, base.Content):
         args = {
-          'filepath': event.dest,
-          'contents': event.content,
-          'content_type': event.content_type,
-          'mode': 'w',
+            'filepath': event.dest,
+            'contents': event.content,
+            'content_type': event.content_type,
+            'mode': 'w',
         }
         yield self.output.save_from_contents, args
       elif isinstance(event, base.ContentFromURL):
         yield download_from_url, {
-          'url': event.src,
-          'dest': event.dest,
-          'write_mode': 'wb',
-          'content_type': event.content_type,
-          'output_uri': self.output.uri
+            'url': event.src,
+            'dest': event.dest,
+            'write_mode': 'wb',
+            'content_type': event.content_type,
+            'output_uri': self.output.uri
         }
       else:
         raise Exception('Unable to handle ', event)
@@ -146,38 +146,38 @@ class TRF4(base.BaseCrawler):
   @utils.retryable(max_retries=9)  # type: ignore
   def count(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=60)
+                                   data=params, headers=self.header_generator.generate(), timeout=60)
     return self._extract_count_from_text(response.text)
 
   @utils.retryable(max_retries=9)  # type: ignore
   def _vet_pagination(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=60)
+                                   data=params, headers=self.header_generator.generate(), timeout=60)
     soup = utils.soup_by_content(response.text)
     vet_pagination = soup.find('input', {'type': 'hidden', 'id': 'vetPaginacao'})
     return {
-      'total': self._extract_count_from_text(response.text),
-      'vetPaginacao': (vet_pagination['value'] if vet_pagination else '')
+        'total': self._extract_count_from_text(response.text),
+        'vetPaginacao': (vet_pagination['value'] if vet_pagination else '')
     }
 
   def chunks(self):
     ranges = list(utils.timely(
-      self.params['start_date'], self.params['end_date'], unit='weeks', step=2))
+        self.params['start_date'], self.params['end_date'], unit='weeks', step=2))
 
     for start_date, end_date in reversed(ranges):
       for org in self.orgs:
         chunk_params = {
-          'start_date'  : start_date.to_date_string(),
-          'end_date'    : end_date.to_date_string(),
-          'org'         : org,
+            'start_date': start_date.to_date_string(),
+            'end_date': end_date.to_date_string(),
+            'org': org,
         }
         rows_generator =\
-          self.rows(start_date=start_date, end_date=end_date, arrorgaos=org)
+            self.rows(start_date=start_date, end_date=end_date, arrorgaos=org)
         yield utils.Chunk(
-          params=chunk_params,
-          output=self.output,
-          rows_generator=rows_generator,
-          prefix=f'{start_date.year}/{end_date.month:02d}/')
+            params=chunk_params,
+            output=self.output,
+            rows_generator=rows_generator,
+            prefix=f'{start_date.year}/{end_date.month:02d}/')
 
         time.sleep(.1)
       time.sleep(.5)
@@ -202,25 +202,25 @@ class TRF4(base.BaseCrawler):
 
     for page in range(len(expected_docs_per_page)):
       req_params = {**params, **{
-        'checkTabela': 'true',
-        'selEscolhaPagina': page,
-        'pesquisaLivre': '',
-        'registrosSelecionados': '',
-        'vetPaginacao': pagination['vetPaginacao'],
-        'paginaAtual': page,
-        'totalRegistros': pagination['total'],
-        'rdoCampoPesquisa': 'I',
-        'chkAcordaos': 'on',
-        'chkDecMono': '',
-        'textoPesqLivre': '',
-        'chkDocumentosSelecionados': '',
-        'numProcesso': '',
-        'tipodata': 'DEC',
-        'docsPagina': '50',
-        'arrorgaos': '',
-        'arrclasses': '',
-        'hdnAcao': '',
-        'hdnTipo': 1
+          'checkTabela': 'true',
+          'selEscolhaPagina': page,
+          'pesquisaLivre': '',
+          'registrosSelecionados': '',
+          'vetPaginacao': pagination['vetPaginacao'],
+          'paginaAtual': page,
+          'totalRegistros': pagination['total'],
+          'rdoCampoPesquisa': 'I',
+          'chkAcordaos': 'on',
+          'chkDecMono': '',
+          'textoPesqLivre': '',
+          'chkDocumentosSelecionados': '',
+          'numProcesso': '',
+          'tipodata': 'DEC',
+          'docsPagina': '50',
+          'arrorgaos': '',
+          'arrclasses': '',
+          'hdnAcao': '',
+          'hdnTipo': 1
       }}
       text = self._make_request(req_params)
 
@@ -233,13 +233,13 @@ class TRF4(base.BaseCrawler):
       rows.extend(self._extract_rows(text, expects=expects, params=params))
 
     assert len(rows) == pagination['total'], \
-      f"got {len(rows)} was expecting {pagination['total']}"
+        f"got {len(rows)} was expecting {pagination['total']}"
     return rows
 
   @utils.retryable(max_retries=3)
   def _make_request(self, params):
     response = self.requester.post('https://jurisprudencia.trf4.jus.br/pesquisa/resultado_pesquisa.php',
-      data=params, headers=self.header_generator.generate(), timeout=60)
+                                   data=params, headers=self.header_generator.generate(), timeout=60)
 
     if response.status_code != 200:
       logger.warn(f'Got {response.status_code} for {params}')
@@ -253,7 +253,7 @@ class TRF4(base.BaseCrawler):
     docs = defaultdict(list)
     docs_judgment_date = {}
     docs_urls = {}
-    docs_ids  = {}
+    docs_ids = {}
 
     doc_index = None
 
@@ -272,10 +272,10 @@ class TRF4(base.BaseCrawler):
 
         # Figure out judgment date -- will use it as date ref.
         if 'Inteiro Teor:' in col_value.get_text() and \
-            col_label.get_text() in ['Acórdão', 'DecisãoMonocrática']:
+                col_label.get_text() in ['Acórdão', 'DecisãoMonocrática']:
           judgment_date_match =\
-            re.match(r'.*Data da Decisão: (\d{2}/\d{2}/\d{4}).*', col_value.get_text(),
-                    re.MULTILINE | re.DOTALL)
+              re.match(r'.*Data da Decisão: (\d{2}/\d{2}/\d{4}).*', col_value.get_text(),
+                       re.MULTILINE | re.DOTALL)
           if judgment_date_match:
             assert docs_judgment_date.get(doc_index) is None
             docs_judgment_date[doc_index] = judgment_date_match.group(1)
@@ -297,8 +297,8 @@ class TRF4(base.BaseCrawler):
 
     for key, cols in docs.items():
       doc_date = docs_judgment_date[key]
-      doc_url  = docs_urls[key]
-      doc_id   = docs_ids[key]
+      doc_url = docs_urls[key]
+      doc_id = docs_ids[key]
       assert doc_url
       assert doc_date
       assert doc_id
@@ -307,22 +307,22 @@ class TRF4(base.BaseCrawler):
       base_path = f'{year}/{month}'
       doc_html = '\n'.join([col.prettify() for col in cols])
       yield [
-        base.Content(content=doc_html,
-                     dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
-        # base.Content(content=doc_url,
-        #   dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
-        base.ContentFromURL(src=doc_url,
-                            dest=f'{base_path}/{doc_id}_INTEIRO.html', content_type='text/html')
+          base.Content(content=doc_html,
+                       dest=f'{base_path}/{doc_id}_row.html', content_type='text/html'),
+          # base.Content(content=doc_url,
+          #   dest=f'{base_path}/{doc_id}_url.txt', content_type='text/plain')
+          base.ContentFromURL(src=doc_url,
+                              dest=f'{base_path}/{doc_id}_INTEIRO.html', content_type='text/html')
       ]
 
   def _find_optimal_filters(self, start_date, end_date, **filters):
     # This site limits the number of records to 1000.
     # We must make sure it won't surpass this limit.
     default_params = self._get_query_params(
-      dataIni=start_date.strftime(DATE_FORMAT),
-      dataFim=end_date.strftime(DATE_FORMAT),
-      docsPagina=10,
-      **filters)
+        dataIni=start_date.strftime(DATE_FORMAT),
+        dataFim=end_date.strftime(DATE_FORMAT),
+        docsPagina=10,
+        **filters)
     count = self.count(default_params)
     if count == 0:
       return []
@@ -330,18 +330,18 @@ class TRF4(base.BaseCrawler):
     # Ouch! Exceeded the 1000 records limit.
     if count > 1000:
       logger.warn(
-        f'More than 1000 records found on a query (got {count}) -- finding for optimal ranges.')
+          f'More than 1000 records found on a query (got {count}) -- finding for optimal ranges.')
 
       all_params = []
 
       # Reduce the range to the minimal possible.
       params_list = [
-        self._get_query_params(
-          dataIni=start.strftime(DATE_FORMAT),
-          dataFim=end.strftime(DATE_FORMAT),
-          docsPagina=10,
-          **filters)
-        for start, end in utils.timely(start_date, end_date, unit='days', step=1)
+          self._get_query_params(
+              dataIni=start.strftime(DATE_FORMAT),
+              dataFim=end.strftime(DATE_FORMAT),
+              docsPagina=10,
+              **filters)
+          for start, end in utils.timely(start_date, end_date, unit='days', step=1)
       ]
       counts_by_params = [(params, self.count(params)) for params in params_list]
 
@@ -375,8 +375,8 @@ class TRF4(base.BaseCrawler):
 
   def _find_optimal_params_by_referendaries(self, params):
     params_list = [
-      {**self._get_query_params(**params), **{'cboRelator': referendary}}
-      for referendary in self.referendaries
+        {**self._get_query_params(**params), **{'cboRelator': referendary}}
+        for referendary in self.referendaries
     ]
     counts_by_params = [(params, self.count(params)) for params in params_list]
     return counts_by_params
@@ -387,13 +387,13 @@ class TRF4(base.BaseCrawler):
     spl = div
 
     while True:
-      n           = math.ceil(len(arr) / div)
-      arr         = random.sample(arr, len(arr))
-      partitions  = [arr[i:i + n] for i in range(0, len(arr), n)]
+      n = math.ceil(len(arr) / div)
+      arr = random.sample(arr, len(arr))
+      partitions = [arr[i:i + n] for i in range(0, len(arr), n)]
       logger.info(f'Partitions {len(partitions)} of {len(arr)}.')
       params_list = [
-        {**self._get_query_params(**params), **{'arrclasses': ','.join(partition)}}
-        for partition in partitions
+          {**self._get_query_params(**params), **{'arrclasses': ','.join(partition)}}
+          for partition in partitions
       ]
 
       counts_by_params = [(params, self.count(params)) for params in params_list]
@@ -414,12 +414,12 @@ class TRF4(base.BaseCrawler):
       scope.set_extra('params', params)
       sentry_sdk.capture_message('Impossible situation found -- ignoring', 'warning')
       logger.warn(
-        f'Impossible situation found for params {params}.')
+          f'Impossible situation found for params {params}.')
 
   def _get_referendaries(self):
     response = self.requester.get(f'{BASE_URL}/pesquisa.php?tipo=4')
     options = utils.soup_by_content(response.text) \
-      .find('select', {'id': 'cboRelator'}).find_all('option')
+        .find('select', {'id': 'cboRelator'}).find_all('option')
     return [option['value'] for option in options if len(option['value']) > 0]
 
   def _get_classes(self):
@@ -428,9 +428,9 @@ class TRF4(base.BaseCrawler):
     for classtype in classtypes:
       response = self.requester.get(f'{BASE_URL}/listar_classes.php?tipo={classtype}')
       options = utils.soup_by_content(response.text) \
-        .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
+          .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
       values.extend(
-        [option['value'] for option in options if len(option['value']) > 0]
+          [option['value'] for option in options if len(option['value']) > 0]
       )
     return list(set(values))
 
@@ -440,27 +440,27 @@ class TRF4(base.BaseCrawler):
     for classtype in classtypes:
       response = self.requester.get(f'{BASE_URL}/listar_orgaos.php?tipo={classtype}')
       options = utils.soup_by_content(response.text) \
-        .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
+          .find_all('input', {'type': 'checkbox', 'class': 'checkbox_sem_fundo'})
       values.extend(
-        [option['value'] for option in options if len(option['value']) > 0]
+          [option['value'] for option in options if len(option['value']) > 0]
       )
     return list(set(values))
 
   def _get_query_params(self, **overrides):
     return {**{
-      'rdoTipo': 1,
-      'rdoCampoPesquisa': 'I',
-      'textoPesqLivre': '',
-      'chkAcordaos': 'on',
-      'numProcesso': '',
-      'cboRelator': '',
-      'dataIni': '',
-      'dataFim': '',
-      'tipodata': 'DEC',
-      'docsPagina': '1000',
-      'hdnAcao': 'nova_pesquisa',
-      'arrclasses': '',
-      'arrorgaos': '',
+        'rdoTipo': 1,
+        'rdoCampoPesquisa': 'I',
+        'textoPesqLivre': '',
+        'chkAcordaos': 'on',
+        'numProcesso': '',
+        'cboRelator': '',
+        'dataIni': '',
+        'dataFim': '',
+        'tipodata': 'DEC',
+        'docsPagina': '1000',
+        'hdnAcao': 'nova_pesquisa',
+        'arrclasses': '',
+        'arrorgaos': '',
     }, **overrides}
 
   def _extract_count_from_text(self, text):
@@ -482,55 +482,47 @@ def trf4_task(start_date, end_date, output_uri):
     setup_cloud_logger(logger)
 
     start_date, end_date =\
-      pendulum.parse(start_date), pendulum.parse(end_date)
+        pendulum.parse(start_date), pendulum.parse(end_date)
 
     crawler = TRF4(params={
-      'start_date': start_date, 'end_date': end_date
+        'start_date': start_date, 'end_date': end_date
     }, output=output, logger=logger)
     crawler.run()
 
 
 @cli.command(name='trf4')
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def trf4_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def trf4_command(**kwargs):
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
   if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in utils.timely(start_date, end_date, unit=split_tasks, step=1):
-        task_id = trf4_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      trf4_task.delay(*args)
+    utils.enqueue_tasks(trf4_task, split_tasks, **kwargs)
   else:
-    trf4_task(*args)
+    trf4_task(**kwargs)
 
 
-@cli.command(name='trf4-seq')
-@click.option('--start',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
+@ cli.command(name='trf4-seq')
+@ click.option('--start',
+               default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+               help='Format YYYY-MM-DD.',
+               )
+@ click.option('--end',
+               default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+               help='Format YYYY-MM-DD.',
+               )
+@ click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
 def trf4_seq_command(start, end, output_uri):
   output = utils.get_output_strategy_by_path(path=output_uri)
   logger.info(f'Output: {output}.')

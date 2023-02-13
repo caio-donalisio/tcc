@@ -31,42 +31,44 @@ DEFAULT_HEADERS = {
     'sec-ch-ua-platform': '"Windows"',
 }
 
-def get_filters(start_date : pendulum.DateTime, end_date : pendulum.DateTime):
+
+def get_filters(start_date: pendulum.DateTime, end_date: pendulum.DateTime):
   date_filter = f'@DTPB >= {start_date.format(DATE_FORMAT_1)} E @DTPB <= {end_date.format(DATE_FORMAT_1)}'
   return {
-# 'pesquisaAmigavel':'+%3Cb%3EPublica%E7%E3o%3A+01%2F02%2F2022+a+01%2F03%2F2022%3C%2Fb%3E',
-'acao': 'pesquisar',
-'novaConsulta': 'true',
-# 'i': 1,
-'b': 'ACOR',
-'livre': '',
-'filtroPorOrgao': '',
-'filtroPorMinistro': '',
-'filtroPorNota': '',
-'data': date_filter,
-'operador': 'e',
-'p': 'true',
-'tp': 'T',
-'processo': '',
-'classe': '',
-'uf': '',
-'relator': '',
-'dtpb': date_filter,
-'dtpb1':start_date.format(DATE_FORMAT_2),
-'dtpb2':end_date.format(DATE_FORMAT_2),
-'dtde': '',
-'dtde1': '',
-'dtde2': '',
-'orgao': '',
-'ementa': '',
-'nota': '',
-'ref': '',
+      # 'pesquisaAmigavel':'+%3Cb%3EPublica%E7%E3o%3A+01%2F02%2F2022+a+01%2F03%2F2022%3C%2Fb%3E',
+      'acao': 'pesquisar',
+      'novaConsulta': 'true',
+      # 'i': 1,
+      'b': 'ACOR',
+      'livre': '',
+      'filtroPorOrgao': '',
+      'filtroPorMinistro': '',
+      'filtroPorNota': '',
+      'data': date_filter,
+      'operador': 'e',
+      'p': 'true',
+      'tp': 'T',
+      'processo': '',
+      'classe': '',
+      'uf': '',
+      'relator': '',
+      'dtpb': date_filter,
+      'dtpb1': start_date.format(DATE_FORMAT_2),
+      'dtpb2': end_date.format(DATE_FORMAT_2),
+      'dtde': '',
+      'dtde1': '',
+      'dtde2': '',
+      'orgao': '',
+      'ementa': '',
+      'nota': '',
+      'ref': '',
   }
+
 
 class STJClient:
 
   def __init__(self):
-    self.base_url  = 'https://scon.stj.jus.br'
+    self.base_url = 'https://scon.stj.jus.br'
     self.requester = requests.Session()
 
   def reset_session(self):
@@ -88,20 +90,20 @@ class STJClient:
   @utils.retryable(max_retries=3)
   def _response_or_retry(self, data):
     response = self.requester.post(
-      f'{self.base_url}/SCON/pesquisar.jsp',
-      headers=DEFAULT_HEADERS,
-      verify=False,
-      data=data)
+        f'{self.base_url}/SCON/pesquisar.jsp',
+        headers=DEFAULT_HEADERS,
+        verify=False,
+        data=data)
     soup = utils.soup_by_content(response.content)
 
     if soup \
-        .find('div', id='idCaptchaLinha'):
+            .find('div', id='idCaptchaLinha'):
       logger.warn('Got captcha -- reseting session.')
       self.reset_session()
       raise utils.PleaseRetryException()
 
     info = soup.find('span', {'class': 'numDocs'}) or \
-      soup.find('div', {'class':'erroMensagem'})
+        soup.find('div', {'class': 'erroMensagem'})
     if not info:
       logger.warn('Got invalid page -- reseting session.')
       self.reset_session()
@@ -112,7 +114,7 @@ class STJClient:
   def _count_by_content(self, content):
     soup = utils.soup_by_content(content)
     info = soup.find('span', {'class': 'numDocs'}) or \
-      soup.find('div', {'class':'erroMensagem'})
+        soup.find('div', {'class': 'erroMensagem'})
 
     assert info
     if info.get_text() == 'Nenhum documento encontrado!':
@@ -130,48 +132,48 @@ class STJClient:
 
 class STJCollector(base.ICollector):
 
-  def __init__(self, client : STJClient, query : dict, **options):
-    self.client  = client
-    self.query   = query
+  def __init__(self, client: STJClient, query: dict, **options):
+    self.client = client
+    self.query = query
     self.options = (options or {})
 
   def count(self) -> int:
     return self.client.count(get_filters(
-      self.query['start_date'], self.query['end_date']))
+        self.query['start_date'], self.query['end_date']))
 
   def chunks(self):
     ranges = list(utils.timely(
-      self.query['start_date'], self.query['end_date'], unit='days', step=1))
+        self.query['start_date'], self.query['end_date'], unit='days', step=1))
 
     for start_date, end_date in reversed(ranges):
       filters = get_filters(start_date, end_date)
-      count   = self.client.count(filters)
+      count = self.client.count(filters)
 
       keys =\
-        {'start_date' : start_date.to_date_string(),
-          'end_date'  : end_date.to_date_string(),
-          'limit'     : count + 1}
+          {'start_date': start_date.to_date_string(),
+           'end_date': end_date.to_date_string(),
+           'limit': count + 1}
 
       yield STJChunk(keys=keys,
-        client=self.client,
-        filters=filters,
-        limit=count + 1,
-        prefix=f'{start_date.year}/{start_date.month:02d}/')
+                     client=self.client,
+                     filters=filters,
+                     limit=count + 1,
+                     prefix=f'{start_date.year}/{start_date.month:02d}/')
 
 
 class STJChunk(base.Chunk):
 
   def __init__(self, keys, client, filters, limit, prefix):
     super(STJChunk, self).__init__(keys, prefix)
-    self.client  = client
+    self.client = client
     self.filters = filters
-    self.limit   = limit
+    self.limit = limit
 
   @utils.retryable(max_retries=3)
   def rows(self):
     response = self.client.fetch({
-      **self.filters, **{'l': self.limit, 'numDocsPagina': self.limit}}, offset=0)
-    soup  = utils.soup_by_content(response.content)
+        **self.filters, **{'l': self.limit, 'numDocsPagina': self.limit}}, offset=0)
+    soup = utils.soup_by_content(response.content)
     count = self.client._count_by_content(response.content)
     if count == 0:
       return
@@ -183,23 +185,23 @@ class STJChunk(base.Chunk):
     docs = soup.find_all(class_='documento')
 
     def _get_pdf_url(doc):
-      a = doc.find('a',attrs={'title':'Exibir o inteiro teor do acórdão.'}) or \
-        doc.find('a',attrs={'original-title':'Exibir o inteiro teor do acórdão.'})
+      a = doc.find('a', attrs={'title': 'Exibir o inteiro teor do acórdão.'}) or \
+          doc.find('a', attrs={'original-title': 'Exibir o inteiro teor do acórdão.'})
       return utils.find_between(a['href'], start="'", end="'")
 
     for doc in docs:
       pdf_url = _get_pdf_url(doc)
-      act_id  = utils.get_param_from_url(pdf_url, 'num_registro')
+      act_id = utils.get_param_from_url(pdf_url, 'num_registro')
       publication_date = utils.get_param_from_url(
-        pdf_url, 'dt_publicacao')
+          pdf_url, 'dt_publicacao')
       filepath = utils.get_filepath(publication_date, act_id, 'html')
 
       pdf_contents = self.pdf_contents(pdf_url, act_id, publication_date)
       yield [
-        base.Content(
-          content=doc.prettify(), dest=filepath, content_type='text/html'
-        ),
-        *pdf_contents
+          base.Content(
+              content=doc.prettify(), dest=filepath, content_type='text/html'
+          ),
+          *pdf_contents
       ]
 
   def pdf_contents(self, pdf_path, act_id, publication_date):
@@ -207,39 +209,39 @@ class STJChunk(base.Chunk):
     contents = []
 
     if 'text/html' in response.headers['Content-Type']:
-      soup  = utils.soup_by_content(response.content)
+      soup = utils.soup_by_content(response.content)
       table = soup.find(id='listaInteiroTeor')
       if not table:
         logger.warn(f"{pdf_path} has no valid content.")
         return []
 
-      rows  = table.find_all('div', class_='row')[1:]
+      rows = table.find_all('div', class_='row')[1:]
 
       for index, row in enumerate(rows):
-        url      = row.a['href'].replace('®', '&reg')
+        url = row.a['href'].replace('®', '&reg')
         if 'documento_sequencial' in url:
-          doc_id   = utils.get_param_from_url(url, 'documento_sequencial')
+          doc_id = utils.get_param_from_url(url, 'documento_sequencial')
         elif 'seq' in url:
-          doc_id   = utils.get_param_from_url(url, 'seq')
+          doc_id = utils.get_param_from_url(url, 'seq')
         else:
           doc_id = 'NA'
         filename = f'{act_id}-{doc_id}--{index}'
         contents.append(base.ContentFromURL(
-          src=url,
-          dest=utils.get_filepath(
-            date=publication_date, filename=filename, extension='pdf'
-          ),
-          content_type='application/pdf'
+            src=url,
+            dest=utils.get_filepath(
+                date=publication_date, filename=filename, extension='pdf'
+            ),
+            content_type='application/pdf'
         ))
 
     else:
       pdf_filepath = utils.get_filepath(
-        date=publication_date, filename=act_id, extension='pdf')
+          date=publication_date, filename=act_id, extension='pdf')
 
       contents.append(base.Content(
-        content=response.content,
-        content_type='application/pdf',
-        dest=pdf_filepath
+          content=response.content,
+          content_type='application/pdf',
+          dest=pdf_filepath
       ))
 
     return contents
@@ -252,49 +254,41 @@ def stj_task(start_date, end_date, output_uri):
 
   from app.crawlers.logutils import logging_context
 
-  with logging_context(crawler='STJ'):
+  with logging_context(crawler='stj'):
     output = utils.get_output_strategy_by_path(path=output_uri)
     logger.info(f'Output: {output}.')
 
     start_date, end_date =\
-      pendulum.parse(start_date), pendulum.parse(end_date)
+        pendulum.parse(start_date), pendulum.parse(end_date)
 
     query_params = {'start_date': start_date, 'end_date': end_date}
     collector = STJCollector(client=STJClient(), query=query_params)
-    handler   = base.ContentHandler(output=output)
+    handler = base.ContentHandler(output=output)
 
     snapshot = base.Snapshot(keys=query_params)
     base.get_default_runner(
         collector=collector, output=output, handler=handler, logger=logger, max_workers=8) \
-      .run(snapshot=snapshot)
+        .run(snapshot=snapshot)
 
 
 @cli.command(name='stj')
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri', default=None,  help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   , default=False, help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue', default=False, help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-def stj_command(start_date, end_date, output_uri, enqueue, split_tasks):
-  args = (start_date, end_date, output_uri)
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+def stj_command(**kwargs):
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
   if enqueue:
-    if split_tasks:
-      start_date, end_date =\
-        pendulum.parse(start_date), pendulum.parse(end_date)
-      for start, end in reversed(list(utils.timely(start_date, end_date, unit=split_tasks, step=1))):
-        task_id = stj_task.delay(
-          start.to_date_string(),
-          end.to_date_string(),
-          output_uri)
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      stj_task.delay(*args)
+    utils.enqueue_tasks(stj_task, split_tasks, **kwargs)
   else:
-    stj_task(*args)
+    stj_task(**kwargs)

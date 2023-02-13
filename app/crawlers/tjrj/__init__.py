@@ -1,1 +1,1 @@
-from  .tjrj_crawler import tjrj_task
+from .tjrj_crawler import tjrj_task
