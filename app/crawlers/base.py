@@ -292,18 +292,19 @@ class FutureChunkProcessor(IChunkProcessor):
 class ChunkRunner:
 
   def __init__(self, collector : ICollector, processor : IChunkProcessor,
-      repository : SnapshotsRepository, logger):
+      repository : SnapshotsRepository, logger, runner_options: Dict):
     self.collector  = collector
     self.processor  = processor
     self.repository = repository
     self.logger     = logger
+    self.runner_options = runner_options
     self.min_snapshot_interval = 30  # secs
 
   def run(self, snapshot : Snapshot = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
     hashmap = {}
-    if snapshot and self.repository.exists(snapshot):
+    if snapshot and self.repository.exists(snapshot) and not self.runner_options.get('skip_cache', False):
       self.repository.restore(snapshot)
       chunks   = snapshot.get_value('chunks')
       if chunks:
@@ -426,7 +427,8 @@ def get_default_runner(collector, output, handler, logger, runner_options, **kwa
     collector=collector,
     processor=processor,
     repository=snapshots_repository,
-    logger=logger
+    logger=logger,
+    runner_options=runner_options,
   )
 
   return runner
