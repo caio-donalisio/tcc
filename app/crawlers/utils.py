@@ -29,7 +29,7 @@ from itertools import chain
 from pathlib import Path
 from selenium.common.exceptions import TimeoutException
 from tqdm import tqdm
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Optional
 from urllib.parse import parse_qsl, urlsplit
 
 CURRENT_TIME = pendulum.now()
@@ -359,8 +359,8 @@ def get_response(logger, session, url, headers, verify=True, timeout=15):
   response = session.get(
       url=url, headers=headers, verify=verify, timeout=timeout)
   if response.status_code != 200:
-      logger.warn(f"Response <{response.status_code}> - {response.url}")
-      raise PleaseRetryException()
+    logger.warn(f"Response <{response.status_code}> - {response.url}")
+    raise PleaseRetryException()
   else:
     return response
 
@@ -592,3 +592,20 @@ def get_random_useragent():
   except Exception:
     return random.choice(headers.POSSIBLE_USER_AGENTS)
 
+
+def enqueue_tasks(task: Callable, split_tasks: Optional[str] = None, **kwargs):
+  from copy import deepcopy
+
+  if split_tasks:
+    start_date = pendulum.parse(kwargs.get('start_date'))
+    end_date = pendulum.parse(kwargs.get('end_date'))
+
+    args = deepcopy(kwargs)
+    for start, end in timely(start_date, end_date, unit=split_tasks, step=1):
+      args['start_date'] = start.to_date_string()
+      args['end_date'] = end.to_date_string()
+      task_id = task.delay(**args)
+      print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
+  else:
+    task_id = task.delay(**kwargs)
+    print(f"task {task_id} sent with params {kwargs.get('start_date')} {kwargs.get('end_date')}")
