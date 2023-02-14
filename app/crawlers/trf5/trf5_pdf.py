@@ -1,6 +1,7 @@
 import logging
 import random
 import time
+import re
 
 from app.crawlers import base, browsers, utils
 import click
@@ -19,7 +20,7 @@ class TRF5Downloader:
     self._client = client
     self._output = output
 
-  # @utils.retryable(retryable_exceptions=Exception)
+  @utils.retryable(retryable_exceptions=Exception, ignore_if_exceeds=True)
   def download(self, items, pbar=None):
     import concurrent.futures
 
@@ -51,7 +52,7 @@ class TRF5Downloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
-  @utils.retryable(retryable_exceptions=Exception)
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url(self, record: dict, browser=None):
     import re
 
@@ -64,7 +65,6 @@ class TRF5Downloader:
 
     try:
       if re.search(r'www4.trf5.jus.br\/processo', record['url']):
-        # if not self.filters('skip_full'):
         report_url = self._get_report_url_from_trf5(record)
         if report_url is None:
           report_url = self._get_report_url_from_trf5(record, digits=2)
@@ -82,7 +82,7 @@ class TRF5Downloader:
         'content_type': content_type_report
     }
 
-  @utils.retryable(retryable_exceptions=Exception)
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_trf5(self, doc: dict, digits=0):
     import requests
     import re
@@ -115,7 +115,7 @@ class TRF5Downloader:
 
     return self._get_judgment_doc_url_by_closest_date(links)
 
-  @utils.retryable(retryable_exceptions=Exception)
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_pje(self, browser, doc):
     details_url = self._get_judgment_details_url(browser, doc)
     if not details_url:
@@ -127,6 +127,8 @@ class TRF5Downloader:
     from selenium.webdriver.common.by import By
 
     browser.get(doc['url'])
+    if browser.bsoup().find('div', attrs={'class':'box-mensagem'}, text=re.compile('Erro 403')):
+      raise utils.SourceUnavailable('Website is currently unavailable - too many requests - try again later')
     browser.wait_for_element(locator=(By.ID, 'consultaPublicaForm:captcha:captchaImg'), timeout=30)
 
     judgment_id = self._format_process_number(doc['numeroProcesso'])
@@ -278,7 +280,7 @@ class TRF5Downloader:
 
     return None
 
-  @utils.retryable(max_retries=6)
+  # @utils.retryable(max_retries=6)
   def _get_response(self, content_from_url):
     import requests
     logger.debug(f'GET {content_from_url.src}')
@@ -390,7 +392,7 @@ def trf5_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count
   startDate = pendulum.parse(start_date)
   endDate = pendulum.parse(end_date)
   global MAX_WORKERS
-  MAX_WORKERS = max_workers
+  MAX_WORKERS = int(max_workers)
 
   if count:
     total = 0

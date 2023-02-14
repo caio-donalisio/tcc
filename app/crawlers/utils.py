@@ -52,6 +52,8 @@ class DefaultDates:
 class PleaseRetryException(Exception):
   pass
 
+class SourceUnavailable(Exception):
+  pass
 
 def retryable(*, max_retries=3, sleeptime=5,
               message='Got connection issues',
