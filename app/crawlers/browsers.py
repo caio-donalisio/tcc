@@ -18,14 +18,15 @@ def get_soup_xpath(element):
   for parent in child.parents:
     siblings = parent.find_all(child.name, recursive=False)
     components.append(
-      child.name if 1 == len(siblings) else '%s[%d]' % (
-        child.name,
-        next(i for i, s in enumerate(siblings, 1) if s is child)
-      )
+        child.name if 1 == len(siblings) else '%s[%d]' % (
+            child.name,
+            next(i for i, s in enumerate(siblings, 1) if s is child)
+        )
     )
     child = parent
   components.reverse()
   return '/%s' % '/'.join(components)
+
 
 class FirefoxBrowser:
   def __init__(self, headers=None, headless=True, page_load_strategy='normal'):
@@ -34,12 +35,12 @@ class FirefoxBrowser:
     env = os.getenv('ENV', 'development')
 
     if env == "development":
-        self.driver = webdriver.Firefox(options=options)
+      self.driver = webdriver.Firefox(options=options)
     else:
-        self.driver = webdriver.Remote(
-            command_executor=os.getenv('SELENIUM_HUB_URI', 'http://selenium-hub:4444/wd/hub'),
-            desired_capabilities=DesiredCapabilities.FIREFOX
-        )
+      self.driver = webdriver.Remote(
+          command_executor=os.getenv('SELENIUM_HUB_URI', 'http://selenium-hub:4444/wd/hub'),
+          desired_capabilities=DesiredCapabilities.FIREFOX
+      )
 
   def __enter__(self):
     return self
@@ -51,7 +52,7 @@ class FirefoxBrowser:
     # TODO: HANDLE: Exception has occurred: TimeoutException -- Message: TimedPromise timed out after 300000 ms
     self.driver.get(url)
     if wait_for is not None:
-        self.wait_for_element(locator=wait_for)
+      self.wait_for_element(locator=wait_for)
 
   def close_current_window(self):
     self.driver.close()
@@ -91,7 +92,7 @@ class FirefoxBrowser:
     xpath = get_soup_xpath(bs4_element)
     select = Select(self.driver.find_element(By.XPATH, xpath))
     if option_text:
-        select.select_by_visible_text(option_text)
+      select.select_by_visible_text(option_text)
 
   def fill_in(self, field_id, value):
     start_input = self.driver.find_element(By.ID, field_id)
@@ -100,24 +101,24 @@ class FirefoxBrowser:
 
   def select_by_id(self, field_id, option):
     self.driver.find_element(By.XPATH,
-      f"//select[@id='{field_id}']/option[text()='{option}']").click()
+                             f"//select[@id='{field_id}']/option[text()='{option}']").click()
 
   def is_text_present(self, substring, tag="*"):
     try:
-        xpath = f"//{tag}[contains(text(),'{substring}')]"
-        self.driver.find_element(By.XPATH, xpath)
-        return True
+      xpath = f"//{tag}[contains(text(),'{substring}')]"
+      self.driver.find_element(By.XPATH, xpath)
+      return True
     except NoSuchElementException:
-        return False
+      return False
 
   def get_cookie(self, cookie_name):
     value = None
     cookies = self.driver.get_cookies()
     for cookie in cookies:
-        if cookie.get('name') == cookie_name:
-            value = cookie['value']
+      if cookie.get('name') == cookie_name:
+        value = cookie['value']
     if cookie is None:
-        raise Exception(f'Cookie not found: {cookie_name}')
+      raise Exception(f'Cookie not found: {cookie_name}')
     return value
 
   def get_cookie_dict(self):
@@ -131,9 +132,9 @@ class FirefoxBrowser:
     headers = urlencode(headers or self._sample_headers())
     options.add_argument(headers)
     if headless:
-        options.add_argument('--headless')
+      options.add_argument('--headless')
     if page_load_strategy:
-        options.add_argument('--page-load-strategy')
+      options.add_argument('--page-load-strategy')
     return options
 
   def _sample_headers(self):
