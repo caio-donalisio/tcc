@@ -11,7 +11,7 @@ def list_all(bucket_name, prefix):
 
 def list_pending_pdfs(bucket_name, prefix):
   jsons = {}
-  pdfs  = {}
+  pdfs = {}
 
   for name in list_all(bucket_name, prefix):
     path = pathlib.Path(name)
@@ -24,6 +24,6 @@ def list_pending_pdfs(bucket_name, prefix):
     if name not in pdfs:
       cdacordao = name.split('_')[-1]
       yield {'url':
-        f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?conversationId=&cdAcordao={cdacordao}&cdForo=0',
-         'dest': f'{parent}/{name}.pdf'
-      }
+             f'http://esaj.tjsp.jus.br/cjsg/getArquivo.do?conversationId=&cdAcordao={cdacordao}&cdForo=0',
+             'dest': f'{parent}/{name}.pdf'
+             }

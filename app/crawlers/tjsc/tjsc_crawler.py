@@ -11,7 +11,7 @@ import time
 logger = logger_factory('tjsc')
 
 COURT_NAME = 'tjsc'
-RESULTS_PER_PAGE = 50  
+RESULTS_PER_PAGE = 50
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
@@ -128,44 +128,46 @@ class TJSCClient:
 
 class TJSCCollector(base.ICollector):
 
-    def __init__(self, client, filters):
-        self.client = client
-        self.filters = filters
+  def __init__(self, client, filters):
+    self.client = client
+    self.filters = filters
 
-    def count(self, period=None):
-        if period:
-            return self.client.count(period)
-        else:
-            return self.client.count(self.filters)
+  def count(self, period=None):
+    if period:
+      return self.client.count(period)
+    else:
+      return self.client.count(self.filters)
 
-    @utils.retryable()
-    def chunks(self):
-        periods = list(utils.timely(
-            start_date=self.filters.get('start_date'),
-            end_date=self.filters.get('end_date'),
-            step=1,
-            unit='months',
-        ))
-        time.sleep(3)
-        for start,end in reversed(periods):
-            total = self.count({'start_date':start,'end_date':end})
-            pages = range(1, 2 + total//RESULTS_PER_PAGE)
-            for page in pages:
-                yield TJSCChunk(
-                    keys={
-                        'start_date':start.to_date_string(),
-                        'end_date':end.to_date_string(),
-                        'page': page,
-                        'count': total,
-                        },
-                    prefix='',
-                    filters={
-                        'start_date':start,
-                        'end_date':end,
-                        },
-                    page=page,
-                    client=self.client
-                )
+  @utils.retryable()
+  def chunks(self):
+    periods = list(utils.timely(
+        start_date=self.filters.get('start_date'),
+        end_date=self.filters.get('end_date'),
+        step=1,
+        unit='months',
+    ))
+    time.sleep(3)
+    for start, end in reversed(periods):
+      total = self.count({'start_date': start, 'end_date': end})
+      pages = range(1, 2 + total//RESULTS_PER_PAGE)
+      for page in pages:
+        yield TJSCChunk(
+            keys={
+                'start_date': start.to_date_string(),
+                'end_date': end.to_date_string(),
+                'page': page,
+                'count': total,
+            },
+            prefix='',
+            filters={
+                'start_date': start,
+                'end_date': end,
+            },
+            page=page,
+            client=self.client
+        )
+
+
 class TJSCChunk(base.Chunk):
 
     def __init__(self, keys, prefix, filters, page, client):
@@ -273,75 +275,63 @@ class TJSCContentHandler(base.ContentHandler):
 
     if response.status_code == 200 and len(response.content) > 0:
       self.output.save_from_contents(
-        filepath=dest,
-        contents=response.content,
-        content_type=content_type)
+          filepath=dest,
+          contents=response.content,
+          content_type=content_type)
+
 
 @celery.task(name='crawlers.tjsc', default_retry_delay=5 * 60,
-            autoretry_for=(BaseException,))
+             autoretry_for=(BaseException,))
 def tjsc_task(**kwargs):
-    setup_cloud_logger(logger)
+  setup_cloud_logger(logger)
 
-    from app.crawlers.logutils import logging_context
+  from app.crawlers.logutils import logging_context
 
-    with logging_context(crawler='tjsc'):
-        output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
-        logger.info(f'Output: {output}.')
+  with logging_context(crawler='tjsc'):
+    output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
+    logger.info(f'Output: {output}.')
 
         start_date = kwargs.get('start_date')
         start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)
         end_date = kwargs.get('end_date')
         end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)
 
-        query_params = {
-            'start_date':start_date,
-            'end_date': end_date,
-        }
+    query_params = {
+        'start_date': start_date,
+        'end_date': end_date,
+    }
 
-        collector = TJSCCollector(client=TJSCClient(), filters=query_params)
-        handler   = TJSCContentHandler(output=output)
-        snapshot = base.Snapshot(keys=query_params)
+    collector = TJSCCollector(client=TJSCClient(), filters=query_params)
+    handler = TJSCContentHandler(output=output)
+    snapshot = base.Snapshot(keys=query_params)
 
-        base.get_default_runner(
-            collector=collector,
-            output=output,
-            handler=handler,
-            logger=logger,
-            max_workers=8) \
-            .run(snapshot=snapshot)
+    base.get_default_runner(
+        collector=collector,
+        output=output,
+        handler=handler,
+        logger=logger,
+        max_workers=8) \
+        .run(snapshot=snapshot)
+
 
 @cli.command(name=COURT_NAME)
 @click.option('--start-date',
-  default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
-@click.option('--end-date'  ,
-  default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
-  help='Format YYYY-MM-DD.',
-)
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-    default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
 def tjsc_command(**kwargs):
-  # VALIDATE URI
-  if COURT_NAME.lower() not in kwargs.get('output_uri').lower():
-      if not click.confirm(
-          (f"Name of court {COURT_NAME.upper()} not found in the "
-            f"URI {kwargs.get('output_uri')}. REALLY PROCEED?"),default=False):
-          logger.info('Operation canceled - wrong URI')
-          return
-  if kwargs.get('enqueue'):
-    if kwargs.get('split_tasks'):
-      start_date = pendulum.parse(kwargs.get('start_date'))
-      end_date = pendulum.parse(kwargs.get('end_date'))
-      for start, end in utils.timely(start_date, end_date, unit=kwargs.get('split_tasks'), step=1):
-        task_id = tjsc_task.delay(
-          start_date=start.to_date_string(),
-          end_date=end.to_date_string(),
-          output_uri=kwargs.get('output_uri'))
-        print(f"task {task_id} sent with params {start.to_date_string()} {end.to_date_string()}")
-    else:
-      tjsc_task.delay(**kwargs)
+  enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
+  del (kwargs['enqueue'])
+  del (kwargs['split_tasks'])
+  if enqueue:
+    utils.enqueue_tasks(tjsc_task, split_tasks, **kwargs)
   else:
     tjsc_task(**kwargs)

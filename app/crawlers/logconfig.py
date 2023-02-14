@@ -1,3 +1,4 @@
+from app.crawlers.logutils import logging_context_handler
 import os
 import logging
 from google.cloud.logging import Client
@@ -7,15 +8,13 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
 DEFAULT_FORMATTER =\
-  '[%(asctime)s] p%(process)s %(module)s %(levelname)s %(name)s: %(message)s'
+    '[%(asctime)s] p%(process)s %(module)s %(levelname)s %(name)s: %(message)s'
 
-
-from app.crawlers.logutils import logging_context_handler
 
 class ContextFilter(logging.Filter):
   def filter(self, record):
     record.crawler =\
-      (logging_context_handler.get('crawler') or 'unknown')
+        (logging_context_handler.get('crawler') or 'unknown')
     return True
 
 
@@ -46,7 +45,7 @@ def setup_cloud_logger(logger):
   client = Client()
   cloud_handler = CloudLoggingHandler(client)
   destination =\
-    'logging.googleapis.com/projects/inspira-development/locations/us-east1/buckets/log-crawlers'
+      'logging.googleapis.com/projects/inspira-development/locations/us-east1/buckets/log-crawlers'
   client.sink('log-crawlers', destination=destination)
   cloud_handler.setFormatter(formatter)
   logger.addHandler(cloud_handler)

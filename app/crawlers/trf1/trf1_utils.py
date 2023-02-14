@@ -5,15 +5,15 @@ from google.cloud import storage
 client = storage.Client()
 
 
-
 def list_all(bucket_name, prefix):
   bucket = utils.get_bucket_ref(bucket_name)
   for blob in bucket.list_blobs(prefix=prefix):
     yield blob.name
 
+
 def list_pending_pdfs(bucket_name, prefix):
   htmls = {}
-  pdfs  = {}
+  pdfs = {}
   b_files = {}
 
   for name in list_all(bucket_name, prefix):
@@ -30,7 +30,7 @@ def list_pending_pdfs(bucket_name, prefix):
 
   for name, parent in htmls.items():
     if name[:name.find("_A")] not in pdfs:
-      
-      yield {'row':bucket.get_blob(f'{parent}/{name}.html').download_as_string(),
-          'dest': f'{parent}/{name[:name.find("_A")]}'
-      }
+
+      yield {'row': bucket.get_blob(f'{parent}/{name}.html').download_as_string(),
+             'dest': f'{parent}/{name[:name.find("_A")]}'
+             }

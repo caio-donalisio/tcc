@@ -35,9 +35,9 @@ class BaseCrawler:
 class Content(pydantic.BaseModel):
   """Represents a `saved` content to a destination uri
   """
-  content : Any
-  dest : str
-  content_type : str
+  content: Any
+  dest: str
+  content_type: str
 
   def __repr__(self):
     return f'Content(value={self.content[:10]}..., dest={self.dest})'
@@ -46,16 +46,16 @@ class Content(pydantic.BaseModel):
 class ContentFromURL(pydantic.BaseModel):
   """Represents a content we should get from a url and save to destination url.
   """
-  src : str
-  dest : str
-  content_type : Optional[str]
+  src: str
+  dest: str
+  content_type: Optional[str]
 
   def __repr__(self):
     return f'ContentFromURL(src={self.src}..., dest={self.dest})'
 
 
 class Late(pydantic.BaseModel):
-  postpone : Any
+  postpone: Any
 
 
 class SkipWithBlock(Exception):
@@ -86,11 +86,11 @@ class ChunkTransaction:
 
 class Runner:
   def __init__(self, chunks_generator, row_to_futures, total_records, logger, **options):
-    self.chunks_generator  = chunks_generator
-    self.row_to_futures    = row_to_futures
-    self.total_records     = total_records
-    self.logger            = logger
-    self.options           = (options or {})
+    self.chunks_generator = chunks_generator
+    self.row_to_futures = row_to_futures
+    self.total_records = total_records
+    self.logger = logger
+    self.options = (options or {})
 
   def run(self):
     import concurrent.futures
@@ -102,7 +102,7 @@ class Runner:
         with tqdm(total=self.total_records, file=tqdm_out) as pbar:
           for chunk in self.chunks_generator:
             if chunk.commited():
-              chunk_records  = chunk.get_value('records')
+              chunk_records = chunk.get_value('records')
               records_fetch += chunk_records
               pbar.set_postfix(chunk.params)
               pbar.update(chunk_records)
@@ -128,7 +128,6 @@ class Runner:
 
     finally:
       pass
-
 
 
 class ICollector:
@@ -158,15 +157,15 @@ class ICollector:
 
 class HashedKeyValue:
 
-  def __init__(self, keys : dict, prefix=None):
-    self._keys   = keys
-    self._state  = {}
+  def __init__(self, keys: dict, prefix=None):
+    self._keys = keys
+    self._state = {}
     self._prefix = prefix
 
   @property
   def hash(self):
     return hashlib.sha1(repr(sorted(self._keys.items())).encode()) \
-      .hexdigest()
+        .hexdigest()
 
   @property
   def prefix(self):
@@ -191,7 +190,7 @@ class HashedKeyValue:
       self._state[key] = []
     self._state[key].append(value)
 
-  def update_values(self, values : dict):
+  def update_values(self, values: dict):
     self._state = {**self.state, **values}
 
 
@@ -222,9 +221,9 @@ class HashedKeyValueRepository:
 
   def commit(self, chunk):
     self._output.save_from_contents(
-      filepath=self.path_of(chunk),
-      contents=json.dumps(chunk.state),
-      content_type='application/json')
+        filepath=self.path_of(chunk),
+        contents=json.dumps(chunk.state),
+        content_type='application/json')
 
   def path_of(self, chunk):
     if chunk._prefix:
@@ -259,9 +258,9 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  def __init__(self, executor, handler, repository : ChunksRepository):
-    self.executor   = executor
-    self.handler    = handler
+  def __init__(self, executor, handler, repository: ChunksRepository):
+    self.executor = executor
+    self.handler = handler
     self.repository = repository
 
   def process(self, chunk) -> ChunkResult:
@@ -275,7 +274,7 @@ class FutureChunkProcessor(IChunkProcessor):
       records += 1
       for item in record:
         futures.append(self.executor.submit(
-          self.handler.handle, item))
+            self.handler.handle, item))
 
     for future in concurrent.futures.as_completed(futures):
       future.result()
@@ -290,28 +289,28 @@ class FutureChunkProcessor(IChunkProcessor):
 
 class ChunkRunner:
 
-  def __init__(self, collector : ICollector, processor : IChunkProcessor,
-      repository : SnapshotsRepository, logger):
-    self.collector  = collector
-    self.processor  = processor
+  def __init__(self, collector: ICollector, processor: IChunkProcessor,
+               repository: SnapshotsRepository, logger):
+    self.collector = collector
+    self.processor = processor
     self.repository = repository
-    self.logger     = logger
+    self.logger = logger
     self.min_snapshot_interval = 30  # secs
 
-  def run(self, snapshot : Snapshot = None):
+  def run(self, snapshot: Optional[Snapshot] = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
     hashmap = {}
     if snapshot and self.repository.exists(snapshot):
       self.repository.restore(snapshot)
-      chunks   = snapshot.get_value('chunks')
+      chunks = snapshot.get_value('chunks')
       if chunks:
-        hashmap  = {chunk['hash']: chunk for chunk in chunks}
+        hashmap = {chunk['hash']: chunk for chunk in chunks}
 
     try:
       self.collector.setup()
 
-      dirty   = False
+      dirty = False
       last_snapshot_taken = 0
       expects = self.collector.count()
       snapshot.set_value('expects', expects)
@@ -335,16 +334,16 @@ class ChunkRunner:
           if snapshot:
             snapshot.set_value('records', records)
             snapshot.set_value('expects', expects)
-            snapshot.add_value('chunks' , {
-              'hash': chunk.hash,
-              'keys': chunk.keys,
-              'records': chunk_result.updates,
-              'state': chunk.state
+            snapshot.add_value('chunks', {
+                'hash': chunk.hash,
+                'keys': chunk.keys,
+                'records': chunk_result.updates,
+                'state': chunk.state
             })
             dirty = True
 
           if dirty and snapshot and \
-            time.time() - last_snapshot_taken >= self.min_snapshot_interval:
+                  time.time() - last_snapshot_taken >= self.min_snapshot_interval:
             self.repository.commit(snapshot)
             last_snapshot_taken = time.time()
     finally:
@@ -375,21 +374,21 @@ class ContentHandler:
     else:
       raise Exception(f'Unable to handle {event}.')
 
-  def _handle_content_event(self, event : Content):
+  def _handle_content_event(self, event: Content):
     return self.output.save_from_contents(
-      filepath=event.dest,
-      contents=event.content,
-      content_type=event.content_type)
+        filepath=event.dest,
+        contents=event.content,
+        content_type=event.content_type)
 
   @utils.retryable()
-  def _handle_url_event(self, event : ContentFromURL):
+  def _handle_url_event(self, event: ContentFromURL):
     if self.output.exists(event.dest):
       return
 
     try:
       response = requests.get(event.src,
-        allow_redirects=True,
-        verify=False)
+                              allow_redirects=True,
+                              verify=False)
     except:
       raise utils.PleaseRetryException()
     if response.status_code == 404:
@@ -400,14 +399,14 @@ class ContentHandler:
       content_type = event.content_type
     else:
       content_type = response.headers['Content-type'] \
-        .split(';')[0].strip()
+          .split(';')[0].strip()
       dest = f'{event.dest}{guess_extension(content_type)}'
 
     if response.status_code == 200 and len(response.content) > 0:
       self.output.save_from_contents(
-        filepath=dest,
-        contents=response.content,
-        content_type=content_type)
+          filepath=dest,
+          contents=response.content,
+          content_type=content_type)
 
 
 def get_default_runner(collector, output, handler, logger, **kwargs):
@@ -417,15 +416,15 @@ def get_default_runner(collector, output, handler, logger, **kwargs):
   chunks_repository = ChunksRepository(output=output)
 
   processor =\
-    FutureChunkProcessor(executor=executor,
-      handler=handler, repository=chunks_repository)
+      FutureChunkProcessor(executor=executor,
+                           handler=handler, repository=chunks_repository)
 
   snapshots_repository = SnapshotsRepository(output=output)
   runner = ChunkRunner(
-    collector=collector,
-    processor=processor,
-    repository=snapshots_repository,
-    logger=logger
+      collector=collector,
+      processor=processor,
+      repository=snapshots_repository,
+      logger=logger
   )
 
   return runner
