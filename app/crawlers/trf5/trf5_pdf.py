@@ -42,7 +42,7 @@ class TRF5Downloader:
 
             futures.append(executor.submit(self._handle_upload, item, response))
           else:
-            logger.warn(f"URL not found for {item['numeroProcesso']}")
+            logger.warn(f"URL not found for {item.dest}")
 
           if pbar:
             pbar.update(1)
