@@ -416,32 +416,3 @@ def trf5_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count
         startDate = startDate.add(months=1)
     utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
     startDate = startDate.add(months=1)
-# def tjsp1i_pdf_command(input_uri, start_date, end_date, dry_run, local, count, max_workers, batch):
-#   # batch  = []
-#   global MAX_WORKERS
-#   MAX_WORKERS=int(max_workers)
-#   output = utils.get_output_strategy_by_path(path=input_uri)
-#   startDate = pendulum.parse(start_date)
-#   endDate = pendulum.parse(end_date)
-
-#   if count:
-#     total = 0
-#     while startDate <= endDate:
-#       for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
-#         total += 1
-#       startDate = startDate.add(months=1)
-#     print('Total files to download', total)
-#     return
-
-#   while startDate <= endDate:
-#     print(f"TJSP1I - Collecting PDFs {startDate.format('YYYY/MM')}...")
-#     pendings = []
-#     counter = 0 
-#     for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
-#       pendings.append(pending)
-#       counter += 1
-#       if counter % batch == 0:
-#         utils.run_pending_tasks(tjsp1i_download, pendings, input_uri=input_uri, dry_run=dry_run, max_workers=max_workers)
-#         pendings=[]
-#     utils.run_pending_tasks(tjsp1i_download, pendings, input_uri=input_uri, dry_run=dry_run, max_workers=max_workers)
-#     startDate = startDate.add(months=1)
