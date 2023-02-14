@@ -13,15 +13,13 @@ from app.crawlers.logconfig import logger_factory
 
 logger = logger_factory('trf5-pdf')
 
-MAX_WORKERS = 3
-
-
 class TRF5Downloader:
 
   def __init__(self, client=None, output=None):
     self._client = client
     self._output = output
 
+  # @utils.retryable(retryable_exceptions=Exception)
   def download(self, items, pbar=None):
     import concurrent.futures
 
@@ -53,6 +51,7 @@ class TRF5Downloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
+  @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url(self, record: dict, browser=None):
     import re
 
@@ -83,6 +82,7 @@ class TRF5Downloader:
         'content_type': content_type_report
     }
 
+  @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_trf5(self, doc: dict, digits=0):
     import requests
     import re
@@ -115,6 +115,7 @@ class TRF5Downloader:
 
     return self._get_judgment_doc_url_by_closest_date(links)
 
+  @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_pje(self, browser, doc):
     details_url = self._get_judgment_details_url(browser, doc)
     if not details_url:
@@ -381,12 +382,15 @@ def trf5_download(items, output_uri, pbar):
               help='Format YYYY-MM.',
               )
 @click.option('--input-uri', help='Input URI')
+@click.option('--max-workers', default=3, help='Number of parallel workers')
 @click.option('--dry-run', default=False, is_flag=True)
 @click.option('--count', default=False, is_flag=True)
-def trf5_pdf_command(input_uri, start_date, end_date, dry_run, count):
+def trf5_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count):
   output = utils.get_output_strategy_by_path(path=input_uri)
   startDate = pendulum.parse(start_date)
   endDate = pendulum.parse(end_date)
+  global MAX_WORKERS
+  MAX_WORKERS = max_workers
 
   if count:
     total = 0
