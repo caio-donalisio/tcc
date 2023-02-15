@@ -413,6 +413,8 @@ def trf5_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count
       counter += 1
       if counter % batch == 0:
         utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
-        startDate = startDate.add(months=1)
+        pendings.clear()
+      startDate = startDate.add(months=1)
     utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
+    pendings.clear()
     startDate = startDate.add(months=1)
