@@ -16,7 +16,7 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "python", "-m", "app.commands", "cmtsp", "--output-uri", "gs://inspira-production-buckets-cmtsp" ]
+            command: [ "python", "-m", "app.commands", "cmtsp", "--output-uri", "gs://inspira-production-buckets-cmtsp", "--skip-cache"]
             envFrom:
             - secretRef:
                 name: crawler-env
@@ -47,7 +47,7 @@ spec:
           - name: crawler
             image: us-docker.pkg.dev/inspira-registry/docker/data/crawlers:${IMAGE_TAG}
             imagePullPolicy: IfNotPresent
-            command: [ "python", "-m", "app.commands", "cmtsp-pdf", "--local", "--input-uri", "gs://inspira-production-buckets-cmtsp" ]
+            command: [ "python", "-m", "app.commands", "cmtsp-pdf", "--input-uri", "gs://inspira-production-buckets-cmtsp" ]
             envFrom:
             - secretRef:
                 name: crawler-env

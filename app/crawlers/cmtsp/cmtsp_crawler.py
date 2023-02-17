@@ -10,7 +10,7 @@ from app.crawler_cli import cli
 import re
 import time
 
-from selenium.common.exceptions import UnexpectedAlertPresentException, JavascriptException
+from selenium.common.exceptions import UnexpectedAlertPresentException, JavascriptException, ElementClickInterceptedException
 from selenium.webdriver.common.by import By
 
 DEBUG = False
@@ -75,31 +75,42 @@ class CMTSPClient:
 
   @utils.retryable(max_retries=9, sleeptime=20)
   def make_search(self, filters, by='date'):
-    self.browser.driver.implicitly_wait(10)
 
-    # ACEITA COOKIES
-    if self.browser.bsoup().find('prodamsp-componente-consentimento'):
-      try:
-        self.browser.driver.execute_script('''
+    def accept_cookies(browser):
+      if browser.bsoup().find('prodamsp-componente-consentimento'):
+        try:
+          browser.driver.execute_script('''
             document.querySelector("prodamsp-componente-consentimento").shadowRoot.querySelector("input[class='cc__button__autorizacao--all']").click()''')
-      except JavascriptException:
-        pass
-    # PREENCHE DADOS
+        except JavascriptException:
+          pass
+    
+    def fill_data(browser, by):
+      browser.driver.implicitly_wait(10)
+      if by == 'date':
+        browser.fill_in('txtDtInicio', pendulum.parse(filters.get('start_date')).format(CMTSP_DATE_FORMAT))
+        browser.fill_in('txtDtFim', pendulum.parse(filters.get('end_date')).format(CMTSP_DATE_FORMAT))
+      elif by == 'process':
+        browser.fill_in("txtExpressao", filters['process'])
+      else:
+        raise Exception(f'Option "{by}" not available')
+    
+    def click_search(browser):
+      while True:
+        try:
+          browser.driver.find_element(By.ID, 'btnPesquisar').click()
+          browser.driver.implicitly_wait(10)
+        except ElementClickInterceptedException:
+          accept_cookies(browser)
+        except Exception as e:
+          logger.error(e)
+          raise Exception(e)
+        break
+    
     self.browser.driver.implicitly_wait(10)
-    if by == 'date':
-      self.browser.fill_in('txtDtInicio', pendulum.parse(filters.get('start_date')).format(CMTSP_DATE_FORMAT))
-      self.browser.fill_in('txtDtFim', pendulum.parse(filters.get('end_date')).format(CMTSP_DATE_FORMAT))
-    elif by == 'process':
-      self.browser.fill_in("txtExpressao", filters['process'])
-    else:
-      raise Exception(f'Option "{by}" not available')
-    # RECAPTCHA
+    accept_cookies(self.browser)
+    fill_data(self.browser, by)
     captcha.solve_recaptcha(self.browser, logger, SITE_KEY)
-
-    # CLICK 'PESQUISAR'
-    self.browser.driver.find_element(By.ID, 'btnPesquisar').click()
-    self.browser.driver.implicitly_wait(10)
-
+    click_search(self.browser)
     try:
       return bool(self.browser.bsoup().find('td', text='Ementa'))
     except UnexpectedAlertPresentException:
@@ -244,7 +255,7 @@ def cmtsp_task(**kwargs):
         'start_date': kwargs.get('start_date'),
         'end_date': kwargs.get('end_date'),
     }
-
+    skip_cache = kwargs.get('skip_cache')
     collector = CMTSPCollector(client=CMTSPClient(), filters=query_params)
     handler = base.ContentHandler(output=output)
     snapshot = base.Snapshot(keys=query_params)
@@ -254,7 +265,8 @@ def cmtsp_task(**kwargs):
         output=output,
         handler=handler,
         logger=logger,
-        max_workers=8) \
+        max_workers=8,
+        skip_cache=skip_cache) \
         .run(snapshot=snapshot)
 
 
@@ -271,6 +283,7 @@ def cmtsp_task(**kwargs):
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+@click.option('--skip-cache', default=False, help='Starts collection from the beginning', is_flag=True)            
 def cmtsp_command(**kwargs):
   enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
   del (kwargs['enqueue'])
