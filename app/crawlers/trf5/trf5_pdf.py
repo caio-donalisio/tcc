@@ -1,6 +1,7 @@
 import logging
 import random
 import time
+import re
 
 from app.crawlers import base, browsers, utils
 import click
@@ -13,15 +14,13 @@ from app.crawlers.logconfig import logger_factory
 
 logger = logger_factory('trf5-pdf')
 
-MAX_WORKERS = 3
-
-
 class TRF5Downloader:
 
   def __init__(self, client=None, output=None):
     self._client = client
     self._output = output
 
+  @utils.retryable(retryable_exceptions=Exception, ignore_if_exceeds=True)
   def download(self, items, pbar=None):
     import concurrent.futures
 
@@ -43,7 +42,7 @@ class TRF5Downloader:
 
             futures.append(executor.submit(self._handle_upload, item, response))
           else:
-            logger.warn(f"URL not found for {item['numeroProcesso']}")
+            logger.warn(f"URL not found for {item.dest}")
 
           if pbar:
             pbar.update(1)
@@ -53,6 +52,7 @@ class TRF5Downloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url(self, record: dict, browser=None):
     import re
 
@@ -65,7 +65,6 @@ class TRF5Downloader:
 
     try:
       if re.search(r'www4.trf5.jus.br\/processo', record['url']):
-        # if not self.filters('skip_full'):
         report_url = self._get_report_url_from_trf5(record)
         if report_url is None:
           report_url = self._get_report_url_from_trf5(record, digits=2)
@@ -83,6 +82,7 @@ class TRF5Downloader:
         'content_type': content_type_report
     }
 
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_trf5(self, doc: dict, digits=0):
     import requests
     import re
@@ -115,6 +115,7 @@ class TRF5Downloader:
 
     return self._get_judgment_doc_url_by_closest_date(links)
 
+  # @utils.retryable(retryable_exceptions=Exception)
   def _get_report_url_from_pje(self, browser, doc):
     details_url = self._get_judgment_details_url(browser, doc)
     if not details_url:
@@ -126,6 +127,8 @@ class TRF5Downloader:
     from selenium.webdriver.common.by import By
 
     browser.get(doc['url'])
+    if browser.bsoup().find('div', attrs={'class':'box-mensagem'}, text=re.compile('Erro 403')):
+      raise utils.SourceUnavailable('Website is currently unavailable - too many requests - try again later')
     browser.wait_for_element(locator=(By.ID, 'consultaPublicaForm:captcha:captchaImg'), timeout=30)
 
     judgment_id = self._format_process_number(doc['numeroProcesso'])
@@ -277,7 +280,7 @@ class TRF5Downloader:
 
     return None
 
-  @utils.retryable(max_retries=6)
+  # @utils.retryable(max_retries=6)
   def _get_response(self, content_from_url):
     import requests
     logger.debug(f'GET {content_from_url.src}')
@@ -381,12 +384,16 @@ def trf5_download(items, output_uri, pbar):
               help='Format YYYY-MM.',
               )
 @click.option('--input-uri', help='Input URI')
+@click.option('--max-workers', default=3, help='Number of parallel workers')
 @click.option('--dry-run', default=False, is_flag=True)
 @click.option('--count', default=False, is_flag=True)
-def trf5_pdf_command(input_uri, start_date, end_date, dry_run, count):
+@click.option('--batch', default=100)
+def trf5_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count, batch):
   output = utils.get_output_strategy_by_path(path=input_uri)
   startDate = pendulum.parse(start_date)
   endDate = pendulum.parse(end_date)
+  global MAX_WORKERS
+  MAX_WORKERS = int(max_workers)
 
   if count:
     total = 0
@@ -400,8 +407,13 @@ def trf5_pdf_command(input_uri, start_date, end_date, dry_run, count):
   while startDate <= endDate:
     print(f"TRF5 - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
+    counter = 0
     for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)
-
+      counter += 1
+      if counter % batch == 0:
+        utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
+        pendings.clear()
+      startDate = startDate.add(months=1)
     utils.run_pending_tasks(trf5_download, pendings, input_uri=input_uri, dry_run=dry_run)
     startDate = startDate.add(months=1)

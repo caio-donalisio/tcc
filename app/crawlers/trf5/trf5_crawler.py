@@ -29,27 +29,26 @@ DEFAULT_HEADERS = {
     'sec-ch-ua-platform': '"Windows"',
 }
 
-
-def merged_with_default_filters(start_date, end_date, skip_full):
-  return {
-      'draw': '1',
-      'columns[0][data]': 'codigoDocumento',
-      'columns[0][name]': '',
-      'columns[0][searchable]': 'true',
-      'columns[0][orderable]': 'false',
-      'columns[0][search][value]': '',
-      'columns[0][search][regex]': 'false',
-      'start': '0',
-      'length': '10',
-      'search[value]': '',
-      'search[regex]': 'false',
-      'pesquisaLivre': '',
-      'numeroProcesso': '',
-      'orgaoJulgador': '',
-      'relator': '',
-      'dataIni': f'{start_date}',
-      'dataFim': f'{end_date}',
-  }
+def merged_with_default_filters(start_date, end_date, **kwargs):
+    return {
+        'draw': '1',
+        'columns[0][data]': 'codigoDocumento',
+        'columns[0][name]': '',
+        'columns[0][searchable]': 'true',
+        'columns[0][orderable]': 'false',
+        'columns[0][search][value]': '',
+        'columns[0][search][regex]': 'false',
+        'start': '0',
+        'length': '10',
+        'search[value]': '',
+        'search[regex]': 'false',
+        'pesquisaLivre': '',
+        'numeroProcesso': '',
+        'orgaoJulgador': '',
+        'relator': '',
+        'dataIni': f'{start_date}',
+        'dataFim': f'{end_date}',
+    }
 
 
 class TRF5Client:
@@ -170,24 +169,25 @@ def trf5_task(**kwargs):
     end_date = pendulum.parse(kwargs.get('end_date')).format(SOURCE_DATE_FORMAT)
 
     filters = {
-        'start_date': start_date,
-        'end_date': end_date,
-        'skip_full': kwargs.get('skip_full'),
-    }
-
+            'start_date' :start_date,
+            'end_date': end_date,
+            'skip_full': kwargs.get('skip_full'),
+        }
     collector = TRF5Collector(
         client=TRF5Client(),
         filters=filters
     )
-    handler = base.ContentHandler(output=output)
+    handler   = base.ContentHandler(output=output)
     snapshot = base.Snapshot(keys=filters)
+    
 
     base.get_default_runner(
         collector=collector,
         output=output,
         handler=handler,
         logger=logger,
-        max_workers=8) \
+        max_workers=8,
+        skip_cache=kwargs.get('skip_cache', False)) \
         .run(snapshot=snapshot)
 
 
@@ -203,8 +203,9 @@ def trf5_task(**kwargs):
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--skip-full',    default=False,    help='Collects metadata only', is_flag=True)
+  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+@click.option('--skip-full' ,    default=False,    help='Collects metadata only'  , is_flag=True)
+@click.option('--skip-cache' ,    default=False,    help='Starts collection from the beginning'  , is_flag=True)
 def trf5_command(**kwargs):
   enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
   del (kwargs['enqueue'])

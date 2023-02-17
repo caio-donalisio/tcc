@@ -12,7 +12,7 @@ from typing import Optional
 
 from tqdm import tqdm
 from bs4 import BeautifulSoup
-from typing import Any
+from typing import Any, Dict
 
 
 class BaseCrawler:
@@ -258,13 +258,14 @@ class IChunkProcessor:
 
 
 class FutureChunkProcessor(IChunkProcessor):
-  def __init__(self, executor, handler, repository: ChunksRepository):
-    self.executor = executor
-    self.handler = handler
+  def __init__(self, executor, handler, repository : ChunksRepository, skip_cache):
+    self.executor   = executor
+    self.handler    = handler
     self.repository = repository
+    self.skip_cache = skip_cache
 
   def process(self, chunk) -> ChunkResult:
-    if self.repository.commited(chunk):
+    if self.repository.commited(chunk) and not self.skip_cache:
       self.repository.restore(chunk)
       return ChunkResult(updates=chunk.get_value('records'))
 
@@ -289,19 +290,20 @@ class FutureChunkProcessor(IChunkProcessor):
 
 class ChunkRunner:
 
-  def __init__(self, collector: ICollector, processor: IChunkProcessor,
-               repository: SnapshotsRepository, logger):
-    self.collector = collector
-    self.processor = processor
+  def __init__(self, collector : ICollector, processor : IChunkProcessor,
+      repository : SnapshotsRepository, logger, skip_cache):
+    self.collector  = collector
+    self.processor  = processor
     self.repository = repository
-    self.logger = logger
+    self.logger     = logger
+    self.skip_cache = skip_cache
     self.min_snapshot_interval = 30  # secs
 
   def run(self, snapshot: Optional[Snapshot] = None):
     tqdm_out = utils.TqdmToLogger(self.logger, level=logging.INFO)
 
     hashmap = {}
-    if snapshot and self.repository.exists(snapshot):
+    if snapshot and self.repository.exists(snapshot) and not self.skip_cache:
       self.repository.restore(snapshot)
       chunks = snapshot.get_value('chunks')
       if chunks:
@@ -412,19 +414,21 @@ class ContentHandler:
 def get_default_runner(collector, output, handler, logger, **kwargs):
   import concurrent.futures
   executor = concurrent.futures.ThreadPoolExecutor(max_workers=kwargs.get('max_workers', 2))
+  skip_cache = kwargs.get('skip_cache', False)
 
   chunks_repository = ChunksRepository(output=output)
 
   processor =\
-      FutureChunkProcessor(executor=executor,
-                           handler=handler, repository=chunks_repository)
+    FutureChunkProcessor(executor=executor,
+      handler=handler, repository=chunks_repository, skip_cache=skip_cache)
 
   snapshots_repository = SnapshotsRepository(output=output)
   runner = ChunkRunner(
-      collector=collector,
-      processor=processor,
-      repository=snapshots_repository,
-      logger=logger
+    collector=collector,
+    processor=processor,
+    repository=snapshots_repository,
+    logger=logger,
+    skip_cache = skip_cache,
   )
 
   return runner

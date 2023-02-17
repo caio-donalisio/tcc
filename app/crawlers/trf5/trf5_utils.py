@@ -25,10 +25,8 @@ def list_pending_pdfs(bucket_name, prefix):
   client = storage.Client()
   bucket = client.get_bucket(bucket_name)
 
-  counter = 0
   for name, parent in jsons.items():
-    if name not in inteiros and counter <= 250:
-      counter += 1
+    if name not in inteiros:
       blob = bucket.get_blob(f'{parent}/{name}.json')
       yield {
           'row': json.loads(blob.download_as_bytes()) if blob else None,
