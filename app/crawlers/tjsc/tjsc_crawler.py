@@ -291,10 +291,10 @@ def tjsc_task(**kwargs):
     output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
     logger.info(f'Output: {output}.')
 
-        start_date = kwargs.get('start_date')
-        start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)
-        end_date = kwargs.get('end_date')
-        end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)
+    start_date = kwargs.get('start_date')
+    start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)
+    end_date = kwargs.get('end_date')
+    end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)
 
     query_params = {
         'start_date': start_date,
