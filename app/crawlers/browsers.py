@@ -42,6 +42,12 @@ class FirefoxBrowser:
           desired_capabilities=DesiredCapabilities.FIREFOX
       )
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+      self.driver.quit()
+  
   def get(self, url, wait_for=(By.TAG_NAME, 'body')):
     # TODO: HANDLE: Exception has occurred: TimeoutException -- Message: TimedPromise timed out after 300000 ms
     self.driver.get(url)
@@ -115,7 +121,13 @@ class FirefoxBrowser:
       raise Exception(f'Cookie not found: {cookie_name}')
     return value
 
-  def _get_options(self, headers, headless, page_load_strategy):
+  def get_cookie_dict(self):
+    cookies = {}
+    for item in self.driver.get_cookies():
+      cookies.update({item['name']:item['value']})
+    return cookies
+
+  def _get_options(self, headers, headless,page_load_strategy):
     options = Options()
     headers = urlencode(headers or self._sample_headers())
     options.add_argument(headers)

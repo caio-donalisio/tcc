@@ -13,6 +13,7 @@ import app.crawlers.tjrj
 import app.crawlers.tjrs
 import app.crawlers.tjsc
 import app.crawlers.tjsp
+import app.crawlers.tjsp1i
 import app.crawlers.trf1
 import app.crawlers.trf2
 import app.crawlers.trf3
