@@ -253,6 +253,12 @@ class TJSCContentHandler(base.ContentHandler):
   def __init__(self, output):
     self.output = output
 
+  def validate_content(self, content:str):
+    soup = utils.soup_by_content(content)
+    captcha_pattern = r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*'
+    captcha_div = soup.find(text=re.compile(captcha_pattern))
+    return not bool(captcha_div)
+
   @utils.retryable(max_retries=9, sleeptime=1.1)
   def _handle_url_event(self, event : base.ContentFromURL):
     if self.output.exists(event.dest):
@@ -264,11 +270,13 @@ class TJSCContentHandler(base.ContentHandler):
         headers = DOWNLOAD_HEADERS,
         verify=False,
         timeout=5.1,
-)
+)   
     except Exception as e:
       raise utils.PleaseRetryException(f'Could not download: {event.dest} {e}')
     if response.status_code == 404:
       return
+    if not self.validate_content(response.text): 
+      raise utils.PleaseRetryException('Invalid downloaded content')
 
     dest = event.dest
     content_type = event.content_type
