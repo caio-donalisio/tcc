@@ -37,110 +37,93 @@ DEFAULT_HEADERS = {
     # 'TE': 'trailers',
 }
 
-
-# response = requests.post(
-#     'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do?&categoria=acordaos&categoria=acma&categoria=recurso',
-#     cookies=cookies,
-#     headers=headers,
-#     data=data,
-# )
+DOWNLOAD_HEADERS = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive',
+    # 'Cookie': 'JSESSIONID=72DC72D9050FC324EAA6B2B444228270; _ga_M10DPR56QV=GS1.1.1675107176.6.0.1675107752.0.0.0; _ga=GA1.3.1806411352.1673869367; _gid=GA1.3.2051174715.1675714634; _gat=1',
+    'Referer': 'https://busca.tjsc.jus.br/jurisprudencia/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Edg/109.0.1518.78',
+    'sec-ch-ua': '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+}
 
 def get_filters(start_date, end_date, **kwargs):
-  return {
-      'q': '',
-      'only_ementa': '',
-      'frase': '',
-      'excluir': '',
-      'qualquer': '',
-      '': '',
-      'prox1': '',
-      'prox2': '',
-      'proxc': '',
-      'sort': 'dtJulgamento desc',
-      'ps': '50',
-      'busca': 'avancada',
-      # 'pg': '2',
-      'flapto': '1',
-      'datainicial': start_date.format(SEARCH_DATE_FORMAT),
-      'datafinal': end_date.format(SEARCH_DATE_FORMAT),
-      'radio_campo': 'integra',
-      'categoria[]': [
-          'acordaos',
-          'acma',
-          'recurso',
-      ],
-      'faceta': 'false',
-  }
-#     {
-#     'q': '',
-#     'only_ementa': '',
-#     'qualquer': '',
-#     'excluir': '',
-#     'prox1': '',
-#     'prox2': '',
-#     'proxc': '',
-#     'frase': '',
-#     'classe': '',
-#     'juizProlator': '',
-#     'origem': '',
-#     'relator': '',
-#     'radio_campo': 'ementa',
-#     'faceta': 'true',
-#     'busca': 'avancada',
-#     'datainicial': start_date.format(SEARCH_DATE_FORMAT),
-#     'datafinal': end_date.format(SEARCH_DATE_FORMAT),
-#     'nuProcesso': '',
-#     'ps': '50',
-#     'sort': 'dtJulgamento desc',
-# }
-
-
-class NoProcessNumberError(Exception):
-  pass
-
+    return {
+    'q': '',
+    'only_ementa': '',
+    'frase': '',
+    'excluir': '',
+    'qualquer': '',
+    '': '',
+    'prox1': '',
+    'prox2': '',
+    'proxc': '',
+    'sort': 'dtJulgamento desc',
+    'ps': '50',
+    'busca': 'avancada',
+    #'pg': '2',
+    'flapto': '1',
+    'datainicial': start_date.format(SEARCH_DATE_FORMAT),
+    'datafinal': end_date.format(SEARCH_DATE_FORMAT),
+    'radio_campo': 'integra',
+    'categoria[]': [
+        'acordaos',
+        'acma',
+        'recurso',
+    ],
+    'faceta': 'false',
+}
 
 class TJSCClient:
 
-  def __init__(self):
-    self.session = requests.Session()
-    self.url = f'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do'
+    def __init__(self):
+        self.session = requests.Session()
+        self.url = f'https://busca.tjsc.jus.br/jurisprudencia/buscaajax.do'
 
-  @utils.retryable(max_retries=3, sleeptime=31)
-  def count(self, filters, min_votes=3):
-    counts = []
-    while not any(counts.count(n) >= min_votes for n in counts):
-      result = self.fetch(filters)
-      soup = utils.soup_by_content(result.text)
-      count_tag = soup.find('div', attrs={'class': 'texto_resultados'})
-      if count_tag:
-        count = re.search(r'^\s*([\d\,]+) resultados.*$', count_tag.text, re.M)
-        count = int(utils.extract_digits(count.group(1)))
-      else:
-        count = 0
-      counts.append(count)
+    @utils.retryable(max_retries=3, sleeptime=31)
+    def count(self,filters, min_votes=3):
+        counts = []
+        while not any(counts.count(n) >= min_votes for n in counts):
+            result = self.fetch(filters)
+            soup = utils.soup_by_content(result.text)
+            count_tag = soup.find('div', attrs={'class':'texto_resultados'})
+            if count_tag:
+                count = re.search(r'^\s*([\d\,]+) resultados.*$',count_tag.text, re.M)
+                count = int(utils.extract_digits(count.group(1)))
+            else:
+                count = 0
+            counts.append(count)
+        def check_if_recaptcha(soup):
+            if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
+                raise utils.PleaseRetryException()
+        check_if_recaptcha(soup)
+        return max(counts, key=lambda n: counts.count(n))
 
-    def check_if_recaptcha(soup):
-      if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
-        raise utils.PleaseRetryException()
-    check_if_recaptcha(soup)
-    return max(counts, key=lambda n: counts.count(n))
+    @utils.retryable(max_retries=3)
+    def fetch(self, filters, page=1):
+        self.session.headers.update(DEFAULT_HEADERS)
+        try:
+            return self.session.post(
+                url=f'{self.url}',
+                data={
+                    **get_filters(**filters),
+                    'pg':str(page)
+                },
+                verify=False,
+                timeout=10,
+            )
 
-  @utils.retryable(max_retries=3)
-  def fetch(self, filters, page=1):
-    self.session.headers.update(DEFAULT_HEADERS)
-    try:
-      return self.session.post(
-          url=f'{self.url}',
-          data={
-              **get_filters(**filters),
-              'pg': str(page)
-          },
-          verify=False,
-      )
-
-    except Exception as e:
-      logger.error(f"page fetch error params: {filters}")
-      raise e
+        except Exception as e:
+            logger.error(f"page fetch error params: {filters} {e}")
+            raise e
 
 
 class TJSCCollector(base.ICollector):
@@ -187,101 +170,103 @@ class TJSCCollector(base.ICollector):
 
 class TJSCChunk(base.Chunk):
 
-  def __init__(self, keys, prefix, filters, page, client):
-    super(TJSCChunk, self).__init__(keys, prefix)
-    self.filters = filters
-    self.page = page
-    self.client = client
+    def __init__(self, keys, prefix, filters, page, client):
+        super(TJSCChunk, self).__init__(keys, prefix)
+        self.filters  = filters
+        self.page = page
+        self.client = client
 
-  @utils.retryable(sleeptime=31)
-  def rows(self):
-    to_download = []
+    @utils.retryable(sleeptime=31)
+    def rows(self):
+        to_download = []
 
-    @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
-    def check_if_recaptcha():
-      result = self.client.fetch(self.filters, self.page)
-      soup = utils.soup_by_content(result.text)
-      if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
-        raise utils.PleaseRetryException()
-      return soup
+        @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
+        def check_if_recaptcha():
+            result = self.client.fetch(self.filters, self.page)
+            soup = utils.soup_by_content(result.text)
+            if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
+                raise utils.PleaseRetryException('Found ReCaptcha')
+            return soup
+        
+        soup = check_if_recaptcha()
+        
+        for act in soup.find_all('div', class_='resultados'):
+            time.sleep(0.2456)
+            links = {}
 
-    soup = check_if_recaptcha()
+            links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
+            links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
 
-    for act in soup.find_all('div', class_='resultados'):
-      time.sleep(0.51531325)
-      links = {}
+            links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
+            links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
+            
+            links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
+            links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
-      links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
-      links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
+            process_code = re.search(r'.*Processo\:\s?([\d\-\.\/]+)\s.*', act.find('p').text).group(1)
+            process_code = utils.extract_digits(process_code)
+            
 
-      links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
-      links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
+            assert process_code and 25 > len(process_code) > 5
+            session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
+            session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
+            
+            onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
+            ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
+            links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
 
-      links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
-      links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
 
-      process_code = re.search(r'.*Processo\:\s?([\d\-\.]+)\s.*', act.find('p').text).group(1)
-      process_code = utils.extract_digits(process_code)
+            base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
+            
+            if links.get('short_html'):
+                to_download.append(
+                    base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
+                )
 
-      assert process_code and 25 > len(process_code) > 5
-      session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
-      session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
+            if links.get('html'):
+                to_download.append(
+                    base.ContentFromURL(src=links['html'], dest=f'{base_path}_FULL.html', content_type='text/html')
+                )
 
-      onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
-      ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
-      links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
+            if links.get('pdf'):
+                to_download.append(
+                    base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
+                )
+            
+            if links.get('rtf'):
+                to_download.append(
+                    base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
+                )
+            
+            #TJSC will cut connection if too many requests are made
+            time.sleep(0.261616136)
 
-      base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
+            to_download.append(base.Content(
+                content=str(act),
+                dest=f'{base_path}.html',
+                content_type='text/html'))
 
-      if links.get('short_html'):
-        to_download.append(
-            base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
-        )
-
-      if links.get('html'):
-        to_download.append(
-            base.ContentFromURL(src=links['html'], dest=f'{base_path}_FULL.html', content_type='text/html')
-        )
-
-      if links.get('pdf'):
-        to_download.append(
-            base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
-        )
-
-      if links.get('rtf'):
-        to_download.append(
-            base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
-        )
-
-      # TJSC will cut connection if too many requests are made
-      time.sleep(0.561616136)
-
-      to_download.append(base.Content(
-          content=str(act),
-          dest=f'{base_path}.html',
-          content_type='text/html'))
-
-      yield to_download
-
+            yield to_download
 
 class TJSCContentHandler(base.ContentHandler):
 
   def __init__(self, output):
     self.output = output
 
-  @utils.retryable(max_retries=9)
-  def _handle_url_event(self, event: base.ContentFromURL):
+  @utils.retryable(max_retries=9, sleeptime=1.1)
+  def _handle_url_event(self, event : base.ContentFromURL):
     if self.output.exists(event.dest):
       return
 
     try:
       response = requests.get(event.src,
-                              allow_redirects=True,
-                              verify=False,
-                              timeout=10,
-                              )
-    except:
-      raise utils.PleaseRetryException()
+        allow_redirects=False,
+        headers = DOWNLOAD_HEADERS,
+        verify=False,
+        timeout=5.1,
+)
+    except Exception as e:
+      raise utils.PleaseRetryException(f'Could not download: {event.dest} {e}')
     if response.status_code == 404:
       return
 
@@ -306,10 +291,10 @@ def tjsc_task(**kwargs):
     output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
     logger.info(f'Output: {output}.')
 
-    start_date = kwargs.get('start_date')
-    start_date = pendulum.from_format(start_date, INPUT_DATE_FORMAT)  # .format(SEARCH_DATE_FORMAT)
-    end_date = kwargs.get('end_date')
-    end_date = pendulum.from_format(end_date, INPUT_DATE_FORMAT)  # .format(SEARCH_DATE_FORMAT)
+        start_date = kwargs.get('start_date')
+        start_date = pendulum.from_format(start_date,INPUT_DATE_FORMAT)
+        end_date = kwargs.get('end_date')
+        end_date = pendulum.from_format(end_date,INPUT_DATE_FORMAT)
 
     query_params = {
         'start_date': start_date,
