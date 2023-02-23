@@ -254,9 +254,11 @@ class TJSCContentHandler(base.ContentHandler):
     self.output = output
 
   def validate_content(self, content:str):
-    soup = utils.soup_by_content(content)
-    captcha_pattern = r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*'
-    captcha_div = soup.find(text=re.compile(captcha_pattern))
+    captcha_div = None
+    if not content.startswith(('%PDF', '{\\rtf')):
+        soup = utils.soup_by_content(content)
+        captcha_pattern = r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*'
+        captcha_div = soup.find(text=re.compile(captcha_pattern))
     return not bool(captcha_div)
 
   @utils.retryable(max_retries=9, sleeptime=1.1)
