@@ -2,11 +2,14 @@ from app.crawlers import base, utils, proxy
 import re
 import pendulum
 from app.crawlers.logconfig import logger_factory, setup_cloud_logger
+from app.crawlers import browsers, captcha
 import click
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
 import requests
 import time
+
+
 
 logger = logger_factory('tjsc')
 
@@ -15,6 +18,7 @@ RESULTS_PER_PAGE = 50
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
 NOW = pendulum.now()
+SITE_KEY='6LfYJVcUAAAAALnIOWLWZnxRtDWxdpbreWi2hzwr'
 BASE_URL = 'https://busca.tjsc.jus.br/jurisprudencia/'
 DOC_TO_PDF_CONTAINER_URL = 'http://localhost/unoconv/pdf'
 
@@ -253,7 +257,15 @@ class TJSCContentHandler(base.ContentHandler):
   def __init__(self, output):
     self.output = output
 
-  @utils.retryable(max_retries=9, sleeptime=1.1)
+  def validate_content(self, content:str):
+    captcha_div = None
+    if not content.startswith(('%PDF', '{\\rtf')):
+        soup = utils.soup_by_content(content)
+        captcha_pattern = r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*'
+        captcha_div = soup.find(text=re.compile(captcha_pattern))
+    return not bool(captcha_div)
+
+  @utils.retryable(max_retries=9, sleeptime=5.1)
   def _handle_url_event(self, event : base.ContentFromURL):
     if self.output.exists(event.dest):
       return
@@ -264,11 +276,16 @@ class TJSCContentHandler(base.ContentHandler):
         headers = DOWNLOAD_HEADERS,
         verify=False,
         timeout=5.1,
-)
+)   
     except Exception as e:
       raise utils.PleaseRetryException(f'Could not download: {event.dest} {e}')
     if response.status_code == 404:
       return
+    if not self.validate_content(response.text): 
+        with browsers.FirefoxBrowser() as browser:
+            browser.get(event.src)            
+            captcha.solve_recaptcha(browser=browser, logger=logger, site_key=SITE_KEY)
+        raise utils.PleaseRetryException('Invalid downloaded content')
 
     dest = event.dest
     content_type = event.content_type
