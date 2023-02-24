@@ -1,6 +1,6 @@
 default:
   tags:
-    - docker
+    - k8s
 
 variables:
   DOCKER_IMAGE: "us-docker.pkg.dev/inspira-registry/docker/data/crawlers"
