@@ -24,11 +24,10 @@ class TJSCDownloader:
   @utils.retryable(retryable_exceptions=Exception, ignore_if_exceeds=True)
   def download(self, items, pbar=None):
     import concurrent.futures
-
-    handler = TJSCContentHandler(self._output)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures = []
       try:
+        handler = TJSCContentHandler(self._output)
         for item in items:
           item_soup = utils.soup_by_content(item.content)
           responses = TJSCChunk(*[None]*5).get_act_files(item_soup)
