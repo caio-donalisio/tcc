@@ -1,16 +1,17 @@
-# from jmespath import search
-import base
 import math
 import pendulum
 import celery
-import utils
-from logconfig import logger_factory, setup_cloud_logger
 import click
-from app import cli, celery
+from app.crawlers import base, utils
+from app.crawler_cli import cli
+from app.celery_run import celery_app as celery
 import requests
+from app.crawlers.logutils import logging_context
+from app.crawlers.logconfig import logger_factory, setup_cloud_logger
 
 logger = logger_factory('cvm')
 
+COURT_NAME = 'cvm'
 DATE_FORMAT = 'DD/MM/YYYY'
 BOUND_DATE_FORMAT = 'MM/DD/YYYY'
 RESULTS_PER_PAGE = 10
@@ -31,7 +32,6 @@ DEFAULT_HEADERS = headers = {
     'Sec-Fetch-Site': 'same-origin',
 }
 
-
 def get_params(start_date, end_date, page=1):
     return {
         'lastNameShow':'',
@@ -50,8 +50,6 @@ def get_params(start_date, end_date, page=1):
         'searchPage':page,
         'tipos':'',
     }
-
-
 
 class CVMClient:
 
@@ -151,10 +149,7 @@ class CVMChunk(base.Chunk):
 @celery.task(queue='crawlers.cvm', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))
 def cvm_task(**kwargs):
-    import utils
     setup_cloud_logger(logger)
-
-    from logutils import logging_context
 
     with logging_context(crawler='cvm'):
         output = utils.get_output_strategy_by_path(path=kwargs.get('output_uri'))
@@ -177,13 +172,21 @@ def cvm_task(**kwargs):
             max_workers=8) \
             .run(snapshot=snapshot)
 
-@cli.command(name='cvm')
-@click.option('--start-date',    prompt=True,      help='Format YYYY-MM-DD.')
-@click.option('--end-date'  ,    prompt=True,      help='Format YYYY-MM-DD.')
+@cli.command(name=COURT_NAME)
+@click.option('--start-date',
+              default=utils.DefaultDates.BEGINNING_OF_YEAR_OR_SIX_MONTHS_BACK.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m-%d"),
+              help='Format YYYY-MM-DD.',
+              )
 @click.option('--output-uri',    default=None,     help='Output URI (e.g. gs://bucket_name')
-@click.option('--enqueue'   ,    default=False,    help='Enqueue for a worker'  , is_flag=True)
+@click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
-  default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+              default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+@click.option('--count-only',
+              default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def cvm_command(**kwargs):
   if kwargs.get('enqueue'):
     if kwargs.get('split_tasks'):

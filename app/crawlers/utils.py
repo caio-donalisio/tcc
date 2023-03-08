@@ -23,8 +23,7 @@ from app.crawlers.storage import get_bucket_ref
 from bs4 import BeautifulSoup
 from datetime import datetime
 from fake_useragent import UserAgent
-from functools import partial
-from functools import wraps
+from functools import partial, wraps
 from itertools import chain
 from pathlib import Path
 from selenium.common.exceptions import TimeoutException
