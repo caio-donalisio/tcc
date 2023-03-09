@@ -126,6 +126,5 @@ def tjsc_recollect_command(input_uri, start_date, end_date,max_workers, dry_run,
       if counter % batch == 0:
         utils.run_pending_tasks(tjsc_download, pendings, input_uri=input_uri, dry_run=dry_run)
         pendings.clear()
-      startDate = startDate.add(months=1)
     utils.run_pending_tasks(tjsc_download, pendings, input_uri=input_uri, dry_run=dry_run)
     startDate = startDate.add(months=1)
