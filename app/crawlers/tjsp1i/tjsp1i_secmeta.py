@@ -64,7 +64,7 @@ class TJSP1IDownloader:
 
   @utils.retryable(max_retries=3)
   def _get_response(self, content_from_url):
-    response=utils.get_response(logger, requests.Session(), content_from_url.src, '')
+    response=utils.get_response(logger, content_from_url.src)
     logger.debug(f'GET {content_from_url.src}')
     # for cookie in self._client.request_cookies_browser:
     #   self._client.session.cookies.set(cookie['name'], cookie['value'])

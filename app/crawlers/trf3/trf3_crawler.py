@@ -231,8 +231,9 @@ class TRF3Chunk(base.Chunk):
     page_response = utils.get_response(
         logger=logger,
         url=url,
+        session=self.client.session,
         headers=headers,
-        session=self.client.session)
+        )
     page_acordao_soup = BeautifulSoup(page_response.text, features='html5lib')
     self.page_is_error(logger, page_acordao_soup, processo_text)
     return page_acordao_soup

@@ -8,13 +8,14 @@ from app.celery_run import celery_app as celery
 import requests
 from app.crawlers.logutils import logging_context
 from app.crawlers.logconfig import logger_factory, setup_cloud_logger
+import re
 
 logger = logger_factory('cvm')
 
 COURT_NAME = 'cvm'
 DATE_FORMAT = 'DD/MM/YYYY'
 BOUND_DATE_FORMAT = 'MM/DD/YYYY'
-RESULTS_PER_PAGE = 10
+RESULTS_PER_PAGE = 50
 DEFAULT_HEADERS = headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
     'Accept': '*/*',
@@ -54,11 +55,7 @@ def get_params(start_date, end_date, page=1):
 class CVMClient:
 
     def __init__(self):
-        # lastNameShow=&lastName=&filtro=todos&dataInicio=15%2F01%2F2019&dataFim=31%2F10%2F2021&categoria0=%2Fsancionadores%2Fsancionador%2F&buscado=false&contCategoriasCheck=2
-        # self.url = 'https://conteudo.cvm.gov.br/sancionadores/index.html?'
         self.url = 'https://conteudo.cvm.gov.br/system/modules/br.com.squadra.principal/elements/resultadoDecisaoColegiado2.jsp'
-        # response = requests.post('https://conteudo.cvm.gov.br/system/modules/br.com.squadra.principal/elements/resultadoDecisaoColegiado2.jsp', headers=headers, cookies=cookies, data=data)
-
 
     @utils.retryable(max_retries=3)
     def count(self,filters):
@@ -66,7 +63,7 @@ class CVMClient:
             self.fetch(filters, page=1)
         )
         count = soup.find(name='div',class_='col-sm-6 no-padding').find('span').text
-        count = ''.join(char for char in count if char.isdigit())
+        count = utils.extract_digits(count)
         return int(count) if count else 0
 
     @utils.retryable(max_retries=3)
@@ -83,8 +80,6 @@ class CVMClient:
         except Exception as e:
             logger.error(f"page fetch error params: {filters}")
             raise e
-
-# https://conteudo.cvm.gov.br/sancionadores/index.html?lastNameShow=&lastName=&filtro=todos&dataInicio=15%2F10%2F2019&dataFim=31%2F10%2F2021&categoria0=%2Fsancionadores%2Fsancionador%2F&buscado=false&contCategoriasCheck=2
 class CVMCollector(base.ICollector):
 
     def __init__(self, client, filters):
@@ -122,29 +117,46 @@ class CVMChunk(base.Chunk):
 
     def rows(self):
         # yield
+        to_download = []
         BASE_URL = 'https://conteudo.cvm.gov.br'
         result = self.client.fetch(self.filters,self.page)
         soup = utils.soup_by_content(result)
-        for link in soup.find_all('a'):
-            page = requests.get(f'{BASE_URL}{link["href"]}')
-            item_soup = utils.soup_by_content(page.text)
-            ...
-        #     session_at = pendulum.parse(record['dt_sessao_tdt'])
+        for item in soup.find_all('article'):
 
-        #     record_id = record['id']
-        #     base_path   = f'{session_at.year}/{session_at.month:02d}'
-        #     report_id,_ = record['nome_arquivo_pdf_s'].split('.')
-        #     dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
+            date = [p for p in item.find_all('p') if 'Data' in p.text].pop().text
+            date_dict = re.search(r'.*(?P<day>\d{2})\/(?P<month>\d{2})\/(?P<year>\d{4})', date).groupdict()
+            tipo = [p for p in item.find_all('p') if 'Tipo' in p.text].pop().text.replace(' ','').lower()
+            tipo = ''.join(char for char in tipo if char.isalnum())
+            link = item.find('a')['href']
+            content_hash = utils.get_content_hash(soup=item, tag_descriptions=[{'name':'h3'}])
+            base_path = f'{date_dict["year"]}/{date_dict["month"]}/{date_dict["day"]}_{tipo}_{content_hash}'
+            
+            to_download.append(
+                base.Content(content=str(item), dest=f'{base_path}.html', content_type='text/html')
+            )
+            item_page = utils.get_response(logger=logger, url=f'{BASE_URL}{link}')
+            item_soup = utils.soup_by_content(item_page.text)
 
-        #     # report_url = f'https://acordaos.economia.gov.br/acordaos2/pdfs/processados/{report_id}.pdf'
-        #     dest_report = f"{base_path}/doc_{record_id}_{report_id}.pdf"
+            if link.endswith('.pdf'):
+                to_download.append(
+                    base.ContentFromURL(src=link, dest=f'{base_path}.pdf', content_type='application/pdf')
+                )
+            elif link.endswith('.html'):
 
-        #     yield [
-        #     base.Content(content=json.dumps(record),dest=dest_record,
-        #         content_type='application/json'),
-        #     base.ContentFromURL(src=report_url,dest=dest_report,
-        #         content_type='application/pdf')
-        #     ]
+                to_download.append(
+                    base.Content(content=str(item_page), dest=f'{base_path}_SEC.html', content_type='text/html')
+                )
+                for n, a in enumerate(item_soup.find_all('a')):
+                    *_, fmt = a['href'].split('.')
+                    to_download.append(
+                        base.ContentFromURL( src=a['href'], 
+                            dest=f'{base_path}_{n:02}.{fmt}', content_type='application/pdf')
+                    )   
+
+            else:
+                raise Exception('Unexpected link')
+
+            yield to_download
 
 @celery.task(queue='crawlers.cvm', default_retry_delay=5 * 60,
             autoretry_for=(BaseException,))

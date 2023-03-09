@@ -252,62 +252,6 @@ def get_content_hash(
   )
   return hashlib.sha1(content_string.encode('utf-8')).hexdigest()[:length]
 
-
-def get_count_filepath(
-        court_name: str,
-        start_date: pendulum.datetime,
-        end_date: pendulum.datetime,
-        filepath=None):
-  '''
-  Returns custom or standard count file name
-  '''
-  if filepath is None:
-    dest_record = f'{court_name.upper()}-COUNT-{start_date.to_date_string()}-{end_date.to_date_string()}.json'
-  else:
-    dest_record = filepath
-  return dest_record
-
-
-def get_count_data(
-        start_date: pendulum.datetime,
-        end_date: pendulum.datetime,
-        count: int,
-        count_time: pendulum.datetime,):
-  '''
-  Returns count data dictionary
-  '''
-  return {
-      'start_date': start_date.to_date_string(),
-      'end_date': end_date.to_date_string(),
-      'count': count,
-      'count_time': count_time.to_datetime_string(),
-  }
-
-
-def get_count_data_and_filepath(
-        court_name: str,
-        start_date: pendulum.datetime,
-        end_date: pendulum.datetime,
-        count: int,
-        count_time: pendulum.datetime,
-        filepath=None):
-
-  return tuple([
-      get_count_data(start_date, end_date, count, count_time),
-      get_count_filepath(court_name, start_date, end_date, filepath)
-  ])
-
-
-def count_data_content(count_data, count_filepath):
-  return [
-      base.Content(
-          content=json.dumps(count_data),
-          dest=count_filepath,
-          content_type='application/json'
-      )
-  ]
-
-
 def pdf_content_file_by_url(pdf_url):
   response = urllib.request.urlopen(pdf_url)
   if response.code == 200 and response.headers['Content-Type'] == 'application/pdf':
@@ -355,8 +299,10 @@ def get_pdf_hash(pdf_content: bytes,
 
 
 @retryable(max_retries=9)
-def get_response(logger, session, url, headers, verify=True, timeout=15):
+def get_response(logger,  url, session=None, headers='', verify=True, timeout=15):
   """Gets response and checks if response object has status code 200, throws Retry exception if not"""
+  if session is None:
+    session = requests.Session()
   response = session.get(
       url=url, headers=headers, verify=verify, timeout=timeout)
   if response.status_code != 200:
