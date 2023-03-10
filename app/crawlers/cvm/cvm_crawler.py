@@ -134,7 +134,7 @@ class CVMChunk(base.Chunk):
             to_download.append(
                 base.Content(content=str(item), dest=f'{base_path}.html', content_type='text/html')
             )
-            item_page = utils.get_response(logger=logger, url=f'{BASE_URL}{link}')
+            item_page = utils.get_response(logger=logger, url=f'{BASE_URL}{link}', verify=False)
             item_soup = utils.soup_by_content(item_page.text)
 
             if link.endswith('.pdf'):
@@ -142,15 +142,18 @@ class CVMChunk(base.Chunk):
                     base.ContentFromURL(src=link, dest=f'{base_path}.pdf', content_type='application/pdf')
                 )
             elif link.endswith('.html'):
+                article = item_soup.find('article')
 
                 to_download.append(
-                    base.Content(content=str(item_page), dest=f'{base_path}_SEC.html', content_type='text/html')
+                    base.Content(content=str(article), dest=f'{base_path}_SEC.html', content_type='text/html')
                 )
-                for n, a in enumerate(item_soup.find_all('a')):
+                fmt_types = {'html':'text/html', 'txt':'text/html', 'pdf':'application/pdf','doc':'application/doc'}
+                for n, a in enumerate(article.find_all('a', class_=re.compile(r'(link|download)')), start=1):
                     *_, fmt = a['href'].split('.')
+                    assert fmt in fmt_types
                     to_download.append(
-                        base.ContentFromURL( src=a['href'], 
-                            dest=f'{base_path}_{n:02}.{fmt}', content_type='application/pdf')
+                        base.ContentFromURL( src=f"{BASE_URL}{a['href']}", 
+                            dest=f'{base_path}_{n:02}.{fmt}', content_type=fmt_types[fmt])
                     )   
 
             else:
@@ -181,6 +184,7 @@ def cvm_task(**kwargs):
             output=output,
             handler=handler,
             logger=logger,
+            skip_cache=kwargs.get('skip_cache'),
             max_workers=8) \
             .run(snapshot=snapshot)
 
@@ -197,8 +201,7 @@ def cvm_task(**kwargs):
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--count-only',
-              default=False, help='Crawler will only collect the expected number of results', is_flag=True)
+@click.option('--skip-cache', default=False, help='Skip any cache crawler does', is_flag=True)
 def cvm_command(**kwargs):
   if kwargs.get('enqueue'):
     if kwargs.get('split_tasks'):
