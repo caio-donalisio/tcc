@@ -182,75 +182,79 @@ class TJSCChunk(base.Chunk):
 
     @utils.retryable(sleeptime=31)
     def rows(self):
+        soup = self.get_valid_soup()
+        for act in soup.find_all('div', class_='resultados'):
+            yield self.get_act_files(act)
+    
+    def check_if_recaptcha(self, soup):
+        if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
+            raise utils.PleaseRetryException('Found ReCaptcha')
+
+    @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
+    def get_valid_soup(self):
+        result = self.client.fetch(self.filters, self.page)
+        soup = utils.soup_by_content(result.text)
+        self.check_if_recaptcha(soup)
+        return soup
+
+    def get_act_files(self, act):
         to_download = []
 
-        @utils.retryable(sleeptime=61, max_retries=5, message='Found ReCaptcha')
-        def check_if_recaptcha():
-            result = self.client.fetch(self.filters, self.page)
-            soup = utils.soup_by_content(result.text)
-            if soup.find(text=re.compile(r'.*O Poder Judiciário de Santa Catarina identificou inúmeros acessos provenientes do IP:.*')):
-                raise utils.PleaseRetryException('Found ReCaptcha')
-            return soup
+        time.sleep(0.2456)
+        links = {}
+
+        links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
+        links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
+
+        links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
+        links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
         
-        soup = check_if_recaptcha()
+        links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
+        links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
+
+        process_code = re.search(r'.*Processo\:\s?([\d\-\.\/]+)\s.*', act.find('p').text).group(1)
+        process_code = utils.extract_digits(process_code)
         
-        for act in soup.find_all('div', class_='resultados'):
-            time.sleep(0.2456)
-            links = {}
 
-            links['html'] = act.find('a', href=re.compile(r".*html\.do.*"))
-            links['html'] = BASE_URL + links['html'].get('href') if links['html'] else ''
+        assert process_code and 25 > len(process_code) > 5
+        session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
+        session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
+        
+        onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
+        ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
+        links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
 
-            links['pdf'] = act.find('a', href=re.compile(r".*integra\.do.*arq=pdf"))
-            links['pdf'] = BASE_URL + links['pdf'].get('href') if links['pdf'] else ''
-            
-            links['rtf'] = act.find('a', href=re.compile(r"(.*integra\.do\?.*)[^(arq\=pdf)]+$"))
-            links['rtf'] = BASE_URL + links['rtf'].get('href') if links['rtf'] else ''
+        base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
+        
+        if links.get('short_html'):
+            to_download.append(
+                base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
+            )
 
-            process_code = re.search(r'.*Processo\:\s?([\d\-\.\/]+)\s.*', act.find('p').text).group(1)
-            process_code = utils.extract_digits(process_code)
-            
+        if links.get('html'):
+            to_download.append(
+                base.ContentFromURL(src=links['html'], dest=f'{base_path}_FULL.html', content_type='text/html')
+            )
 
-            assert process_code and 25 > len(process_code) > 5
-            session_date = act.find(text=re.compile('.*Julgado em\:.*')).next
-            session_date = pendulum.from_format(session_date.strip(), 'DD/MM/YYYY')
-            
-            onclick = act.find(href='#', onclick=re.compile(r'abreIntegra'))['onclick']
-            ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
-            links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
+        if links.get('pdf'):
+            to_download.append(
+                base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
+            )
+        
+        if links.get('rtf'):
+            to_download.append(
+                base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
+            )
+        
+        #TJSC will cut connection if too many requests are made
+        time.sleep(0.261616136)
 
+        to_download.append(base.Content(
+            content=str(act),
+            dest=f'{base_path}.html',
+            content_type='text/html'))
 
-            base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_id}'
-            
-            if links.get('short_html'):
-                to_download.append(
-                    base.ContentFromURL(src=links['short_html'], dest=f'{base_path}_short.html', content_type='text/html')
-                )
-
-            if links.get('html'):
-                to_download.append(
-                    base.ContentFromURL(src=links['html'], dest=f'{base_path}_FULL.html', content_type='text/html')
-                )
-
-            if links.get('pdf'):
-                to_download.append(
-                    base.ContentFromURL(src=links['pdf'], dest=f'{base_path}.pdf', content_type='application/pdf')
-                )
-            
-            if links.get('rtf'):
-                to_download.append(
-                    base.ContentFromURL(src=links['rtf'], dest=f'{base_path}.rtf', content_type='application/rtf')
-                )
-            
-            #TJSC will cut connection if too many requests are made
-            time.sleep(0.261616136)
-
-            to_download.append(base.Content(
-                content=str(act),
-                dest=f'{base_path}.html',
-                content_type='text/html'))
-
-            yield to_download
+        return to_download
 
 class TJSCContentHandler(base.ContentHandler):
 
@@ -266,8 +270,8 @@ class TJSCContentHandler(base.ContentHandler):
     return not bool(captcha_div)
 
   @utils.retryable(max_retries=9, sleeptime=5.1)
-  def _handle_url_event(self, event : base.ContentFromURL):
-    if self.output.exists(event.dest):
+  def _handle_url_event(self, event : base.ContentFromURL, recollect=False):
+    if self.output.exists(event.dest) and not recollect:
       return
 
     try:
