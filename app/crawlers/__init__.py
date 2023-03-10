@@ -10,6 +10,7 @@ import app.crawlers.tjdf
 import app.crawlers.tjmg
 import app.crawlers.tjpr
 import app.crawlers.tjrj
+import app.crawlers.tjrn
 import app.crawlers.tjrs
 import app.crawlers.tjsc
 import app.crawlers.tjsp
