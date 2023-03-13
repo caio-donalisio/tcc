@@ -75,7 +75,9 @@ class TJRNClient:
   @utils.retryable(max_retries=3)
   def count(self, filters):
     result = self.fetch(filters)
-    return result.json()['hits']['total']
+    count = result.json()['hits']['total']
+    assert count < 10_000, 'Count must be lower than 10.000, please narrow the search date range' 
+    return count
 
   @utils.retryable(max_retries=3)
   def fetch(self, filters, page=1):
