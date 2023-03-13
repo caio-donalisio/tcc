@@ -62,6 +62,7 @@ def retryable(*, max_retries=3, sleeptime=5,
                   requests.exceptions.ConnectionError,
                   requests.exceptions.ReadTimeout,
                   requests.exceptions.ChunkedEncodingError,
+                  requests.exceptions.HTTPError,
                   http.client.HTTPException,
                   TimeoutException,
                   PleaseRetryException)):
