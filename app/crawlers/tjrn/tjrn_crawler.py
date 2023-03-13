@@ -128,11 +128,22 @@ class TJRNChunk(base.Chunk):
   def rows(self):
     rows = self.client.fetch(self.filters, self.page)
     for row in rows.json()['hits']['hits']:
-      yield [base.Content(
+      to_download = []
+      filepath = self.get_filepath(row)
+      inteiro = row['_source'].get('inteiro_teor')
+      if inteiro:
+        del row['_source']['inteiro_teor']
+        to_download.append(
+          base.Content(
+          content=str(inteiro),
+          dest=f'{filepath}.html',
+          content_type='text/html'))
+      to_download.append(
+        base.Content(
         content=json.dumps(row), 
-        dest=self.get_filepath(row), 
-        content_type='application/json')
-      ]
+        dest=f'{filepath}.json',
+        content_type='application/json'))
+      yield to_download
 
   def get_filepath(self, row):
     default_value = '0' * 10
@@ -142,7 +153,7 @@ class TJRNChunk(base.Chunk):
     process = row['_source'].get('numero_processo', default_value)
     id_ementa = row['_source'].get('id_documento_ementa', default_value)
     id_teor = row['_source'].get('id_documento_teor', default_value)
-    return f'{year}/{month}/{day}_{process}_{id_ementa}_{id_teor}.json'
+    return f'{year}/{month}/{day}_{process}_{id_ementa}_{id_teor}'
 
 
 @celery.task(name='crawlers.tjrn', default_retry_delay=5 * 60,
