@@ -1,50 +1,64 @@
 from app.crawlers import base, utils
-import re
 import pendulum
 from app.crawlers.logconfig import logger_factory, setup_cloud_logger
 import click
 from app.crawler_cli import cli
 from app.celery_run import celery_app as celery
 import requests
+import json
 
 logger = logger_factory('tjrn')
 
 COURT_NAME = 'tjrn'
 RESULTS_PER_PAGE = 10  # DEFINED BY THEIR SERVER, SHOULDN'T BE CHANGED
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
-SEARCH_DATE_FORMAT = 'DD/MM/YYYY'
+SEARCH_DATE_FORMAT = 'DD-MM-YYYY'
 NOW = pendulum.now()
-BASE_URL = 'http://esaj.tjrn.jus.br/cjosg/'
+BASE_URL = 'https://jurisprudencia.tjrn.jus.br/'
 
 DEFAULT_HEADERS = {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,ja;q=0.5',
     'Connection': 'keep-alive',
-    # 'Cookie': 'JSESSIONID=260C058174AB7B85368335FDC4D266C0.oldapp1',
-    'Referer': 'http://esaj.tjrn.jus.br/cjosg/pcjoPesquisa.jsp?tpClasse=J&deEmenta=+&clDocumento=&nuProcesso=&deClasse=&cdClasse=&deOrgaoJulgador=&cdOrgaoJulgador=&nmRelator=&cdRelator=&dtInicio=01%2F01%2F2018&dtTermino=31%2F01%2F2018&cdOrigemDoc=1&Submit=Pesquisar&rbCriterioEmenta=TODAS&rbCriterioBuscaLivre=TODAS&primeiroCodigo=10',
-    'Upgrade-Insecure-Requests': '1',
+    'Content-Type': 'application/json;charset=UTF-8',
+    # 'Cookie': '_ga=GA1.3.212902379.1678477803; _gid=GA1.3.2061417349.1678477803; _gat_gtag_UA_118963421_1=1',
+    'Origin': 'https://jurisprudencia.tjrn.jus.br',
+    'Referer': 'https://jurisprudencia.tjrn.jus.br/',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
     'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36 Edg/110.0.1587.63',
+    'X-Requested-With': 'XMLHttpRequest',
+    'sec-ch-ua': '"Chromium";v="110", "Not A(Brand";v="24", "Microsoft Edge";v="110"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
 }
 
-def get_filters(start_date, end_date, **kwargs):
-  return {
-    'tpClasse': 'J',
-    'deEmenta': ' ',
-    'clDocumento': '',
-    'nuProcesso': '',
-    'deClasse': '',
-    'cdClasse': '',
-    'deOrgaoJulgador': '',
-    'cdOrgaoJulgador': '',
-    'nmRelator': '',
-    'cdRelator': '',
-    'dtInicio': start_date.format(SEARCH_DATE_FORMAT),
-    'dtTermino': end_date.format(SEARCH_DATE_FORMAT),
-    'cdOrigemDoc': '1',
-    'Submit': 'Pesquisar',
-    'rbCriterioEmenta': 'TODAS',
-    'rbCriterioBuscaLivre': 'TODAS',
-    # 'primeiroCodigo': '0',
+def get_filters(start_date, end_date, page=1, **kwargs):
+  return{
+    "jurisprudencia": {
+        "ementa": "",
+        "inteiro_teor": "",
+        "nr_processo": "",
+        "id_classe_judicial": "",
+        "id_orgao_julgador": "",
+        "id_relator": "",
+        "id_colegiado": "",
+        "id_juiz": "",
+        "id_vara": "",
+        "dt_inicio": start_date.format(SEARCH_DATE_FORMAT),
+        "dt_fim": end_date.format(SEARCH_DATE_FORMAT),
+        "origem": "",
+        "sistema": "",
+        "decisoes": "Acórdão",
+        "jurisdicoes": "TJ",
+        "grau": ""
+    },
+    "page": page,
+    "usuario": {
+        "matricula": "",
+        "token": ""
+    }
 }
 
 class NoProcessNumberError(Exception):
@@ -55,43 +69,24 @@ class TJRNClient:
 
   def __init__(self):
     self.session = requests.Session()
-    # self.session.get('')
-    self.url = f'http://esaj.tjrn.jus.br/cjosg/cjosg/pcjoPesquisa.jsp'
+    self.url = f'https://jurisprudencia.tjrn.jus.br/api/pesquisar'
+    self.session.get('https://jurisprudencia.tjrn.jus.br', verify=False)
 
   @utils.retryable(max_retries=3)
-  def count(self, filters, min_votes=3):
-    counts = []
-    while not any(counts.count(n) >= min_votes for n in counts):
-      result = self.fetch(filters)
-      soup = utils.soup_by_content(result.text)
-      count_tag = soup.find('div', attrs={'class': 'navLeft'})
-      if count_tag:
-        count = re.search(r'^\s*(\d+) registro.*$', count_tag.text)
-        count = int(count.group(1))
-      else:
-        count = 0
-      counts.append(count)
-    return max(counts, key=lambda n: counts.count(n))
+  def count(self, filters):
+    result = self.fetch(filters)
+    return result.json()['hits']['total']
 
   @utils.retryable(max_retries=3)
   def fetch(self, filters, page=1):
     self.session.headers.update(DEFAULT_HEADERS)
-    try:
-      return requests.get(
-          url=f'{self.url}',
-          params={
-              **get_filters(**filters),
-              'primeiroCodigo': (page-1)*10
-          },
-          headers=DEFAULT_HEADERS,
-          verify=False,
-          
+    response = requests.post(
+      url=self.url, 
+      json=get_filters(filters['start_date'], filters['end_date'], page),
+      verify=False,
       )
-
-    except Exception as e:
-      logger.error(f"page fetch error params: {filters}")
-      raise e
-
+    response.raise_for_status()
+    return response
 
 class TJRNCollector(base.ICollector):
 
@@ -117,23 +112,36 @@ class TJRNCollector(base.ICollector):
           prefix='',
           filters=self.filters,
           page=page,
-          client=self.client
+          client=self.client,
       )
 
-
 class TJRNChunk(base.Chunk):
-
-  def __init__(self, keys, prefix, filters, page, client):
+  def __init__(self, keys, client, filters, prefix, page):
     super(TJRNChunk, self).__init__(keys, prefix)
+    self.client = client
     self.filters = filters
     self.page = page
-    self.client = client
 
-  @utils.retryable()
+  @utils.retryable(max_retries=3)
   def rows(self):
-    ...
-    result = self.client.fetch(self.filters, self.page)
-    print(5)
+    rows = self.client.fetch(self.filters, self.page)
+    for row in rows.json()['hits']['hits']:
+      yield [base.Content(
+        content=json.dumps(row), 
+        dest=self.get_filepath(row), 
+        content_type='application/json')
+      ]
+
+  def get_filepath(self, row):
+    default_value = '0' * 10
+    date = row['_source']['dt_assinatura_teor']
+    year, month, day = date.split('-')
+    assert pendulum.from_format(date,'YYYY-MM-DD')
+    process = row['_source'].get('numero_processo', default_value)
+    id_ementa = row['_source'].get('id_documento_ementa', default_value)
+    id_teor = row['_source'].get('id_documento_teor', default_value)
+    return f'{year}/{month}/{day}_{process}_{id_ementa}_{id_teor}.json'
+
 
 @celery.task(name='crawlers.tjrn', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
