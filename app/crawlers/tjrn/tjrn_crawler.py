@@ -105,7 +105,7 @@ class TJRNCollector(base.ICollector):
       yield TJRNChunk(
           keys={
               'start_date': self.filters['start_date'].to_date_string(),
-              'end_date': self.filters['start_date'].to_date_string(),
+              'end_date': self.filters['end_date'].to_date_string(),
               'page': page,
               'count': total,
           },
