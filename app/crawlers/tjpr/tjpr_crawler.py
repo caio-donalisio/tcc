@@ -95,14 +95,6 @@ class TJPRClient:
       counts.append(count)
     return max(counts, key=lambda n: counts.count(n))
 
-  def count_periods(self, filters, unit='months'):
-    return sum(1 for _ in utils.timely(
-        filters.get('start_date'),
-        filters.get('end_date'),
-        unit=unit,
-        step=1)
-    )
-
   @utils.retryable(max_retries=3)
   def fetch(self, filters, page=1):
     self.session.headers.update(DEFAULT_HEADERS)
@@ -131,9 +123,7 @@ class TJPRCollector(base.ICollector):
     self.filters = filters
 
   def count(self, period=None):
-    if self.filters.get('count_only'):
-      return self.client.count_periods(self.filters)
-    elif period:
+    if period:
       return self.client.count(period)
     else:
       return self.client.count(self.filters)
@@ -148,7 +138,7 @@ class TJPRCollector(base.ICollector):
     ))
     for start, end in reversed(periods):
       total = self.count({'start_date': start, 'end_date': end})
-      pages = [1] if self.filters['count_only'] else range(1, 2 + total//RESULTS_PER_PAGE)
+      pages = range(1, 2 + total//RESULTS_PER_PAGE)
       for page in pages:
         yield TJPRChunk(
             keys={
@@ -156,7 +146,6 @@ class TJPRCollector(base.ICollector):
                 'end_date': end.to_date_string(),
                 'page': page,
                 'count': total,
-                'count_only': self.filters.get('count_only'),
             },
             prefix='',
             filters={
@@ -164,19 +153,17 @@ class TJPRCollector(base.ICollector):
                 'end_date': end,
             },
             page=page,
-            count_only=self.filters.get('count_only'),
             client=self.client
         )
 
 
 class TJPRChunk(base.Chunk):
 
-  def __init__(self, keys, prefix, filters, page, count_only, client):
+  def __init__(self, keys, prefix, filters, page, client):
     super(TJPRChunk, self).__init__(keys, prefix)
     self.filters = filters
     self.page = page
     self.client = client
-    self.count_only = count_only
 
   def get_act_id(self, soup):
     process_regex = re.compile(r'\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{3,6}')
@@ -214,44 +201,33 @@ class TJPRChunk(base.Chunk):
 
   @utils.retryable()
   def rows(self):
-    if self.count_only:
-      count_data, count_filepath = utils.get_count_data_and_filepath(
-          start_date=self.filters.get('start_date'),
-          end_date=self.filters.get('end_date'),
-          court_name=COURT_NAME,
-          count=self.client.count(self.filters),
-          count_time=NOW
-      )
-      yield utils.count_data_content(count_data, count_filepath)
+    to_download = []
+    for act in self.get_acts():
+      try:
+        act_id = self.get_act_id(act)
+      except NoProcessNumberError:
+        logger.info("Skipping process without number")
+        continue
+      publication_date = self.get_publication_date(act)
+      pdf_bytes, _ = self.download_pdf(act)
+      system_code = act.find(id=re.compile(r'integra_\d{7,}')) or act.find(id=re.compile(r'ementa\d{7,}'))
+      system_code = ''.join(char for char in system_code['id'] if char.isdigit())
+      base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{system_code}'
 
-    else:
-      to_download = []
-      for act in self.get_acts():
-        try:
-          act_id = self.get_act_id(act)
-        except NoProcessNumberError:
-          logger.info("Skipping process without number")
-          continue
-        publication_date = self.get_publication_date(act)
-        pdf_bytes, _ = self.download_pdf(act)
-        system_code = act.find(id=re.compile(r'integra_\d{7,}')) or act.find(id=re.compile(r'ementa\d{7,}'))
-        system_code = ''.join(char for char in system_code['id'] if char.isdigit())
-        base_path = f'{publication_date["year"]}/{publication_date["month"]}/{publication_date["day"]}_{act_id}_{system_code}'
-
-        if pdf_bytes:
-          to_download.append(base.Content(
-              content=pdf_bytes,
-              dest=f'{base_path}.pdf',
-              content_type='application/pdf'))
-        else:
-          logger.warn(f'Inteiro not available for {act_id}')
-
+      if pdf_bytes:
         to_download.append(base.Content(
-            content=str(act),
-            dest=f'{base_path}.html',
-            content_type='text/html'))
+            content=pdf_bytes,
+            dest=f'{base_path}.pdf',
+            content_type='application/pdf'))
+      else:
+        logger.warn(f'Inteiro not available for {act_id}')
 
-        yield to_download
+      to_download.append(base.Content(
+          content=str(act),
+          dest=f'{base_path}.html',
+          content_type='text/html'))
+
+      yield to_download
 
   @utils.retryable()
   def download_pdf(self, act, hash_len=10):
@@ -325,7 +301,6 @@ def tjpr_task(**kwargs):
     query_params = {
         'start_date': start_date,
         'end_date': end_date,
-        'count_only': kwargs.get('count_only')
     }
 
     collector = TJPRCollector(client=TJPRClient(), filters=query_params)
@@ -354,8 +329,6 @@ def tjpr_task(**kwargs):
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
-@click.option('--count-only',
-              default=False, help='Crawler will only collect the expected number of results', is_flag=True)
 def tjpr_command(**kwargs):
   enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
   del (kwargs['enqueue'])
