@@ -224,7 +224,7 @@ class TJSCChunk(base.Chunk):
         ajax, act_code, categoria, act_id = re.findall(r'\'([^\']+?)\'', onclick, re.U)
         links['short_html'] = f'https://busca.tjsc.jus.br/jurisprudencia/html.do?ajax={ajax}&id={act_code}&categoria={categoria}&busca=avancada'
 
-        base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_code}_TJSC'
+        base_path = f'{session_date.year}/{session_date.month:02}/{session_date.format("DD")}_{process_code}_{act_code}'
         
         if links.get('short_html'):
             to_download.append(
