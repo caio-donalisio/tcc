@@ -1,15 +1,14 @@
 #Script used for crawler to iterate through months locally
 
 #example:
-# . local_collect.sh --court tjrn --start-year 2020 --end-year 2023 --extra-args "--skip-cache"
+# . local_collect.sh --court tjrn --start-date 2020-01-01 --end-date 2023-05-31 --extra-args "--skip-cache"
 
 unset COURT
-unset START_YEAR
-unset END_YEAR
+unset START_DATE
+unset END_DATE
 unset EXTRA_ARGS
 
-VALID=true
-DEFAULT_END_YEAR=$(date +'%Y')
+DEFAULT_END_DATE=$(date +'%Y')
 
 while [[ $# -gt 0 ]]
 do
@@ -21,13 +20,13 @@ case $key in
     shift # past argument
     shift # past value
     ;;
-    --start-year)
-    START_YEAR="$2"
+    --start-date)
+    START_DATE="$2"
     shift # past argument
     shift # past value
     ;;
-    --end-year)
-    END_YEAR="$2"
+    --end-date)
+    END_DATE="$2"
     shift # past argument
     shift # past value
     ;;
@@ -37,21 +36,21 @@ case $key in
     shift # past value
     ;;
     *)    # unknown option
-    printf "Unknown option: $key \nValid options are: \n--court \n--start-year \n--end-year \n--extra-args\n\n"
+    printf "Unknown option: $key \nValid options are: \n--court \n--start-date \n--end-date \n--extra-args\n\n"
     return 
     ;;
 esac
 done
 
 #Sets default end-year if it were not given
-if [ -z "$END_YEAR" ]; then
-  END_YEAR=$DEFAULT_END_YEAR
-  echo "Setting default end year to $DEFAULT_END_YEAR" 
+if [ -z "$END_DATE" ]; then
+  END_DATE=$DEFAULT_END_DATE
+  echo "Setting default end year to $DEFAULT_END_DATE" 
 fi
 
 #Checks if start-year and court were given
-if [ -z "$START_YEAR" ] || [ -z "$COURT" ]; then
-  echo "Error: COURT or START_YEAR is null"
+if [ -z "$START_DATE" ] || [ -z "$COURT" ]; then
+  echo "Error: COURT or START_DATE is null"
   return
 fi
 
@@ -62,16 +61,20 @@ then
     return
 fi
 
-for (( y=$((START_YEAR)); y<=$((END_YEAR)); y++)); do
-  for m in {1..12}; do
-    start_date=$(date -d "$y-$m-01" +"%Y-%m-%d")
-    end_date=$(date -d "$y-$m-$(cal $m $y | awk 'NF {DAYS = $NF}; END {print DAYS}')" +"%Y-%m-%d")
-    echo "python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS"
-    python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS
-  done
+current_date="$START_DATE"
+while [[ "$current_date" < "$END_DATE" ]]; do
+  # Extract the year and month from the current date
+  start_date=$(date -d "$current_date" +%Y-%m-%d)
+  end_date=$(date -d "$current_date +1 month -1 day" +%Y-%m-%d)
+  echo "python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS"
+  python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS
+  # Move to the next month
+  current_date=$(date -d "$current_date +1 month" +%Y-%m-%d)
 done
 
+
+
 unset COURT
-unset START_YEAR
-unset END_YEAR
+unset START_DATE
+unset END_DATE
 unset EXTRA_ARGS
