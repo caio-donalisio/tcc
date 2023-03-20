@@ -10,7 +10,7 @@ import json
 logger = logger_factory('tjmt')
 
 COURT_NAME = 'tjmt'
-RESULTS_PER_PAGE = 50
+RESULTS_PER_PAGE = 100
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'YYYY-MM-DD'
 NOW = pendulum.now()
@@ -45,7 +45,7 @@ def get_filters(start_date, end_date, page=1, **kwargs):
     'filtro.relator': '',
     'filtro.julgamento': '',
     'filtro.orgaoJulgador': '',
-    'filtro.colegiado': '',
+    'filtro.colegiado': 'Segunda',
     'filtro.localConsultaAcordao': '',
     'filtro.fqOrgaoJulgador': '',
     'filtro.fqTipoProcesso': '',
