@@ -52,7 +52,7 @@ def get_filters(start_date, end_date, page=1, **kwargs):
     'filtro.fqRelator': '',
     'filtro.fqJulgamento': '',
     'filtro.fqAssunto': '',
-    'filtro.ordenacao.ordenarPor': 'NumeroUnico',
+    'filtro.ordenacao.ordenarPor': 'DataDecrescente',
     'filtro.ordenacao.ordenarDataPor': 'Publicacao',
     'filtro.tipoProcesso': '',
     'filtro.thesaurus': 'false',
