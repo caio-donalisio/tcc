@@ -73,11 +73,12 @@ class CARFCollector(base.ICollector):
     for page in range(1, pages + 1):
       yield CARFChunk(
           keys={
-              **self.filters, **{'page': page}
+              **self.filters, **{'page': page, 'count': total,}
           },
           prefix='',
           filters=self.filters,
           page=page,
+          
           client=self.client
 
       )
@@ -100,8 +101,6 @@ class CARFChunk(base.Chunk):
       base_path = f'{session_at.year}/{session_at.month:02d}'
       report_id, _ = record['nome_arquivo_pdf_s'].split('.')
       dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
-      
-
       
       report_url = f'https://acordaos.economia.gov.br/acordaos2/pdfs/processados/{report_id}.pdf'
       dest_report = f"{base_path}/doc_{record_id}_{report_id}.pdf"
