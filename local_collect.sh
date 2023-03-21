@@ -82,7 +82,7 @@ while [[ $REPEAT>0 ]]; do
     end_date=$(date -d "$current_date +1 month -1 day" +%Y-%m-%d)
     echo "Scrapes remaining: $REPEAT"
     echo "python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS"
-    # python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS
+    python -m app.commands $COURT --start-date $start_date --end-date $end_date --output-uri gs://inspira-production-buckets-$COURT $EXTRA_ARGS
     # Move to the next month
     current_date=$(date -d "$current_date +1 month" +%Y-%m-%d)
   done
