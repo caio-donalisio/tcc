@@ -1,4 +1,4 @@
-from app.crawlers import base, utils
+from app.crawlers import base, utils, browsers
 import math
 import json
 import pendulum
@@ -6,11 +6,31 @@ from app.crawlers.logconfig import logger_factory, setup_cloud_logger
 import click
 from app.celery_run import celery_app as celery
 from app.crawler_cli import cli
-
 import requests
+import re
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 logger = logger_factory('carf')
+NOW = pendulum.now()
 
+DEFAULT_PDF_HEADERS = {
+      'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      # 'Accept-Encoding': 'gzip, deflate, br',
+      'Referer': 'https://carf.fazenda.gov.br/sincon/public/pages/ConsultarJurisprudencia/listaJurisprudenciaCarf.jsf',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Origin': 'https://carf.fazenda.gov.br',
+      'Connection': 'keep-alive',
+      # 'Cookie': 'ss_lbappsincon=1.vv5993; JSESSIONID=BA771EBF7C26F3BB57BEAA0FE71996A9',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-User': '?1',
+      }
 
 class CARFClient:
 
@@ -74,23 +94,105 @@ class CARFChunk(base.Chunk):
   def rows(self):
     result = self.client.fetch(self.filters, self.page)
     for record in result['response']['docs']:
-
+      to_download=[]
       session_at = pendulum.parse(record['dt_sessao_tdt'])
-
       record_id = record['id']
       base_path = f'{session_at.year}/{session_at.month:02d}'
       report_id, _ = record['nome_arquivo_pdf_s'].split('.')
       dest_record = f"{base_path}/doc_{record_id}_{report_id}.json"
+      
 
+      
       report_url = f'https://acordaos.economia.gov.br/acordaos2/pdfs/processados/{report_id}.pdf'
       dest_report = f"{base_path}/doc_{record_id}_{report_id}.pdf"
+      
+      try:
+        response = requests.get(report_url, verify=False)
+        response.raise_for_status()
+        to_download.append(base.Content(content=response.content, content_type='application/pdf', dest=dest_report))
+      except requests.exceptions.HTTPError:
+        logger.warn(f'PDF not available for {record["numero_processo_s"]} - trying other source...')
+        pdf_content=self.download_pdf_from_other_source(record)
+        to_download.append(base.Content(content=pdf_content, content_type='application/pdf', dest=dest_report))
+      to_download.append(base.Content(content=json.dumps(record), dest=dest_record,
+                       content_type='application/json'))
+      yield to_download
+    
+  def download_pdf_from_other_source(self, record):
+    
+    def get_link_id(browser):
+      browser.driver.implicitly_wait(20)
+      process_links = browser.bsoup().find_all('a', text=record['numero_decisao_s'])
+      if not len(process_links)==1:
+        raise Exception(f"Couldn't get correct results page, number of links found: {len(process_links)}")
+      return process_links[0]['id']
 
-      yield [
-          base.Content(content=json.dumps(record), dest=dest_record,
-                       content_type='application/json'),
-          base.ContentFromURL(src=report_url, dest=dest_report,
-                              content_type='application/pdf')
-      ]
+    def get_entry_page(browser, record):
+      browser.get('https://carf.fazenda.gov.br/sincon/public/pages/ConsultarJurisprudencia/consultarJurisprudenciaCarf.jsf')
+      browser.fill_in('valor_pesquisa1',record['numero_processo_s'])
+      browser.driver.find_element(value='botaoPesquisarCarf').click()
+      browser.driver.implicitly_wait(20)
+
+    def get_act_page(browser):
+      browser.driver.implicitly_wait(20)
+      WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'tblJurisprudencia:0:j_id54_body')))
+      link_id=get_link_id(browser)
+      WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID, link_id))).click()
+      # browser.driver.find_element(value=get_link_id(browser)).click()
+      browser.driver.implicitly_wait(20)
+
+    @utils.retryable()
+    def get_pdf_content(browser):
+      browser.driver.implicitly_wait(20)
+      assert browser.bsoup().find(text='Anexos')
+      data = {
+          'formAcordaos': 'formAcordaos',
+          'uniqueToken': '',
+          'javax.faces.ViewState': 'j_id3',
+          'formAcordaos:_idcl': 'formAcordaos:j_id60:0:j_id61',
+      }
+      try:
+        response = requests.post(
+            'https://carf.fazenda.gov.br/sincon/public/pages/ConsultarJurisprudencia/listaJurisprudencia.jsf',
+            cookies=browser.get_cookie_dict(),
+            headers=DEFAULT_PDF_HEADERS,
+            data=data,
+            verify=False,
+        )
+        response.raise_for_status()
+        return response.content
+      except requests.exceptions.HTTPError:
+        raise utils.PleaseRetryException('Could not download PDF - retrying...')
+
+    def get_process_pdf(record):
+      with browsers.FirefoxBrowser(headless=False) as browser:
+        browser.driver.implicitly_wait(20)
+        get_entry_page(browser, record)
+        browser.driver.implicitly_wait(20)
+        get_act_page(browser)
+        browser.driver.implicitly_wait(20)
+        pdf_content = get_pdf_content(browser)
+      return pdf_content
+
+    return get_process_pdf(record)
+    
+   
+
+
+    
+    print(5)
+      # try:
+      #   # response = session.post(
+      #   #     'https://carf.fazenda.gov.br/sincon/public/pages/ConsultarJurisprudencia/consultarJurisprudenciaCarf.jsf',
+      #   #     data=urllib.parse.urlencode(data),
+      #   #     verify=False,
+      #   # )
+      #   response.raise_for_status()
+      #   soup = utils.soup_by_content(response.text)
+        # print(5)
+      # except requests.exceptions.HTTPError:
+      #   raise utils.PleaseRetryException(f'Got {response.status_code} for form post - trying again')
+      
 
 
 @celery.task(name='crawlers.carf', default_retry_delay=5 * 60,
@@ -129,6 +231,7 @@ def carf_task(**kwargs):
         output=output,
         handler=handler,
         logger=logger,
+        skip_cache=kwargs.get('skip_cache'),
         max_workers=8) \
         .run(snapshot=snapshot)
 
@@ -146,6 +249,7 @@ def carf_task(**kwargs):
 @click.option('--enqueue',    default=False,    help='Enqueue for a worker', is_flag=True)
 @click.option('--split-tasks',
               default=None, help='Split tasks based on time range (weeks, months, days, etc) (use with --enqueue)')
+@click.option('--skip-cache' ,    default=False,    help='Starts collection from the beginning'  , is_flag=True)
 def carf_command(**kwargs):
   enqueue, split_tasks = kwargs.get('enqueue'), kwargs.get('split_tasks')
   del (kwargs['enqueue'])
