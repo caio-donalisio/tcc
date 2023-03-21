@@ -8,6 +8,7 @@ import app.crawlers.titsp
 import app.crawlers.tjba
 import app.crawlers.tjdf
 import app.crawlers.tjmg
+import app.crawlers.tjmt
 import app.crawlers.tjpr
 import app.crawlers.tjrj
 import app.crawlers.tjrn
