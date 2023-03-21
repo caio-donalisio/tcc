@@ -138,7 +138,6 @@ class CARFChunk(base.Chunk):
       WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID, 'tblJurisprudencia:0:j_id54_body')))
       link_id=get_link_id(browser)
       WebDriverWait(browser.driver, 10).until(EC.element_to_be_clickable((By.ID, link_id))).click()
-      # browser.driver.find_element(value=get_link_id(browser)).click()
       browser.driver.implicitly_wait(20)
 
     @utils.retryable()
@@ -165,7 +164,7 @@ class CARFChunk(base.Chunk):
         raise utils.PleaseRetryException('Could not download PDF - retrying...')
 
     def get_process_pdf(record):
-      with browsers.FirefoxBrowser(headless=False) as browser:
+      with browsers.FirefoxBrowser(headless=True) as browser:
         browser.driver.implicitly_wait(20)
         get_entry_page(browser, record)
         browser.driver.implicitly_wait(20)
