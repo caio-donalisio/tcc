@@ -153,7 +153,7 @@ class STJCollector(base.ICollector):
           {'start_date': start_date.to_date_string(),
            'end_date': end_date.to_date_string(),
            'limit': count + 1,
-           'total': count}
+           'count': count}
 
       yield STJChunk(keys=keys,
                      client=self.client,
