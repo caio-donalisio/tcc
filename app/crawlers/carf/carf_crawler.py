@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 logger = logger_factory('carf')
 NOW = pendulum.now()
-
+MIN_FILE_SIZE=100  # TODO: Add PDF collection logic into content handler
 DEFAULT_PDF_HEADERS = {
       'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -108,11 +108,13 @@ class CARFChunk(base.Chunk):
       try:
         response = requests.get(report_url, verify=False)
         response.raise_for_status()
-        to_download.append(base.Content(content=response.content, content_type='application/pdf', dest=dest_report))
+        if len(response.text) > MIN_FILE_SIZE:
+          to_download.append(base.Content(content=response.content, content_type='application/pdf', dest=dest_report))
       except requests.exceptions.HTTPError:
         logger.warn(f'PDF not available for {record["numero_processo_s"]} - trying other source...')
         pdf_content=self.download_pdf_from_other_source(record)
-        to_download.append(base.Content(content=pdf_content, content_type='application/pdf', dest=dest_report))
+        if len(pdf_content) > MIN_FILE_SIZE:
+          to_download.append(base.Content(content=pdf_content, content_type='application/pdf', dest=dest_report))
       to_download.append(base.Content(content=json.dumps(record), dest=dest_record,
                        content_type='application/json'))
       yield to_download
