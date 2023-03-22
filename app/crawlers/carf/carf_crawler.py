@@ -146,8 +146,8 @@ class CARFChunk(base.Chunk):
       data = {
           'formAcordaos': 'formAcordaos',
           'uniqueToken': '',
-          'javax.faces.ViewState': 'j_id3',
-          'formAcordaos:_idcl': 'formAcordaos:j_id60:0:j_id61',
+          'javax.faces.ViewState': browser.bsoup().find('input', id='javax.faces.ViewState')['value'],
+          'formAcordaos:_idcl': browser.bsoup().find('a', id=re.compile(r'formAcordaos:(j_id\d+:0:j_id\d+)'))['id'],
       }
       try:
         response = requests.post(
