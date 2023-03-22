@@ -105,7 +105,8 @@ class TRF2:
     for start_date, end_date in reversed(ranges):
       chunk_params = {
           'start_date': start_date.to_date_string(),
-          'end_date': end_date.to_date_string()
+          'end_date': end_date.to_date_string(),
+          'count': self.count()
       }
       yield utils.Chunk(params=chunk_params, output=self.output,
                         rows_generator=self.rows(start_date=start_date, end_date=end_date))

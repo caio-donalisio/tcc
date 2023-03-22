@@ -54,6 +54,7 @@ class TJSP1I(base.ICollector):
           'start_date': start_date.to_date_string(),
           'end_date'  : end_date.to_date_string(),
           'page'      : page,
+          'count'     : number_of_records
         }
         yield TJSP1IChunk(
           keys=chunk_params,

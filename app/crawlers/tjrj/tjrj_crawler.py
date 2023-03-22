@@ -86,6 +86,7 @@ class TJRJ(base.BaseCrawler, base.ICollector):
           'start_year': self.params['start_year'],
           'end_year': self.params['end_year'],
           'page': page,
+          'count': self.total_records,
       }
 
       yield TJRJChunk(

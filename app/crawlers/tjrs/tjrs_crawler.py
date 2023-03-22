@@ -120,7 +120,7 @@ class TJRSCollector(base.ICollector):
     for page in range(1, pages + 1):
       yield TJRSChunk(
           keys={
-              **self.filters, **{'page': page}
+              **self.filters, **{'page': page, 'count': total,}
           },
           prefix='',
           filters=self.filters,
