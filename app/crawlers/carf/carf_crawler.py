@@ -78,9 +78,7 @@ class CARFCollector(base.ICollector):
           prefix='',
           filters=self.filters,
           page=page,
-          
           client=self.client
-
       )
 
 
@@ -175,25 +173,6 @@ class CARFChunk(base.Chunk):
       return pdf_content
 
     return get_process_pdf(record)
-    
-   
-
-
-    
-    print(5)
-      # try:
-      #   # response = session.post(
-      #   #     'https://carf.fazenda.gov.br/sincon/public/pages/ConsultarJurisprudencia/consultarJurisprudenciaCarf.jsf',
-      #   #     data=urllib.parse.urlencode(data),
-      #   #     verify=False,
-      #   # )
-      #   response.raise_for_status()
-      #   soup = utils.soup_by_content(response.text)
-        # print(5)
-      # except requests.exceptions.HTTPError:
-      #   raise utils.PleaseRetryException(f'Got {response.status_code} for form post - trying again')
-      
-
 
 @celery.task(name='crawlers.carf', default_retry_delay=5 * 60,
              autoretry_for=(BaseException,))
