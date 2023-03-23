@@ -56,7 +56,7 @@ class TJSPDownloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=5)
   def _get_response(self, content_from_url):
     logger.debug(f'GET {content_from_url.src}')
     for cookie in self._client.request_cookies_browser:
