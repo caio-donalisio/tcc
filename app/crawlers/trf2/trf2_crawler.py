@@ -103,9 +103,15 @@ class TRF2:
     ranges = list(utils.timely(
         self.params['start_date'], self.params['end_date'], unit='days', step=3))
     for start_date, end_date in reversed(ranges):
+      base_query = {
+        'start_date': start_date.start_of('day').to_date_string(),
+        'end_date': end_date.start_of('day').to_date_string()
+      }
+      count = self._get_search_page_for_query({**base_query, 'offset': 0}).count()
       chunk_params = {
           'start_date': start_date.to_date_string(),
-          'end_date': end_date.to_date_string()
+          'end_date': end_date.to_date_string(),
+          'count': count
       }
       yield utils.Chunk(params=chunk_params, output=self.output,
                         rows_generator=self.rows(start_date=start_date, end_date=end_date))

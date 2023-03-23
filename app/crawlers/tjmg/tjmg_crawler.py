@@ -195,7 +195,8 @@ class TJMG(base.BaseCrawler, base.ICollector):
             keys.update({'listaClasse': str(query.get('listaClasse')).upper()})
           elif query.get('excluirRepetitivos'):
             keys.update(
-                {'excluirRepetitivos': str(query.get('excluirRepetitivos')).upper()})
+                {'excluirRepetitivos': str(query.get('excluirRepetitivos')).upper(),
+                 'count': query_total_records})
 
           yield TJMGChunk(
               keys=keys,

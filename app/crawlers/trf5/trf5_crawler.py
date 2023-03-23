@@ -95,7 +95,7 @@ class TRF5Collector(base.ICollector):
     for page in range(1, pages + 1):
       yield TRF5Chunk(
           keys={
-              **self.filters, **{'page': page}
+              **self.filters, **{'page': page, 'count': total}
           },
           prefix='',
           filters=self.filters,

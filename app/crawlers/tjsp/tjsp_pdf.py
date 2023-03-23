@@ -31,7 +31,7 @@ class TJSPDownloader:
     self._client.close()
 
     interval = 5
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
       futures = []
       last_run = None
       for item in items:
@@ -56,7 +56,7 @@ class TJSPDownloader:
       for future in concurrent.futures.as_completed(futures):
         future.result()
 
-  @utils.retryable(max_retries=3)
+  @utils.retryable(max_retries=5)
   def _get_response(self, content_from_url):
     logger.debug(f'GET {content_from_url.src}')
     for cookie in self._client.request_cookies_browser:
@@ -70,6 +70,8 @@ class TJSPDownloader:
                                         allow_redirects=True,
                                         verify=False,
                                         timeout=10)
+    if not response.headers.get('Content-type'):
+      raise utils.PleaseRetryException("Couldn't download file, retrying...")
     if 'application/pdf' in response.headers.get('Content-type'):
       logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
       return response
@@ -140,59 +142,45 @@ def tjsp_download(items, output_uri, pbar):
 
 
 @cli.command(name='tjsp-pdf')
-@click.option('--prefix')
+@click.option('--start-date',
+              default=utils.DefaultDates.THREE_MONTHS_BACK.strftime("%Y-%m"),
+              help='Format YYYY-MM.',
+              )
+@click.option('--end-date',
+              default=utils.DefaultDates.NOW.strftime("%Y-%m"),
+              help='Format YYYY-MM.',
+              )
 @click.option('--input-uri', help='Input URI')
+@click.option('--max-workers', default=3, help='Number of parallel workers')
 @click.option('--dry-run', default=False, is_flag=True)
-@click.option('--local', default=False, is_flag=True)
 @click.option('--count', default=False, is_flag=True)
-def tjsp_pdf_command(input_uri, prefix, dry_run, local, count):
-  batch = []
+@click.option('--batch', default=100)
+def tjsp_pdf_command(input_uri, start_date, end_date,max_workers, dry_run, count, batch):
   output = utils.get_output_strategy_by_path(path=input_uri)
+  startDate = pendulum.parse(start_date)
+  endDate = pendulum.parse(end_date)
+  global MAX_WORKERS
+  MAX_WORKERS = int(max_workers)
 
   if count:
     total = 0
-    for _ in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
+    while startDate <= endDate:
+      for _ in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
+        total += 1
+      startDate = startDate.add(months=1)
     print('Total files to download', total)
     return
 
-  # for testing purposes
-  if local:
-    import concurrent.futures
-
-    from tqdm import tqdm
-
-    # just to count
+  while startDate <= endDate:
+    print(f"TJSP - Collecting {startDate.format('YYYY/MM')}...")
     pendings = []
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
+    counter = 0
+    for pending in list_pending_pdfs(output._bucket_name, startDate.format('YYYY/MM')):
       pendings.append(pending)
-
-    with tqdm(total=len(pendings)) as pbar:
-      executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
-      futures = []
-      for pending in pendings:
-        if not dry_run:
-          batch.append(pending)
-          if len(batch) >= 100:
-            futures.append(executor.submit(tjsp_download, batch, input_uri, pbar))
-            time.sleep(random.uniform(5., 8.))
-            batch = []
-
-    print("Tasks distributed -- waiting for results")
-    for future in concurrent.futures.as_completed(futures):
-      future.result()
-    executor.shutdown()
-    if len(batch):
-      tjsp_download(batch, input_uri, pbar)
-
-  else:
-    total = 0
-    for pending in list_pending_pdfs(output._bucket_name, prefix):
-      total += 1
-      batch.append(pending)
-      if len(batch) >= 100:
-        print("Task", tjsp_download_task.delay(batch, input_uri))
-        batch = []
-    if len(batch):
-      print("Task", tjsp_download_task.delay(batch, input_uri))
-    print('Total files to download', total)
+      counter += 1
+      if counter % batch == 0:
+        utils.run_pending_tasks(tjsp_download, pendings, input_uri=input_uri, dry_run=dry_run)
+        pendings.clear()
+      startDate = startDate.add(months=1)
+    utils.run_pending_tasks(tjsp_download, pendings, input_uri=input_uri, dry_run=dry_run)
+    startDate = startDate.add(months=1)
