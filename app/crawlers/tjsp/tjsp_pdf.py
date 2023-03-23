@@ -70,6 +70,8 @@ class TJSPDownloader:
                                         allow_redirects=True,
                                         verify=False,
                                         timeout=10)
+    if not response.headers.get('Content-type'):
+      raise utils.PleaseRetryException("Couldn't download file, retrying...")
     if 'application/pdf' in response.headers.get('Content-type'):
       logger.info(f'Code {response.status_code} (OK) for URL {content_from_url.src}.')
       return response
