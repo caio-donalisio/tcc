@@ -303,12 +303,10 @@ class STJMONOChunk(base.Chunk):
       a = a or doc.find('a', attrs={'original-title': 'Decisão Monocrática Certificada'})
       # a = a or doc.find('a',attrs={'data-bs-original-title':'Decisão Monocrática Certificada'})
 
-      session = requests.Session()
       pdfs_page = utils.get_response(
-          logger,
-          session,
-          utils.find_between(a['href'], start="'", end="'"),
-          {
+          logger=logger,
+          url=utils.find_between(a['href'], start="'", end="'"),
+          headers={
               **DEFAULT_PDF_HEADERS,
               'User-Agent': f'{utils.get_random_useragent()}'},
           verify=False
@@ -324,7 +322,7 @@ class STJMONOChunk(base.Chunk):
     def get_direct_links(pdf_links: List) -> List:
       direct_links = []
       for pdf_link in pdf_links:
-        page = utils.get_response(logger, requests.Session(), pdf_link, '', verify=False)
+        page = utils.get_response(logger, pdf_link, verify=False)
         soup = utils.soup_by_content(page.content)
         link = soup.find('iframe')['src']
         if 'http' not in soup.find('iframe')['src']:

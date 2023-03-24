@@ -238,9 +238,9 @@ class CaptchaSolver(TJMG):
             and not browser.is_text_present('Nenhum Espelho do Acórdão foi encontrado'):
       browser.wait_for_element(locator=(By.ID, 'captcha_text'))
       response = utils.get_response(
-          logger,
-          self.requester,
+          logger=logger,
           url=f'{BASE_URL}/captchaAudio.svl',
+          session=self.requester,
           headers=self.headers)
       text = self._recognize_audio_by_content(response.content)
       captcha_box = browser.driver.find_element(By.ID, 'captcha_text')

@@ -10,7 +10,7 @@ import json
 logger = logger_factory('tjmt')
 
 COURT_NAME = 'tjmt'
-RESULTS_PER_PAGE = 100
+RESULTS_PER_PAGE = 50
 INPUT_DATE_FORMAT = 'YYYY-MM-DD'
 SEARCH_DATE_FORMAT = 'YYYY-MM-DD'
 NOW = pendulum.now()
@@ -154,7 +154,6 @@ class TJMTChunk(base.Chunk):
     assert pendulum.from_format(date,'DD/MM/YYYY')
     import random, string
     return f'{year}/{month}/{day}_{proc_id}_{proc_number}_TJMT'
-    return f'{year}/{month}/{day}_{proc_id}_{proc_number}_{"".join(random.choices(string.ascii_lowercase, k=10))}_TJMT'
 
 
 @celery.task(name='crawlers.tjmt', default_retry_delay=5 * 60,

@@ -74,9 +74,8 @@ then
     return
 fi
 
-current_date="$START_DATE"
-
 while [[ $REPEAT>0 ]]; do
+  current_date="$START_DATE"
   while [[ "$current_date" < "$END_DATE" ]]; do
     # Extract the year and month from the current date
     start_date=$(date -d "$current_date" +%Y-%m-%d)
@@ -88,6 +87,7 @@ while [[ $REPEAT>0 ]]; do
     current_date=$(date -d "$current_date +1 month" +%Y-%m-%d)
   done
   REPEAT=$(($REPEAT-1))
+  echo $REPEAT
 done
 
 unset COURT
