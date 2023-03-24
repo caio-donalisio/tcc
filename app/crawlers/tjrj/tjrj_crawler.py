@@ -21,7 +21,7 @@ BASE_URL = 'http://www4.tjrj.jus.br'
 EJURIS_URL = f'{BASE_URL}/EJURIS'
 EJUD_URL = f'{BASE_URL}/ejud/WS'
 GED_URL = f'http://www1.tjrj.jus.br/gedcacheweb'
-QUERY = 'a ou o ou de'
+QUERY = 'des ou o'
 DATE_FORMAT = "%d/%m/%Y"
 
 
