@@ -1,39 +1,21 @@
 [tool.poetry]
-name = "inspira-crawlers"
+name = "tcc"
 version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = ["caio.donalisio1 <caio.donalisio@inspira.legal>"]
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-bs4 = "^0.0.1"
-requests = "^2.25.1"
-pendulum = "^2.1.2"
-selenium = "^4.7.2"
-google-cloud-storage = "^2.7.0"
-click = ">=7.0,<8.0"
-tqdm = "^4.61.1"
-gql = {extras = ["aiohttp"], version = "^2.0.0"}
-asyncio-throttle = "^1.0.2"
-python-dotenv = "^0.21.0"
-celery = {version = "^5.1.1", extras = ["redis"]}
-pydantic = "^1.8.2"
-wrapt = "^1.12.1"
-fake-headers = "^1.0.2"
-fake-useragent = "^1.1.1"
-google-cloud-logging = "^2.5.0"
-python-slugify = {version = "^5.0.2", extras = ["unidecode"]}
-flower = "^1.0.0"
-celery-singleton = "^0.3.1"
-sentry-sdk = "^1.11.1"
-backoff = "^1.11.1"
-ratelimit = "^2.2.1"
-SpeechRecognition = "^3.8.1"
-tabulate = "^0.8.9"
-PyPDF2 = "^2.1.0"
+frontend = "^0.0.3"
+matplotlib = "^3.7.1"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+fitz = "^0.0.1.dev2"
+pandas = "^2.0.0"
+dpath = "^2.1.5"
+ipykernel = "^6.22.0"
 
 [build-system]
-requires = ["setuptools", "poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
