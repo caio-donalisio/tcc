@@ -2,18 +2,18 @@
 name = "tcc"
 version = "0.1.0"
 description = ""
-authors = ["caio.donalisio1 <caio.donalisio@inspira.legal>"]
+authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-frontend = "^0.0.3"
-matplotlib = "^3.7.1"
+pandas = "^2.0.1"
+dpath = "^2.1.5"
+pymupdf = "^1.22.2"
+ipython = "8.12"
+
 
 [tool.poetry.group.dev.dependencies]
-fitz = "^0.0.1.dev2"
-pandas = "^2.0.0"
-dpath = "^2.1.5"
 ipykernel = "^6.22.0"
 
 [build-system]
