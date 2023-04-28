@@ -11,6 +11,8 @@ pandas = "^2.0.1"
 dpath = "^2.1.5"
 pymupdf = "^1.22.2"
 ipython = "8.12"
+matplotlib = "^3.7.1"
+seaborn = "^0.12.2"
 
 
 [tool.poetry.group.dev.dependencies]
