@@ -13,6 +13,11 @@ pymupdf = "^1.22.2"
 ipython = "8.12"
 matplotlib = "^3.7.1"
 seaborn = "^0.12.2"
+pyocr = "^0.8.3"
+wand = "^0.6.11"
+textract = "^1.6.5"
+tika = "^2.6.0"
+openpyxl = "^3.1.2"
 
 
 [tool.poetry.group.dev.dependencies]
