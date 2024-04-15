@@ -18,6 +18,7 @@ wand = "^0.6.11"
 textract = "^1.6.5"
 tika = "^2.6.0"
 openpyxl = "^3.1.2"
+pillow = "^10.3.0"
 
 
 [tool.poetry.group.dev.dependencies]

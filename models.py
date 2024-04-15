@@ -1,8 +1,12 @@
 
-import dpath
 import pandas as pd
 from matplotlib import pyplot as plt
 import math
+from typing import List
+from dataclasses import dataclass
+import re
+import string
+from collections import defaultdict
 
 class Token:
     def __init__(self, rectangle:List, symbols:List, confidence:float) -> None:
@@ -26,17 +30,39 @@ class Token:
     def length(self) -> float:
         return self.right-self.left
 
+    @property
+    def data_type(self) -> str:
+        counts = defaultdict(int)
+        for char in self.text:
+            if char.isdigit():
+                counts['number'] += 1
+            elif char.isalpha():
+                counts['text'] += 1
+            elif char in string.punctuation:
+                counts['punctuation'] += 1
+
+        if counts['number'] >= counts['text'] and counts['number'] > counts['punctuation']:
+            data_type = 'number'
+        elif counts['text'] >= counts['number'] and counts['text'] > counts['punctuation']:
+            data_type = 'text'
+        else:
+            data_type = 'punctuation'
+        return data_type
+
+
+        return data_type
+
     def __repr__(self):
         return f'Y:{self.top:.3f} X:{self.left:.3f} ---- "{self.text}" ({self.confidence:.02f})'
 
-class Tokens:
+class TokenSet:
     
     def __init__(self, tokens: list) -> None:
         self.tokens=tokens
 
-    truncate = 3
-    epsilon = 0.007
-    word_gap = 0.01008403999999996
+    truncate = 3 # TRUNCATE DECIMALS
+    epsilon = 0.007 # GAP BETWEEN LINES
+    word_gap = 0.01008403999999996 # GAP BETWEEN WORDS
 
     def __iter__(self):
         self.index = 0
@@ -71,6 +97,9 @@ class Tokens:
     def get_all_values(self, attribute: str):
         assert attribute in ['top', 'left', 'right', 'bottom'], 'Invalid attribute name'
         return [getattr(token, attribute) for token in self.tokens]
+    
+    def max_text_position(self):
+        max(token.left for token in self.tokens if token.data_type=='text')
     
     @property
     def rows(self):
@@ -129,16 +158,23 @@ class Tokens:
         return intervals
 
     @property
-    def columns(self):
-        limits = [gap.left for gap in self._filter_gaps()] + [1]
-        for token in self.tokens:
-            for index, limit in zip(range(len(limits), 0, -1), limits[::-1]):
-                if token.left <= limit:
-                    token.column=index
-        columns = []
-        for index in range(1, len(limits) + 1):
-            columns.append([token for token in tokens if token.column==index])
-        return columns
+    def columns(self, number_of_columns=None):
+        if number_of_columns is None:
+            self.infer_columns()
+        else:
+            ...
+        # limits = [gap.left for gap in self._filter_gaps()] + [1]
+        # for token in self.tokens:
+        #     for index, limit in zip(range(len(limits), 0, -1), limits[::-1]):
+        #         if token.left <= limit:
+        #             token.column=index
+        # columns = []
+        # for index in range(1, len(limits) + 1):
+        #     columns.append([token for token in self.tokens if token.column==index])
+        # return columns
+
+    def infer_columns(self):
+        raise NotImplementedError
 
     def plot_intervals(self):
         df = pd.DataFrame( 
@@ -164,11 +200,16 @@ class Tokens:
         tables.append(new_table)
         return [Table(table) for table in tables]
 
-   
-class Table(Tokens):
+class Row(TokenSet):
+    ...
+
+class Column(TokenSet):
+    ...
+
+class Table(TokenSet):
 
     def get_dataframe(self):
-        cols = {index:list() for index in range(1, len(tokens._filter_gaps()) + 2)}
+        cols = {index:list() for index in range(1, len(self.tokens._filter_gaps()) + 2)}
         for row in self.rows:
             text = ''
             for col in cols:
@@ -179,7 +220,3 @@ class Table(Tokens):
     
     def save_csv(self, address:str):
         self.get_dataframe().to_csv(address)
-
-def get_pages_from_file(results):
-    pages = dpath.search(results, '/responses/*/fullTextAnnotation/pages', yielded=True)
-    return list(pages)
