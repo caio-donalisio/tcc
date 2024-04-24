@@ -1,6 +1,6 @@
 import json
 from typing import Dict, List
-from models import Token, TokenSet
+from models import Token
 import dpath
 from glob import glob
 from config import FILES_DIR
@@ -30,7 +30,7 @@ def get_tokens_from_words(results: List):
                 left, top, bottom, right=0,0,0,0
             rect = [left,top,right,bottom]
             tokens.append(Token(rect, word['symbols'], word['confidence']))
-    return TokenSet(tokens)
+    return tokens
 
 def flatten_list(l: list):
     return [x for y in l for x in y]
@@ -49,7 +49,5 @@ def join_all_pages(prefix: str):
 
 def get_pages_from_file(filepath: str):
     blank_page = {'pages': None}
-    return (page.get('fullTextAnnotation', blank_page)['pages'] for page in open_results_file(filepath))
-    # return dpath.search(results, '/responses/*/fullTextAnnotation/pages', yielded=True)
-    # pages = dpath.search(results, '/responses/*/fullTextAnnotation/pages', yielded=True)
-    # return list(pages)
+    for page in open_results_file(filepath):
+        yield page.get('fullTextAnnotation', blank_page)['pages'], page.get('context', {})
