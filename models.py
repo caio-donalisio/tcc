@@ -77,6 +77,8 @@ class TokenSet:
         self.tokens=tokens
         self.page_number = metadata.get('pageNumber')
         self.filepath = self.extract_filepath(metadata)
+        self.width = metadata.get('width')
+        self.height = metadata.get('height')
 
     # truncate = 3 # TRUNCATE DECIMALS
     epsilon = 0.007 # GAP BETWEEN LINES
@@ -159,61 +161,16 @@ class TokenSet:
                 token.row=index
         return rows
     
-    # def get_best_row_index(self):
-    #     gaps = []
-    #     for index, row in enumerate(self.rows):
-    #         tokens = sorted(row, key= lambda token: token.left)
-    #         if len(tokens) >= 2:
-    #             gap = tokens[-1].right - tokens[0].left
-    #         else:
-    #             gap = 0
-    #         gaps.append((index, gap))
-    #     return max(gaps, key= lambda gap: gap[1])[0]
-    
     @property
     def columns(self):
         inferer = TableInferer(self.filepath, self.page_number)
         column_thresholds = inferer.get_columns()
-        table_scale, x_table_scale, y_table_scale = inferer.get_table_scale()
-        cropped_scale, x_cropped_scale, y_cropped_scale = inferer.get_cropped_scale()
-        table_width, table_height = inferer.image.size
-        cropped_width, cropped_height = inferer.cropped_table.size
-        table_corners = inferer.table_corners
+        table_width, _ = inferer.image.size
+        cropped_width, _ = inferer.cropped_table.size
+        table_x_offset, *_ = inferer.table_corners
+        xs = [( table_x_offset / table_width ) + ( (x / cropped_width) * ( cropped_width / table_width) ) for x in column_thresholds]
         print(5)
         
-    #     tasks = []
-    #     with concurrent.futures.ProcessPoolExecutor(max_workers=100) as executor:
-    #         sample_token = self.rows[self.get_best_row_index()][0]
-    #         best_y = (sample_token.top + sample_token.bottom) / 2
-    #         for index, x in enumerate(numpy.arange(start=self.min_left, stop=self.max_right, step=self.grid_length), start=1):
-    #             print(self.collides_with_token(Point(x, best_y)), x)
-    #             tasks.append(executor.submit(self.get_y_limits, Point(x, best_y)))
-    #         items = [task.result() for task in tasks]
-    #     items = self.filter_items(items)
-    #     return items
-    
-    # def filter_items(self, items):
-    #     items = sorted(items, key= lambda item: (item[1].length, item[0].x, item[0].y), reverse=True)
-    #     filtered_items = []
-    #     gone_x = set()
-    #     for point, interval in items:
-    #         if point.x in gone_x:
-    #             continue
-    #         else:
-    #             filtered_items.append((point, interval))
-    #             gone_x.add(point.x)
-    #     return filtered_items
-    
-    # def get_boundaries(self, items):
-    #     boundaries = []
-    #     MIN_DISTANCE = 0.02
-    #     for index, item in enumerate(items, start=1):
-    #         if index == 1: 
-    #             MAX_HEIGHT = item[1].length
-    #         if all(abs(item[0].x - boundary) - MIN_DISTANCE for boundary in boundaries) and item[1].length >= MAX_HEIGHT * 0.8:
-    #              boundaries.append(item[0].x)
-    #         ...
-
     def draw_grid(self, pdf_path, output_path):
         with open(pdf_path, "rb") as file:
             reader = PyPDF2.PdfReader(file)
@@ -266,19 +223,6 @@ class TokenSet:
         # Write the output PDF
         with open(output_path, "wb") as output_file:
             writer.write(output_file)
-    
-    # def get_y_limits(self, point):
-    #     step = 0.005
-    #     max_y = min_y = point.y
-    #     while not self.collides_with_token(Point(point.x, max_y)) and max_y <= self.max_top:
-    #         max_y += step
-    #     while not self.collides_with_token(Point(point.x, min_y)) and min_y >= self.min_bottom:
-    #         min_y -= step
-    #     return point, pd.Interval(min_y, max_y)
-        
-    # def collides_with_token(self, point):
-    #     tokens_at_point = [token for token in self.tokens if token.left <= point.x <= token.right and token.bottom <= point.y <= token.top]
-    #     return bool(tokens_at_point)
     
     def get_closest_token(self, point: Point):
         distances = ((token, math.dist((token.left, token.top), (point.x, point.y))) for token in self.tokens)

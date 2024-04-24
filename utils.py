@@ -4,6 +4,8 @@ from models import Token
 import dpath
 from glob import glob
 from config import FILES_DIR
+from copy import deepcopy
+
 
 def open_results_file(filepath: str):
     with open(filepath) as f:
@@ -14,7 +16,7 @@ def get_words_from_results(data: Dict):
     words = []
     for _, word in dpath.search(
         data,
-        '*/blocks/*/paragraphs/*/words',yielded=True):
+        'pages/*/blocks/*/paragraphs/*/words',yielded=True):
         words.append(word)
     return words
 
@@ -50,4 +52,10 @@ def join_all_pages(prefix: str):
 def get_pages_from_file(filepath: str):
     blank_page = {'pages': None}
     for page in open_results_file(filepath):
-        yield page.get('fullTextAnnotation', blank_page)['pages'], page.get('context', {})
+        text_annotation = page.get('fullTextAnnotation', blank_page)
+        metadata = text_annotation['pages'][0]
+        pages = deepcopy(text_annotation)
+        if metadata.get('blocks'):
+            del metadata['blocks']
+        metadata = {**page.get('context', {}), **metadata}
+        yield pages, metadata

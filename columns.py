@@ -16,7 +16,6 @@ class MaxResize(object):
 
     def __call__(self, image):
         scale, x_scale, y_scale = self.get_scale(image)
-        print(f'SCALE: {scale=:.3} {x_scale=} {y_scale=}')
         resized_image = image.resize((x_scale, y_scale))
         return resized_image
     
