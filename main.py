@@ -11,10 +11,10 @@ if __name__ == '__main__':
             if page_number >= 5:
                 print('Extracting page -', page_number)
                 tokens = TokenSet(tokens = get_tokens_from_words(get_words_from_results(page)),
-                                  metadata = metadata)
+                                metadata = metadata)
                 tokens.columns
-                for n, table in enumerate(tokens.get_tables()):
-                    ...
+                # for n, table in enumerate(tokens.get_tables()):
+                #     ...
                 # print(n)
                 # try:
                 # table.save_csv(f"{file}_{address.replace('/', '_')}_{n}")

@@ -172,7 +172,13 @@ class TokenSet:
     
     @property
     def columns(self):
-        column_thresholds = TableInferer(self.filepath, self.page_number).get_columns()
+        inferer = TableInferer(self.filepath, self.page_number)
+        column_thresholds = inferer.get_columns()
+        table_scale, x_table_scale, y_table_scale = inferer.get_table_scale()
+        cropped_scale, x_cropped_scale, y_cropped_scale = inferer.get_cropped_scale()
+        table_width, table_height = inferer.image.size
+        cropped_width, cropped_height = inferer.cropped_table.size
+        table_corners = inferer.table_corners
         print(5)
         
     #     tasks = []

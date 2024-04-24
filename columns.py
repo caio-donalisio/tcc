@@ -15,19 +15,25 @@ class MaxResize(object):
         self.max_size = max_size
 
     def __call__(self, image):
-        width, height = image.size
-        current_max_size = max(width, height)
-        scale = self.max_size / current_max_size
-        x_scale, y_scale = int(round(scale*width)), int(round(scale*height))
+        scale, x_scale, y_scale = self.get_scale(image)
         print(f'SCALE: {scale=:.3} {x_scale=} {y_scale=}')
         resized_image = image.resize((x_scale, y_scale))
         return resized_image
+    
+    def get_scale(self, image):
+        width, height = image.size
+        current_max_size = max(width, height)
+        scale = self.max_size / current_max_size
+        x_scale, y_scale = int(round(scale * width)), int(round(scale * height))
+        return scale, x_scale, y_scale
 
 class TableInferer:
     
     def __init__(self, filepath, page_number):
         self.filepath = Path(filepath)
         self.page_number = page_number
+        self.table_resize = 800
+        self.cropped_resize = 1000
     
     def get_page_as_image(self):
         reader = PyPDF2.PdfReader(self.filepath)
@@ -47,12 +53,18 @@ class TableInferer:
             draw.rectangle(cell["bbox"], outline="red")
         cropped_table_visualized.save(Path(DEBUG_DIR) / f"GRID_{str(self.filepath).replace('.','')}_{self.page_number:02}.jpg")
 
+    def get_table_scale(self):
+        return MaxResize(max_size=self.table_resize).get_scale(self.image)
+
+    def get_cropped_scale(self):
+        return MaxResize(max_size=self.cropped_resize).get_scale(self.cropped_table)
+
     @lru_cache
     def get_cells(self):
-        image = self.get_page_as_image().convert("RGB")
+        self.image = self.get_page_as_image().convert("RGB")
         objects = self.get_objects(model=AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-detection", revision="no_timm"), 
-                                   image=image, 
-                                   resize=800)
+                                   image=self.image, 
+                                   resize=self.table_resize)
         self.table_corners = objects[0]['bbox']
         tokens = []
         detection_class_thresholds = {
@@ -61,11 +73,13 @@ class TableInferer:
             "no object": 10
         }
         crop_padding = 0
-        tables_crops = self.objects_to_crops(image, tokens, objects, detection_class_thresholds, padding=crop_padding)
+        tables_crops = self.objects_to_crops(self.image, tokens, objects, detection_class_thresholds, padding=crop_padding)
         self.cropped_table = tables_crops[0]['image'].convert("RGB")
+        self.cropped_size = self.cropped_table.size
+        cropped_table_resize = 1000
         cells = self.get_objects(model= TableTransformerForObjectDetection.from_pretrained("microsoft/table-structure-recognition-v1.1-all"), 
                                  image= self.cropped_table, 
-                                 resize= 1000)
+                                 resize= cropped_table_resize)
         return cells
     
     def get_objects(self, model, image, resize):
@@ -162,19 +176,23 @@ class TableInferer:
 
     @lru_cache
     def get_columns(self):
-        edges = sorted([cell['bbox'][2] for cell in self.get_cells()])
-        edges = self.filter_close_values(edges)
-        if len(edges) > 1:
-            edges.pop(-1)
-        self.draw_grid()
+        edges = []
+        if self.get_cells():
+            edges = sorted([cell['bbox'][2] for cell in self.get_cells()])
+            edges = self.filter_close_values(edges)
+            if len(edges) > 1:
+                edges.pop(-1)
+            self.draw_grid()
         return edges
 
     @lru_cache
     def get_rows(self):
-        edges = sorted([cell['bbox'][3] for cell in self.get_cells()])
-        edges = self.filter_close_values(edges)
-        if len(edges) > 1:
-            edges.pop(-1)
-        self.draw_grid()
+        edges = []
+        if self.get_cells():
+            edges = sorted([cell['bbox'][3] for cell in self.get_cells()])
+            edges = self.filter_close_values(edges)
+            if len(edges) > 1:
+                edges.pop(-1)
+            self.draw_grid()
         return edges
 
