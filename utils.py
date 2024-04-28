@@ -5,7 +5,8 @@ import dpath
 from glob import glob
 from config import FILES_DIR
 from copy import deepcopy
-
+import requests
+import os
 
 def open_results_file(filepath: str):
     with open(filepath) as f:
@@ -59,3 +60,30 @@ def get_pages_from_file(filepath: str):
             del metadata['blocks']
         metadata = {**page.get('context', {}), **metadata}
         yield pages, metadata
+
+def get_google_vision_response(image_path: str):
+    api_key = os.environ['GOOGLE_VISION_API_KEY']
+    url = f'https://vision.googleapis.com/v1/images:annotate?key={api_key}' + api_key
+
+    with open(image_path, 'rb') as image_file:
+        image_content = image_file.read()
+
+    payload = {
+        'requests': [
+            {
+                'image': {
+                    'content': image_content
+                },
+                'features': [
+                    {
+                        'type': 'DOCUMENT_TEXT_DETECTION'
+                    }
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(url, json=payload)
+    response_data = response.json()
+
+    return response_data

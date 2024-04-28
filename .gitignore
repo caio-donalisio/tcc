@@ -1,0 +1,4 @@
+*files/*[!placeholder.txt]
+__pycache__/*
+*.pyc
+.vscode 

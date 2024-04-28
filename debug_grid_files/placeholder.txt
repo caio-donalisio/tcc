@@ -1,0 +1,1 @@
+Arquivos de debug para verificar detecção de tabelas
