@@ -33,7 +33,14 @@ class TableInferer:
         self.page_number = page_number
         self.table_resize = 800
         self.cropped_resize = 1000
-    
+        self.normalize_vectors = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        self.detection_class_thresholds = {
+            "table": 0.5,
+            "table rotated": 0.5,
+            "no object": 10
+        }
+        self.crop_padding = 0
+        
     def get_page_as_image(self):
         reader = PyPDF2.PdfReader(self.filepath)
         writer = PyPDF2.PdfWriter()
@@ -66,19 +73,13 @@ class TableInferer:
                                    resize=self.table_resize)
         self.table_corners = objects[0]['bbox']
         tokens = []
-        detection_class_thresholds = {
-            "table": 0.5,
-            "table rotated": 0.5,
-            "no object": 10
-        }
-        crop_padding = 0
-        tables_crops = self.objects_to_crops(self.image, tokens, objects, detection_class_thresholds, padding=crop_padding)
+        tables_crops = self.objects_to_crops(img=self.image, tokens=tokens, objects=objects, 
+                                             class_thresholds=self.detection_class_thresholds, padding=self.crop_padding)
         self.cropped_table = tables_crops[0]['image'].convert("RGB")
         self.cropped_size = self.cropped_table.size
-        cropped_table_resize = 1000
         cells = self.get_objects(model= TableTransformerForObjectDetection.from_pretrained("microsoft/table-structure-recognition-v1.1-all"), 
                                  image= self.cropped_table, 
-                                 resize= cropped_table_resize)
+                                 resize= self.cropped_resize)
         return cells
     
     def get_objects(self, model, image, resize):
@@ -86,8 +87,7 @@ class TableInferer:
         detection_transform = transforms.Compose([
             MaxResize(resize),
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+            transforms.Normalize(*self.normalize_vectors)])
         pixel_values = detection_transform(image).unsqueeze(0)
         pixel_values = pixel_values.to(self.device)
         with torch.no_grad():
@@ -174,10 +174,10 @@ class TableInferer:
         return filtered_values
 
     @lru_cache
-    def get_columns(self):
+    def get_lines(self, bbox_index:int):
         edges = []
         if self.get_cells():
-            edges = sorted([cell['bbox'][2] for cell in self.get_cells()])
+            edges = sorted([cell['bbox'][bbox_index] for cell in self.get_cells()])
             edges = self.filter_close_values(edges)
             if len(edges) > 1:
                 edges.pop(-1)
@@ -185,13 +185,10 @@ class TableInferer:
         return edges
 
     @lru_cache
-    def get_rows(self):
-        edges = []
-        if self.get_cells():
-            edges = sorted([cell['bbox'][3] for cell in self.get_cells()])
-            edges = self.filter_close_values(edges)
-            if len(edges) > 1:
-                edges.pop(-1)
-            self.draw_grid()
-        return edges
+    def get_columns(self):
+        return self.get_lines(bbox_index=2)
 
+    @lru_cache
+    def get_rows(self):
+        return self.get_lines(bbox_index=3)
+        

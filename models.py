@@ -16,8 +16,7 @@ import io
 import numpy
 from columns import TableInferer
 from pathlib import Path
-
-PDF_FILES_DIR = '.'
+from config import GAP_BETWEEN_LINES, ORIGINAL_FILES_DIR, EXTRACTED_PAGES_DIR, DEBUG_DIR, OUTPUT_DIR
 
 @dataclass
 class Point:
@@ -80,12 +79,6 @@ class TokenSet:
         self.width = metadata.get('width')
         self.height = metadata.get('height')
 
-    # truncate = 3 # TRUNCATE DECIMALS
-    epsilon = 0.007 # GAP BETWEEN LINES
-    # word_gap = 0.01008403999999996 # GAP BETWEEN WORDS
-    # grid_length = 0.002
-
-
     def __iter__(self):
         self.index = 0
         return self
@@ -107,7 +100,7 @@ class TokenSet:
         return '\n'.join(str(token) for token in self.tokens)
 
     def extract_filepath(self, metadata):
-        return Path(PDF_FILES_DIR) / metadata.get('uri').split('/')[-1]
+        return Path(ORIGINAL_FILES_DIR) / metadata.get('uri').split('/')[-1]
 
     @property
     def sorted_tokens(self) -> list:
@@ -116,38 +109,38 @@ class TokenSet:
             key=lambda token: (-token.top, token.left),
         )
 
-    def truncate_values(self, values: list, truncate: int):
-        return [round(value, truncate) for value in values]
+    # def truncate_values(self, values: list, truncate: int):
+    #     return [round(value, truncate) for value in values]
 
-    def get_all_values(self, attribute: str):
+    def _get_all_values(self, attribute: str):
         assert attribute in ['top', 'left', 'right', 'bottom'], 'Invalid attribute name'
         return [getattr(token, attribute) for token in self.tokens]
     
     @property
     def min_bottom(self):
-        return min(self.get_all_values('bottom'))
+        return min(self._get_all_values('bottom'))
     
     @property
     def max_top(self):
-        return max(self.get_all_values('top'))
+        return max(self._get_all_values('top'))
     
     @property
     def min_left(self):
-        return min(self.get_all_values('left'))
+        return min(self._get_all_values('left'))
     
     @property
     def max_right(self):
-        return max(self.get_all_values('right'))
+        return max(self._get_all_values('right'))
     
-    def max_text_position(self):
-        max(token.left for token in self.tokens if token.data_type=='text')
+    # def max_text_position(self):
+    #     max(token.left for token in self.tokens if token.data_type=='text')
     
     @property
     def rows(self):
         new_row, rows = [], []
         prev_y = math.inf
         for token in self.sorted_tokens:
-            is_new_row = bool(abs(token.top - prev_y) > self.epsilon)
+            is_new_row = bool(abs(token.top - prev_y) > GAP_BETWEEN_LINES)
             if is_new_row:
                 rows.append(new_row)
                 new_row=[]
@@ -169,94 +162,95 @@ class TokenSet:
         cropped_width, _ = inferer.cropped_table.size
         table_x_offset, *_ = inferer.table_corners
         xs = [( table_x_offset / table_width ) + ( (x / cropped_width) * ( cropped_width / table_width) ) for x in column_thresholds]
+        
         print(5)
         
-    def draw_grid(self, pdf_path, output_path):
-        with open(pdf_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            writer = PyPDF2.PdfWriter()
+    # def draw_grid(self, pdf_path, output_path):
+    #     with open(pdf_path, "rb") as file:
+    #         reader = PyPDF2.PdfReader(file)
+    #         writer = PyPDF2.PdfWriter()
 
-            for page in reader.pages:
-                packet = io.BytesIO()
-                c = canvas.Canvas(packet, pagesize=letter)
-                c.setStrokeColorRGB(1,0,0)
-                c.setLineWidth(0.3)
+    #         for page in reader.pages:
+    #             packet = io.BytesIO()
+    #             c = canvas.Canvas(packet, pagesize=letter)
+    #             c.setStrokeColorRGB(1,0,0)
+    #             c.setLineWidth(0.3)
 
-                width, height = letter
-                for i in numpy.arange(self.min_left * width, self.max_right * width, self.grid_length * width):
-                    for j in numpy.arange(self.min_bottom * height, self.max_top * height, self.grid_length * height):
-                        c.rect(i, j, self.grid_length * width, self.grid_length * height, stroke=1, fill=0)
-                c.save()
-                packet.seek(0)
-                new_pdf = PyPDF2.PdfReader(packet)
-                page.merge_page(new_pdf.pages[0])
-                writer.add_page(page)
+    #             width, height = letter
+    #             for i in numpy.arange(self.min_left * width, self.max_right * width, self.grid_length * width):
+    #                 for j in numpy.arange(self.min_bottom * height, self.max_top * height, self.grid_length * height):
+    #                     c.rect(i, j, self.grid_length * width, self.grid_length * height, stroke=1, fill=0)
+    #             c.save()
+    #             packet.seek(0)
+    #             new_pdf = PyPDF2.PdfReader(packet)
+    #             page.merge_page(new_pdf.pages[0])
+    #             writer.add_page(page)
 
-        # Write the output PDF
-        with open(output_path, "wb") as output_file:
-            writer.write(output_file)
+    #     # Write the output PDF
+    #     with open(output_path, "wb") as output_file:
+    #         writer.write(output_file)
     
-    def draw_point(self, pdf_path, output_path, point, radius=1):
-        with open(pdf_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            writer = PyPDF2.PdfWriter()
+    # def draw_point(self, pdf_path, output_path, point, radius=1):
+    #     with open(pdf_path, "rb") as file:
+    #         reader = PyPDF2.PdfReader(file)
+    #         writer = PyPDF2.PdfWriter()
 
-            for page in reader.pages:
-                packet = io.BytesIO()
-                c = canvas.Canvas(packet, pagesize=letter)
-                c.setStrokeColorRGB(1,0,0)
-                c.setLineWidth(1)
-                c.setFillColor((1,0,0), alpha=0.5)
+    #         for page in reader.pages:
+    #             packet = io.BytesIO()
+    #             c = canvas.Canvas(packet, pagesize=letter)
+    #             c.setStrokeColorRGB(1,0,0)
+    #             c.setLineWidth(1)
+    #             c.setFillColor((1,0,0), alpha=0.5)
 
-                # Draw the point
-                width, height = letter
-                x = point.x * width
-                y = point.y * height
-                c.circle(x, y, radius, stroke=1, fill=1)
+    #             # Draw the point
+    #             width, height = letter
+    #             x = point.x * width
+    #             y = point.y * height
+    #             c.circle(x, y, radius, stroke=1, fill=1)
 
-                c.save()
-                packet.seek(0)
-                new_pdf = PyPDF2.PdfReader(packet)
-                page.merge_page(new_pdf.pages[0])
-                writer.add_page(page)
+    #             c.save()
+    #             packet.seek(0)
+    #             new_pdf = PyPDF2.PdfReader(packet)
+    #             page.merge_page(new_pdf.pages[0])
+    #             writer.add_page(page)
 
-        # Write the output PDF
-        with open(output_path, "wb") as output_file:
-            writer.write(output_file)
+    #     # Write the output PDF
+    #     with open(output_path, "wb") as output_file:
+    #         writer.write(output_file)
     
-    def get_closest_token(self, point: Point):
-        distances = ((token, math.dist((token.left, token.top), (point.x, point.y))) for token in self.tokens)
-        return min(distances, key=lambda x: x[1])
+    # def get_closest_token(self, point: Point):
+    #     distances = ((token, math.dist((token.left, token.top), (point.x, point.y))) for token in self.tokens)
+    #     return min(distances, key=lambda x: x[1])
 
-    def plot_intervals(self):
-        df = pd.DataFrame( 
-            {'left':[i.left for i in self.intervals],
-            'right':[i.right for i in self.intervals]},
-            )
-        start, end = df['right'], df['left']
-        width = end-start
-        fig, ax = plt.subplots()
-        ax.barh(width=width, left=start, height=0.005, y=df.index, color='red',edgecolor='red')
-        for gap in self.gaps:
-            ax.bar(height=len(self), alpha=0.5, x=gap.left, width=gap.right-gap.left, color='blue', align='edge')
-        plt.show()
+    # def plot_intervals(self):
+    #     df = pd.DataFrame( 
+    #         {'left':[i.left for i in self.intervals],
+    #         'right':[i.right for i in self.intervals]},
+    #         )
+    #     start, end = df['right'], df['left']
+    #     width = end-start
+    #     fig, ax = plt.subplots()
+    #     ax.barh(width=width, left=start, height=0.005, y=df.index, color='red',edgecolor='red')
+    #     for gap in self.gaps:
+    #         ax.bar(height=len(self), alpha=0.5, x=gap.left, width=gap.right-gap.left, color='blue', align='edge')
+    #     plt.show()
 
-    def get_tables(self, table_threshold=0.12):
-        tables, new_table = [], []
-        for index, row in enumerate(self.rows):
-            large_gap = index and row[0].top - self.rows[index-1][0].top >= table_threshold
-            if large_gap:
-                tables.append(new_table)
-                new_table = []
-            new_table.extend(row)
-        tables.append(new_table)
-        return [Table(table) for table in tables]
+    # def get_tables(self, table_threshold=0.12):
+    #     tables, new_table = [], []
+    #     for index, row in enumerate(self.rows):
+    #         large_gap = index and row[0].top - self.rows[index-1][0].top >= table_threshold
+    #         if large_gap:
+    #             tables.append(new_table)
+    #             new_table = []
+    #         new_table.extend(row)
+    #     tables.append(new_table)
+    #     return [Table(table) for table in tables]
 
-class Row(TokenSet):
-    ...
+# class Row(TokenSet):
+#     ...
 
-class Column(TokenSet):
-    ...
+# class Column(TokenSet):
+#     ...
 
 class Table(TokenSet):
 
