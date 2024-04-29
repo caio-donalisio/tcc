@@ -16,7 +16,7 @@ import io
 import numpy
 from columns import TableInferer
 from pathlib import Path
-from config import GAP_BETWEEN_LINES, ORIGINAL_FILES_DIR, EXTRACTED_PAGES_DIR, DEBUG_DIR, OUTPUT_DIR
+from config import GAP_BETWEEN_LINES, ORIGINAL_FILES_DIR
 
 @dataclass
 class Point:

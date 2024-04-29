@@ -8,7 +8,7 @@ from functools import lru_cache
 import PyPDF2
 from pdf2image import convert_from_bytes
 import io
-from config import DEBUG_DIR
+import config
 
 class MaxResize(object):
     def __init__(self, max_size=800):
@@ -31,15 +31,6 @@ class TableInferer:
     def __init__(self, filepath, page_number):
         self.filepath = Path(filepath)
         self.page_number = page_number
-        self.table_resize = 800
-        self.cropped_resize = 1000
-        self.normalize_vectors = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-        self.detection_class_thresholds = {
-            "table": 0.5,
-            "table rotated": 0.5,
-            "no object": 10
-        }
-        self.crop_padding = 0
         
     def get_page_as_image(self):
         reader = PyPDF2.PdfReader(self.filepath)
@@ -57,29 +48,29 @@ class TableInferer:
         draw = ImageDraw.Draw(cropped_table_visualized)
         for cell in self.get_cells():
             draw.rectangle(cell["bbox"], outline="red")
-        cropped_table_visualized.save(Path(DEBUG_DIR) / f"GRID_{str(self.filepath).replace('.','')}_{self.page_number:02}.jpg")
+        cropped_table_visualized.save(Path(config.DEBUG_GRID_FILES_DIR) / f"GRID_{self.filepath.with_suffix('').name}_{self.page_number:02}.jpg")
 
     def get_table_scale(self):
-        return MaxResize(max_size=self.table_resize).get_scale(self.image)
+        return MaxResize(max_size=config.TABLE_RESIZE).get_scale(self.image)
 
     def get_cropped_scale(self):
-        return MaxResize(max_size=self.cropped_resize).get_scale(self.cropped_table)
+        return MaxResize(max_size=config.CROPPED_RESIZE).get_scale(self.cropped_table)
 
     @lru_cache
     def get_cells(self):
         self.image = self.get_page_as_image().convert("RGB")
         objects = self.get_objects(model=AutoModelForObjectDetection.from_pretrained("microsoft/table-transformer-detection", revision="no_timm"), 
                                    image=self.image, 
-                                   resize=self.table_resize)
+                                   resize=config.TABLE_RESIZE)
         self.table_corners = objects[0]['bbox']
         tokens = []
         tables_crops = self.objects_to_crops(img=self.image, tokens=tokens, objects=objects, 
-                                             class_thresholds=self.detection_class_thresholds, padding=self.crop_padding)
+                                             class_thresholds=config.DETECTION_CLASS_THRESHOLDS, padding=config.CROP_PADDING)
         self.cropped_table = tables_crops[0]['image'].convert("RGB")
         self.cropped_size = self.cropped_table.size
         cells = self.get_objects(model= TableTransformerForObjectDetection.from_pretrained("microsoft/table-structure-recognition-v1.1-all"), 
                                  image= self.cropped_table, 
-                                 resize= self.cropped_resize)
+                                 resize= config.CROPPED_RESIZE)
         return cells
     
     def get_objects(self, model, image, resize):
@@ -87,7 +78,7 @@ class TableInferer:
         detection_transform = transforms.Compose([
             MaxResize(resize),
             transforms.ToTensor(),
-            transforms.Normalize(*self.normalize_vectors)])
+            transforms.Normalize(*config.NORMALIZE_VECTORS)])
         pixel_values = detection_transform(image).unsqueeze(0)
         pixel_values = pixel_values.to(self.device)
         with torch.no_grad():
@@ -166,10 +157,10 @@ class TableInferer:
 
         return table_crops
 
-    def filter_close_values(self, values, threshold=7):
+    def filter_close_values(self, values):
         filtered_values = [values[0]]
         for i in range(1, len(values)):
-            if abs(values[i] - filtered_values[-1]) > threshold:
+            if abs(values[i] - filtered_values[-1]) > config.SIMILARITY_THRESHOLD:
                 filtered_values.append(values[i])
         return filtered_values
 

@@ -3,10 +3,11 @@ from typing import Dict, List
 from models import Token
 import dpath
 from glob import glob
-from config import FILES_DIR
-from copy import deepcopy
-import requests
+import config
 import os
+from copy import deepcopy
+from pathlib import Path
+from google.cloud import vision
 
 def open_results_file(filepath: str):
     with open(filepath) as f:
@@ -40,14 +41,14 @@ def flatten_list(l: list):
 
 def join_all_pages(prefix: str):
     pages = []
-    for file in sorted(glob(f'{FILES_DIR}/{prefix}*'), 
+    for file in sorted(glob(f'{config.OCRED_PAGES_DIR}/{prefix}*'), 
                        key=lambda filename: int(filename.split('-')[1])):
         data = open_results_file(file)
         pages.extend(sorted(
             data['responses'], 
             key= lambda response: response['context']['pageNumber']))
     assert [page['context']['pageNumber'] for page in pages] == list(range(1, len(pages) + 1)), 'Missing page'
-    with open(f'{FILES_DIR}/{prefix}_COMPLETE.json', 'w') as f:
+    with open(f'{config.JOINED_OCRED_DIR}/{prefix}.json', 'w') as f:
         f.write(json.dumps(pages))
 
 def get_pages_from_file(filepath: str):
@@ -61,29 +62,25 @@ def get_pages_from_file(filepath: str):
         metadata = {**page.get('context', {}), **metadata}
         yield pages, metadata
 
-def get_google_vision_response(image_path: str):
-    api_key = os.environ['GOOGLE_VISION_API_KEY']
-    url = f'https://vision.googleapis.com/v1/images:annotate?key={api_key}' + api_key
+def get_google_vision_response(filepath, batch_size=100):
+    os.system(f'gsutil -m cp {filepath} gs://{config.BUCKET_NAME}')
+    mime_type = "application/pdf"
+    client = vision.ImageAnnotatorClient()
+    feature = vision.Feature(type_=vision.Feature.Type.TEXT_DETECTION)
+    gcs_source = vision.GcsSource(uri=f"gs://{config.BUCKET_NAME}/{filepath.name}")
+    input_config = vision.InputConfig(gcs_source=gcs_source, mime_type=mime_type)
+    gcs_destination = vision.GcsDestination(uri=f"gs://{config.BUCKET_NAME}/{filepath.with_suffix('.json').name}")
+    
+    output_config = vision.OutputConfig(
+        gcs_destination=gcs_destination, batch_size=batch_size
+    )
+    
+    async_request = vision.AsyncAnnotateFileRequest(
+        features=[feature], input_config=input_config, output_config=output_config
+    )
+    operation = client.async_batch_annotate_files(requests=[async_request])
+    print("Waiting for the operation to finish.")
+    operation.result(timeout=420)
+    os.system(f'gsutil -m cp gs://{config.BUCKET_NAME}/{filepath.with_suffix(".json").name.replace(".json","*.json")} {config.OCRED_PAGES_DIR}')
 
-    with open(image_path, 'rb') as image_file:
-        image_content = image_file.read()
-
-    payload = {
-        'requests': [
-            {
-                'image': {
-                    'content': image_content
-                },
-                'features': [
-                    {
-                        'type': 'DOCUMENT_TEXT_DETECTION'
-                    }
-                ]
-            }
-        ]
-    }
-
-    response = requests.post(url, json=payload)
-    response_data = response.json()
-
-    return response_data
+get_google_vision_response(Path(f'{config.DESKEWED_FILES_DIR}/teste9.pdf'))
