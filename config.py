@@ -27,5 +27,6 @@ DETECTION_CLASS_THRESHOLDS = {
     "no object": 10
 }
 SIMILARITY_THRESHOLD = 7
+SCORE_THRESHOLD = 0.7
 
 BUCKET_NAME='tcc-caio-donalisio-93'

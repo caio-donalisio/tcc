@@ -10,7 +10,7 @@ from pathlib import Path
 from google.cloud import vision
 
 def open_results_file(filepath: str):
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8") as f:
         data = json.loads(f.read())
     return data
 
@@ -56,7 +56,7 @@ def get_pages_from_file(filepath: str):
     for page in open_results_file(filepath):
         text_annotation = page.get('fullTextAnnotation', blank_page)
         metadata = text_annotation['pages'][0]
-        pages = deepcopy(text_annotation)
+        pages = deepcopy(text_annotation)['pages']
         if metadata.get('blocks'):
             del metadata['blocks']
         metadata = {**page.get('context', {}), **metadata}
@@ -81,6 +81,6 @@ def get_google_vision_response(filepath, batch_size=100):
     operation = client.async_batch_annotate_files(requests=[async_request])
     print("Waiting for the operation to finish.")
     operation.result(timeout=420)
-    os.system(f'gsutil -m cp gs://{config.BUCKET_NAME}/{filepath.with_suffix(".json").name.replace(".json","*.json")} {config.OCRED_PAGES_DIR}')
+    os.system(f'gsutil -m cp gs://{config.BUCKET_NAME}/{filepath.with_suffix("*.json").name} {config.OCRED_PAGES_DIR}')
 
-get_google_vision_response(Path(f'{config.DESKEWED_FILES_DIR}/teste9.pdf'))
+# get_google_vision_response(Path(f'{config.DESKEWED_FILES_DIR}/teste9.pdf'))
