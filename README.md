@@ -1,4 +1,4 @@
-Este script é utilizado para extrair tabelas de pdfs em imagem
+Este script é utilizado para transformar imagens de tabelas em arquivos PDF para arquivos .csv
 
 Como utilizar este algoritmo:
 
