@@ -1,5 +1,5 @@
 import utils
-from models import TokenSet
+from models import TokenSet, Table
 from glob import glob
 import config
 import os
@@ -31,9 +31,10 @@ if __name__ == '__main__':
     
     #GET GOOGLE VISION RESPONSE
         complete_ocr_path = Path(f"{config.JOINED_OCRED_DIR}/{path.with_suffix('').name}.json")
+        # utils.join_all_pages(path.with_suffix('').name)
         if not complete_ocr_path.exists():
             logger.info(f'Getting Google Vision response: {path.name}')
-            utils.get_google_vision_response(path)
+            utils.get_google_vision_response(deskewed_path)
             utils.join_all_pages(path.with_suffix('').name)
         else:
             logger.info(f"GOOGLE VISION {path.name} already present, skipping step...")
@@ -41,9 +42,14 @@ if __name__ == '__main__':
     #GET TABLES
         logger.info(f'Generating table: {path.name}')
         for page_number, (page, metadata) in enumerate(utils.get_pages_from_file(complete_ocr_path), start=1):
-            # if page_number < 15: continue
+            if page_number > 50: continue
             logger.info(f'Extracting page - {page_number:04}')
-            tokens = TokenSet(tokens = utils.get_tokens_from_words(utils.get_words_from_results(page)),
+            try:
+                if metadata:
+                    table = Table(tokens = utils.get_tokens_from_words(utils.get_words_from_results(page)),
                                 metadata = metadata)
-            tokens.columns
-    
+                else:
+                    raise IndexError('No metadata found')
+            except IndexError as e:
+                logger.error(e)
+            table.save_csv()# run()

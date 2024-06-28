@@ -8,7 +8,7 @@ from collections import defaultdict
 import logging
 from columns import TableInferer
 from pathlib import Path
-from config import GAP_BETWEEN_LINES, DESKEWED_FILES_DIR
+from config import GAP_BETWEEN_LINES, DESKEWED_FILES_DIR, OUTPUT_TABLES_FILES_DIR
 
 logger = logging.getLogger("table_generator")
 
@@ -33,6 +33,10 @@ class Token:
     @property
     def text(self) -> str:
         return ''.join(char.get('text',' ') for char in self.symbols)
+
+    @property
+    def x_center(self) -> float:
+        return (self.left + self.right)/2
 
     @property
     def height(self) -> float:
@@ -155,34 +159,53 @@ class TokenSet:
         inferer = TableInferer(self.filepath, self.page_number)
         return inferer.get_columns()
     
-    # def get_tables(self, table_threshold=0.12):
-    #     tables, new_table = [], []
-    #     for index, row in enumerate(self.rows):
-    #         large_gap = index and row[0].top - self.rows[index-1][0].top >= table_threshold
-    #         if large_gap:
-    #             tables.append(new_table)
-    #             new_table = []
-    #         new_table.extend(row)
-    #     tables.append(new_table)
-    #     return [Table(table) for table in tables]
-
-# class Row(TokenSet):
-#     ...
-
-# class Column(TokenSet):
-#     ...
-
+    def get_positions(self, index):
+        for pack_index, column_pack in enumerate(self.columns, start=1):
+            if pack_index != index: continue
+            for row_index, row in enumerate(self.rows, start=1):
+                for token in row:
+                    token.row = row_index
+                    for column_index, column_threshold in enumerate(column_pack, start=1):
+                        if token.x_center <= column_threshold:
+                        # if token.left <= column_threshold:
+                            token.column = column_index
+                            break
+                    else:
+                        token.column = len(column_pack) + 1
+                    
+    def get_dataframe(self):
+        
+        table = []
+        dfs = []
+        for pack_index, column_pack in enumerate(self.columns, start=1):
+            self.get_positions(pack_index)
+            for _, row in enumerate(self.rows, start=1):
+                new_row = []
+                for column_index in range(1, len(column_pack) + 2 ):
+                    cell_tokens = [token for token in row if token.column==column_index]
+                    if cell_tokens:
+                        # min_confidence = min(token.confidence for token in cell_tokens)
+                        text = ' '.join(token.text for token in cell_tokens)
+                        new_row.append(text.split(':')[0])# + f' [[{min_confidence}]]')
+                    else:
+                        new_row.append('')
+                table.append(new_row)
+            dfs.append(pd.DataFrame(table))
+        return dfs
+                
 class Table(TokenSet):
 
-    def get_dataframe(self):
-        cols = {index:list() for index in range(1, len(self.tokens._filter_gaps()) + 2)}
-        for row in self.rows:
-            text = ''
-            for col in cols:
-                self.columns
-                text = ' '.join(token.text for token in row if token.column==col)
-                cols[col].append(text)
-        return pd.DataFrame(cols)
+    def __init__(self, tokens: list, metadata: dict) -> None:
+        super().__init__(tokens, metadata)
+        self.dfs = self.get_dataframe()
     
-    def save_csv(self, address:str):
-        self.get_dataframe().to_csv(address)
+    def save_csv(self, filename = None):
+        for index, df in enumerate(self.dfs, start=1):
+            filename = f"{self.filepath.with_suffix('').name}---{self.page_number:04}_{index:02}.csv"
+            df.to_csv(
+                Path(OUTPUT_TABLES_FILES_DIR) / filename,
+                index=False)
+        
+    def run(self):
+        ...
+    
