@@ -1,3 +1,5 @@
+Este script é utilizado para extrair tabelas de pdfs em imagem
+
 Como utilizar este algoritmo:
 
 Note que este algoritmo utiliza o serviço Google Cloud Vision AI, que cobra um valor por página extraída. Consulta a documentação do Google para verificar a precificação.
