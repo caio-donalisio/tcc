@@ -9,7 +9,7 @@ Note que este algoritmo utiliza o serviço Google Cloud Vision AI, que cobra um 
 
 - Execute 'poetry install' para instalar as dependências do módulo.
 - Crie um repositório no Google Cloud Storage e insira o nome deste repositório na variável "BUCKET_NAME" em config.py
-- Crie um arquivo nomeado ".env" na raiz desta pasta e insira a linha "GOOGLE_VISION_API_KEY="\<chave de acesso\>" ( para obter a sua chave de acesso, consulte https://cloud.google.com/vision/product-search/docs/auth?hl=pt-br)
+- Crie um arquivo nomeado ".env" na raiz desta pasta e insira a linha: GOOGLE_VISION_API_KEY="\<chave de acesso\>" ( para obter a sua chave de acesso, consulte https://cloud.google.com/vision/product-search/docs/auth?hl=pt-br)
 - Faça a autenticação na CLI gcloud ("gcloud auth login && gcloud auth application-default login") - também é necessário definir o projeto de cota com "auth application-default set-quota-project <nome-do-projeto>" https://cloud.google.com/docs/quotas/set-quota-project?hl=pt-br
 - Insira o arquivo em PDF desejado na pasta 01_original_files
 - execute main.py (com os comandos "poetry shell" seguido de "python main.py")
